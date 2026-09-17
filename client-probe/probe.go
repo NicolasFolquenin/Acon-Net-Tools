@@ -105,7 +105,7 @@ func (p *NetworkProbe) pingViaExec(target string) (float64, error) {
 	} else {
 		cmd = exec.Command("ping", "-c", "2", "-W", "1", target)
 	}
-
+	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, err

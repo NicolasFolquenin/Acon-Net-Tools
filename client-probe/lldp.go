@@ -56,7 +56,8 @@ func DiscoverSwitchLLDP(ctx context.Context) SwitchInfo {
 	"{}"
 	`
 
-	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", psScript)
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", psScript)
+	hideWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		log.Printf("[LLDP] Consulta LLDP finalizada sem pacotes capturados: %v", err)

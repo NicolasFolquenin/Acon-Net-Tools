@@ -76,8 +76,9 @@ func collectNetworkDetails(info *SystemInfo) {
 
 	// Tenta capturar Gateway via comando do sistema
 	if runtime.GOOS == "windows" {
-		cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command",
+		cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
 			`(Get-NetRoute -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue | Select-Object -First 1).NextHop`)
+		hideWindow(cmd)
 		if out, err := cmd.Output(); err == nil {
 			info.Gateway = strings.TrimSpace(string(out))
 		}
@@ -99,7 +100,8 @@ func collectWindowsHardware(info *SystemInfo) {
 	} | ConvertTo-Json -Compress
 	`
 
-	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", psScript)
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", psScript)
+	hideWindow(cmd)
 	out, err := cmd.Output()
 	if err == nil && len(out) > 0 {
 		var result struct {
@@ -125,8 +127,9 @@ func collectWindowsHardware(info *SystemInfo) {
 	}
 
 	// Fallback para nome da interface descritiva
-	cmdAdapter := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command",
+	cmdAdapter := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
 		`(Get-NetAdapter | Where-Object Status -eq 'Up' | Select-Object -First 1).InterfaceDescription`)
+	hideWindow(cmdAdapter)
 	if outA, errA := cmdAdapter.Output(); errA == nil && len(strings.TrimSpace(string(outA))) > 0 {
 		info.NetworkAdapter = strings.TrimSpace(string(outA))
 	}
