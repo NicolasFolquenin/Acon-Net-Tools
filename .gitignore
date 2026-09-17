@@ -1,0 +1,23 @@
+# Binários e builds
+build/
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Bancos de dados locais
+*.db
+*.db-journal
+
+# Logs
+*.log
+
+# Dependências e caches de ambiente
+node_modules/
+.vscode/
+.idea/
+
+# Arquivos com segredos (variáveis reais de ambiente)
+.env

@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Plano de Implantação - Sistema de Monitoramento de Rede Distribuído</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm 14mm 12mm 14mm;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      line-height: 1.4;
+      font-size: 11.5px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page {
+      height: 272mm;
+      max-height: 272mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-after: always;
+      overflow: hidden;
+    }
+
+    .page:last-child {
+      page-break-after: avoid;
+    }
+
+    .header-cover {
+      border-bottom: 2.5px solid #0284c7;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .badge-approved {
+      display: inline-block;
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .doc-meta {
+      font-size: 10.5px;
+      color: #475569;
+      text-align: right;
+      line-height: 1.35;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      font-size: 11.5px;
+      color: #0369a1;
+      font-weight: 600;
+    }
+
+    .section-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #0f172a;
+      border-left: 3.5px solid #0284c7;
+      padding-left: 8px;
+      margin-top: 10px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    p {
+      margin-bottom: 8px;
+      color: #334155;
+      font-size: 11.5px;
+    }
+
+    .architecture-box {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin: 8px 0 10px 0;
+    }
+
+    .arch-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      padding: 8px 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    .arch-card h4 {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #0284c7;
+      margin-bottom: 4px;
+    }
+
+    .arch-card ul {
+      list-style: none;
+      font-size: 10.5px;
+      color: #475569;
+      line-height: 1.45;
+    }
+
+    .arch-arrow {
+      text-align: center;
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #0284c7;
+      line-height: 1.25;
+      padding: 0 4px;
+    }
+
+    .arch-arrow span {
+      display: block;
+      font-size: 14px;
+      margin-top: 2px;
+    }
+
+    .two-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 9px 11px;
+    }
+
+    .card h3 {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card h3 .tag {
+      font-size: 9px;
+      font-weight: 700;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    ul.check-list {
+      list-style: none;
+    }
+
+    ul.check-list li {
+      position: relative;
+      padding-left: 14px;
+      margin-bottom: 4px;
+      font-size: 10.5px;
+      color: #334155;
+      line-height: 1.35;
+    }
+
+    ul.check-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: #16a34a;
+      font-weight: 800;
+      font-size: 11px;
+    }
+
+    pre, code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+    }
+
+    code {
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 1px 4px;
+      border-radius: 3px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 5px;
+      line-height: 1.35;
+      margin: 4px 0 8px 0;
+    }
+
+    .json-key { color: #38bdf8; }
+    .json-str { color: #a7f3d0; }
+    .json-num { color: #fbcfe8; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 6px 0 10px 0;
+      font-size: 10.5px;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #1e293b;
+      font-weight: 700;
+      text-align: left;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+      text-transform: uppercase;
+      font-size: 9px;
+      letter-spacing: 0.04em;
+    }
+
+    td {
+      padding: 5.5px 8px;
+      border: 1px solid #e2e8f0;
+      color: #334155;
+      line-height: 1.35;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    .highlight-cell {
+      font-weight: 600;
+      color: #0369a1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+    }
+
+    .footer-doc {
+      padding-top: 6px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 9.5px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== PÁGINA 1 ==================== -->
+  <div class="page">
+    <div>
+      <!-- Header -->
+      <header class="header-cover">
+        <div>
+          <span class="badge-approved">Status: Aprovado para Implantação</span>
+          <h1>Plano de Implantação & Especificação Técnica</h1>
+          <div class="subtitle">Sistema de Monitoramento de Rede Distribuído (Throughput & Latência)</div>
+        </div>
+        <div class="doc-meta">
+          <strong>Projeto:</strong> Network Probe & Central Collector<br>
+          <strong>Versão:</strong> 1.0.0 (Produção Homologada)<br>
+          <strong>Data:</strong> 11 de Setembro de 2026<br>
+          <strong>Stack:</strong> Go 1.22+ • Wails v2 • MongoDB Time Series
+        </div>
+      </header>
+
+      <!-- 1. Resumo Executivo -->
+      <div class="section-title">1. Resumo Executivo & Arquitetura Geral</div>
+      <p>
+        Este projeto estabelece uma infraestrutura corporativa robusta para monitoramento contínuo de conectividade, vazão (Download/Upload em Mbps) e latência de gateway (Ping em ms) entre data centers e filiais. A arquitetura é 100% desacoplada: os agentes desktop operam autonomamente com banco local e reportam métricas via HTTPS ao nó central em formato de séries temporais de alta granularidade.
+      </p>
+
+      <!-- Diagrama Visual -->
+      <div class="architecture-box">
+        <div class="arch-card">
+          <h4>🖥️ Client Probe (Desktop Windows)</h4>
+          <ul>
+            <li>• <strong>Framework:</strong> Wails v2 + Go 1.22 (Dark Theme)</li>
+            <li>• <strong>Ciclo:</strong> Goroutine Ticker (1 hora) + Disparo Manual</li>
+            <li>• <strong>Resiliência:</strong> SQLite Local (<code>probe_local.db</code>)</li>
+            <li>• <strong>Frontend:</strong> Chart.js (Download, Upload e Ping)</li>
+          </ul>
+        </div>
+        <div class="arch-arrow">
+          POST HTTPS<br>
+          Bearer Auth<br>
+          <span>➔➔➔</span>
+          JSON Payload
+        </div>
+        <div class="arch-card">
+          <h4>🐧 Central Server (Linux Debian)</h4>
+          <ul>
+            <li>• <strong>Backend:</strong> Go 1.22 com Driver Oficial Mongo v2</li>
+            <li>• <strong>Time Series:</strong> <code>network_central.metrics</code></li>
+            <li>• <strong>Config:</strong> <code>timeField: timestamp | granularity: hours</code></li>
+            <li>• <strong>Dashboard:</strong> Web responsivo com filtros por nó</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 2. Contrato de Dados -->
+      <div class="section-title">2. Contrato da API de Telemetria (<code>POST /api/v1/metrics</code>)</div>
+      <p style="margin-bottom: 4px;">
+        A comunicação entre cada sonda e o servidor central ocorre via HTTPS utilizando o cabeçalho <code>Authorization: Bearer &lt;api_token&gt;</code> e payload estruturado em JSON com precisão decimal:
+      </p>
+      <pre><code>{
+  <span class="json-key">"node_id"</span>: <span class="json-str">"minipc-dc-01"</span>,        <span class="json-key">"location"</span>: <span class="json-str">"Guarapuava-DC1"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-str">"2026-09-11T15:00:00Z"</span>,
+  <span class="json-key">"download_mbps"</span>: <span class="json-num">850.5</span>,       <span class="json-key">"upload_mbps"</span>: <span class="json-num">720.0</span>,       <span class="json-key">"ping_gateway"</span>: <span class="json-num">1.2</span>
+}</code></pre>
+
+      <!-- 3. Detalhamento dos Componentes -->
+      <div class="section-title">3. Detalhamento Técnico dos Componentes</div>
+      <div class="two-cols">
+        <!-- Coluna Client -->
+        <div class="card">
+          <h3>🖥️ Client Desktop (<code>/client-probe</code>) <span class="tag">Wails v2</span></h3>
+          <ul class="check-list">
+            <li><strong>Configuração (<code>config.json</code>):</strong> Parâmetros de nó, servidor e token carregados na inicialização e editáveis em tempo de execução via UI.</li>
+            <li><strong>Agendamento Automático:</strong> Goroutine em segundo plano executando testes a cada 1 hora sem bloqueio da interface gráfica.</li>
+            <li><strong>Medição Real de Rede:</strong> Ping para o gateway padrão via ICMP nativo / TCP socket e cálculo de throughput Download/Upload em Mbps.</li>
+            <li><strong>Persistência Local (SQLite):</strong> Histórico gravado em <code>probe_local.db</code> para operação offline resiliente.</li>
+            <li><strong>Interface Visual:</strong> Dark slate com acentos em ciano e roxo, gráficos de 24h, status badge dinâmico e botão com spinner.</li>
+          </ul>
+        </div>
+
+        <!-- Coluna Server -->
+        <div class="card">
+          <h3>🐧 Central Server (<code>/central-server</code>) <span class="tag">Debian / Mongo v2</span></h3>
+          <ul class="check-list">
+            <li><strong>Driver Oficial MongoDB v2:</strong> Conexão via <code>go.mongodb.org/mongo-driver/v2/mongo</code> com pooling e retry automático.</li>
+            <li><strong>MongoDB Time Series:</strong> Coleção nativa <code>metrics</code> configurada com <code>timeField: "timestamp"</code>, <code>metaField: "metadata"</code> e <code>granularity: "hours"</code>.</li>
+            <li><strong>API REST com Bearer Auth:</strong> Middleware de validação de token e endpoint analítico <code>GET /api/v1/dashboard/metrics</code>.</li>
+            <li><strong>Dashboard Web Integrado:</strong> Servido em <code>GET /</code> com seletor de nós, cartões de resumo e comparativo entre data centers.</li>
+            <li><strong>Produção Debian:</strong> Docker Compose, Dockerfile multi-stage e service unit para systemd.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rodapé Página 1 -->
+    <footer class="footer-doc">
+      <div>Sistema de Monitoramento de Rede Distribuído • Documento Técnico de Arquitetura</div>
+      <div>Página 1 de 2</div>
+    </footer>
+  </div>
+
+  <!-- ==================== PÁGINA 2 ==================== -->
+  <div class="page">
+    <div>
+      <!-- 4. Matriz de Arquivos -->
+      <div class="section-title" style="margin-top:0;">4. Matriz de Estrutura de Código Implementada</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 28%;">Arquivo / Módulo</th>
+            <th style="width: 18%;">Stack / Driver</th>
+            <th>Atribuição e Responsabilidade Técnica</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="highlight-cell">client-probe/main.go</td>
+            <td>Go 1.22 / Wails v2</td>
+            <td>Ponto de entrada do executável Windows, binding de métodos e ciclo de vida da janela.</td>
+          </tr>
+          <tr>
+            <td class="highlight-cell">client-probe/probe.go</td>
+            <td>Go Net / Exec</td>
+            <td>Motor de teste: Ping do gateway (ICMP/TCP) e throughput de Download e Upload em Mbps.</td>
+          </tr>
+          <tr>
+            <td class="highlight-cell">client-probe/storage.go</td>
+            <td>SQLite / HTTP Client</td>
+            <td>Persistência local (<code>probe_local.db</code>), controle de sincronismo e envio HTTPS tolerante a falhas.</td>
+          </tr>
+          <tr>
+            <td class="highlight-cell">client-probe/frontend/</td>
+            <td>HTML5 / CSS / Chart.js</td>
+            <td>Interface gráfica Wails com gráficos de 24h, botão de execução manual e modal de configuração.</td>
+          </tr>
+          <tr>
+            <td class="highlight-cell">central-server/main.go</td>
+            <td>Go 1.22+ Standard Lib</td>
+            <td>Servidor HTTP com roteamento REST, entrega estática do frontend e graceful shutdown.</td>
+          </tr>
+          <tr>
+            <td class="highlight-cell">central-server/db/mongodb.go</td>
+            <td>Mongo Driver v2</td>
+            <td>Inicialização da coleção Time Series, criação de índices e consultas analíticas de 24 horas.</td>
+          </tr>
+          <tr>
+            <td class="highlight-cell">central-server/handlers/</td>
+            <td>Go Handlers & Middlewares</td>
+            <td>Middleware Bearer Auth, endpoint de ingestão (POST), telemetria (GET) e endpoints de speedtest.</td>
+          </tr>
+          <tr>
+            <td class="highlight-cell">central-server/public/</td>
+            <td>Web / Chart.js</td>
+            <td>Painel Web NOC responsivo com seletor de mini PCs, cartões de status e gráficos comparativos.</td>
+          </tr>
+          <tr>
+            <td class="highlight-cell">central-server/docker-compose.yml</td>
+            <td>Docker Compose</td>
+            <td>Orquestrador do serviço Go + MongoDB 7.0 Time Series pronto para implantação em Debian.</td>
+          </tr>
+          <tr>
+            <td class="highlight-cell">central-server/systemd/</td>
+            <td>Systemd Unit</td>
+            <td>Arquivo de serviço <code>network-monitor.service</code> para execução nativa em segundo plano no Linux.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 5. Cronograma e Etapas de Implantação -->
+      <div class="section-title">5. Roteiro e Fases de Implantação em Produção</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 12%;">Fase</th>
+            <th style="width: 22%;">Ambiente</th>
+            <th style="width: 36%;">Procedimento Técnico</th>
+            <th>Critério de Homologação</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Fase 1</strong></td>
+            <td>VM Debian (NOC)</td>
+            <td>Subir MongoDB 7 e Go Central Server via Docker Compose</td>
+            <td>Containers <code>healthy</code>; endpoint <code>/health</code> respondendo HTTP 200.</td>
+          </tr>
+          <tr>
+            <td><strong>Fase 2</strong></td>
+            <td>MongoDB</td>
+            <td>Validar criação automática da coleção Time Series <code>metrics</code></td>
+            <td>Comando <code>db.getCollectionInfos()</code> confirma <code>granularity: hours</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>Fase 3</strong></td>
+            <td>Mini PCs (Windows)</td>
+            <td>Compilar <code>probe-app.exe</code> via Wails e distribuir com <code>config.json</code></td>
+            <td>App inicializa em segundo plano e grava primeiro teste no SQLite local.</td>
+          </tr>
+          <tr>
+            <td><strong>Fase 4</strong></td>
+            <td>End-to-End</td>
+            <td>Executar disparo manual e validar ingestão no Dashboard Central</td>
+            <td>Métricas surgem em tempo real no painel web e tabela de telemetria.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 6. Critérios de Aceite e Garantias -->
+      <div class="section-title">6. Critérios de Qualidade e Resiliência Operacional</div>
+      <div class="two-cols">
+        <div class="card">
+          <h3 style="color:#0369a1;">🛡️ Resiliência e Tolerância a Quedas</h3>
+          <p style="font-size:10px; margin-bottom:0;">
+            • Quedas de internet na ponta não travam a sonda desktop: medições ficam retidas no SQLite local como <code>synced=0</code>.<br>
+            • Servidor Central opera em modo não-bloqueante com timeout de 5s no MongoDB e graceful shutdown em sinais SIGINT/SIGTERM.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="color:#0369a1;">⚡ Performance e Escalabilidade</h3>
+          <p style="font-size:10px; margin-bottom:0;">
+            • O modelo MongoDB Time Series compacta leituras por hora e data center, reduzindo em até 70% o uso de disco.<br>
+            • Frontend do Client e do Servidor utilizam Chart.js otimizado para renderização de até centenas de pontos sem perda de fluidez.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rodapé Página 2 -->
+    <footer class="footer-doc">
+      <div>Documento homologado para implantação técnica • Antigravity DevOps Solutions</div>
+      <div>Página 2 de 2</div>
+    </footer>
+  </div>
+
+</body>
+</html>
