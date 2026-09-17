@@ -12,6 +12,9 @@ RUN go mod download
 # Copia o código fonte
 COPY . .
 
+# Garante resolução completa dos checksums dos módulos
+RUN go mod tidy
+
 # Compila o binário estático para arquitetura Linux
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o central-server main.go
 
