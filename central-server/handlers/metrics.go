@@ -217,6 +217,8 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 			LastPing:        agg.latest.PingGateway,
 			IsHealthy:       isHealthy,
 			TotalReadings24: agg.count,
+			SystemInfo:      agg.latest.SystemInfo,
+			SwitchInfo:      agg.latest.SwitchInfo,
 		})
 	}
 

@@ -115,6 +115,8 @@ func (m *MongoDBClient) InsertMetric(ctx context.Context, payload *models.Metric
 		DownloadMbps: payload.DownloadMbps,
 		UploadMbps:   payload.UploadMbps,
 		PingGateway:  payload.PingGateway,
+		SystemInfo:   payload.SystemInfo,
+		SwitchInfo:   payload.SwitchInfo,
 	}
 
 	_, err := m.Collection.InsertOne(ctx, doc)
@@ -163,6 +165,8 @@ func (m *MongoDBClient) GetMetricsLast24Hours(ctx context.Context, nodeIDFilter 
 			DownloadMbps: doc.DownloadMbps,
 			UploadMbps:   doc.UploadMbps,
 			PingGateway:  doc.PingGateway,
+			SystemInfo:   doc.SystemInfo,
+			SwitchInfo:   doc.SwitchInfo,
 		})
 	}
 

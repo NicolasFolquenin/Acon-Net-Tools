@@ -172,6 +172,20 @@ function renderSummaryCards(summaries) {
           </div>
         </div>
 
+        ${s.system_info || s.switch_info ? `
+        <div class="dc-hardware-box">
+          ${s.system_info ? `
+          <div class="hw-line">
+            <span class="hw-tag">HOST</span>
+            <span class="hw-desc" title="${s.system_info.cpu || ''}">${s.system_info.model || s.system_info.hostname || 'PC'} (${s.system_info.ram_total_gb ? s.system_info.ram_total_gb.toFixed(0) + 'GB' : ''}) • IP: ${s.system_info.ip_address || '--'}</span>
+          </div>` : ''}
+          ${s.switch_info && s.switch_info.switch_name ? `
+          <div class="hw-line">
+            <span class="hw-tag switch">LLDP</span>
+            <span class="hw-desc font-bold text-cyan" title="${s.switch_info.switch_model || ''}">SW: ${s.switch_info.switch_name} [${s.switch_info.switch_port || 'Porta --'}] ${s.switch_info.vlan ? '• VLAN ' + s.switch_info.vlan : ''}</span>
+          </div>` : ''}
+        </div>` : ''}
+
         <div class="dc-footer">
           <span>Último sync: ${timeAgo}</span>
           <span>${s.total_readings_24h} leituras / 24h</span>

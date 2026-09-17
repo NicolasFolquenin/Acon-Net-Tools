@@ -154,6 +154,80 @@
         </div>
       </section>
 
+      <!-- Hardware & LLDP Switch Information Section -->
+      <section class="device-info-section">
+        <!-- PC Specs Card -->
+        <div class="info-box-card">
+          <div class="info-box-header">
+            <div class="info-box-icon cyan">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+            </div>
+            <div>
+              <h4>Hardware do Host</h4>
+              <p class="text-muted text-xs">Especificações do nó de teste</p>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">Computador:</span>
+              <span class="info-val" id="pc-model">Detectando...</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Processador:</span>
+              <span class="info-val" id="pc-cpu">Detectando...</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Memória RAM:</span>
+              <span class="info-val" id="pc-ram">-- GB</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">IP Local / MAC:</span>
+              <span class="info-val font-mono" id="pc-ip-mac">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Switch LLDP Card -->
+        <div class="info-box-card">
+          <div class="info-box-header">
+            <div class="info-box-icon purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              </svg>
+            </div>
+            <div>
+              <h4>Conexão de Switch (LLDP)</h4>
+              <p class="text-muted text-xs">Descoberta em tempo real da porta de rede</p>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">Nome do Switch:</span>
+              <span class="info-val font-bold text-cyan" id="switch-name">Aguardando frame LLDP...</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Porta Conectada:</span>
+              <span class="info-val font-bold" id="switch-port">--</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">VLAN de Acesso:</span>
+              <span class="info-val" id="switch-vlan">--</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Placa Local:</span>
+              <span class="info-val" id="pc-adapter">--</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Charts Section (Last 24 runs) -->
       <section class="charts-container">
         <!-- Throughput Chart -->
