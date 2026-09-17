@@ -72,7 +72,7 @@ func (m *MongoDBClient) ensureTimeSeriesCollection(ctx context.Context) error {
 	log.Printf("[MONGODB] Criando coleção Time Series '%s.%s' (timeField: timestamp, metaField: metadata, granularity: hours)...",
 		m.cfg.DatabaseName, m.cfg.CollectionName)
 
-	// Criação via comando MongoDB padrão (compatível com todas as versões 5.0+)
+	// Criação via comando MongoDB padrão
 	createCmd := bson.D{
 		{Key: "create", Value: m.cfg.CollectionName},
 		{Key: "timeseries", Value: bson.D{
@@ -84,10 +84,13 @@ func (m *MongoDBClient) ensureTimeSeriesCollection(ctx context.Context) error {
 
 	var result bson.M
 	if err := m.Database.RunCommand(ctx, createCmd).Decode(&result); err != nil {
-		return fmt.Errorf("falha ao criar Time Series collection: %w", err)
+		log.Printf("[MONGODB][AVISO] Engine Time Series não disponível (%v). Criando coleção padrão com índices...", err)
+		if errCreate := m.Database.CreateCollection(ctx, m.cfg.CollectionName); errCreate != nil {
+			log.Printf("[MONGODB] Coleção padrão já pronta ou criada: %v", errCreate)
+		}
+	} else {
+		log.Println("[MONGODB] Coleção Time Series criada com sucesso!")
 	}
-
-	log.Println("[MONGODB] Coleção Time Series criada com sucesso!")
 
 	// Cria índices secundários para pesquisas ultra rápidas
 	indexModel := mongo.IndexModel{

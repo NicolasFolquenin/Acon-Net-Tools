@@ -24,9 +24,9 @@ services:
     networks:
       - monitoring-net
 
-  # Banco de Dados MongoDB com suporte nativo a Time Series
+  # Banco de Dados MongoDB compatível com CPUs sem AVX (VMs e Hypervisors)
   mongo:
-    image: mongo:7.0-jammy
+    image: mongo:4.4-focal
     container_name: network-mongo-timeseries
     restart: unless-stopped
     ports:
@@ -35,7 +35,7 @@ services:
       - mongo_data:/data/db
     command: ["mongod", "--bind_ip_all"]
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
       interval: 10s
       timeout: 5s
       retries: 5
