@@ -1,7 +1,7 @@
 {
   "node_id": "minipc-dc-01",
   "location": "Guarapuava-DC1",
-  "server_url": "http://177.101.22.41:8080",
+  "server_url": "http://177.101.22.41:8085",
   "api_token": "super-secret-probe-token-2026",
   "interval_minutes": 60,
   "ping_target": "192.168.1.1"
