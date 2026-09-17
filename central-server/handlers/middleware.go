@@ -20,7 +20,7 @@ func (w *ResponseWriterInterceptor) WriteHeader(code int) {
 
 // LoggerMiddleware gera log estruturado para cada requisição HTTP
 func LoggerMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w *ResponseWriterInterceptorOrStandard, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &ResponseWriterInterceptor{ResponseWriter: w, StatusCode: http.StatusOK}
 
@@ -30,9 +30,6 @@ func LoggerMiddleware(next http.Handler) http.Handler {
 		log.Printf("[HTTP] %s %s - %d (%v)", r.Method, r.URL.Path, rw.StatusCode, elapsed)
 	})
 }
-
-// ResponseWriterInterceptorOrStandard interface wrapper
-type ResponseWriterInterceptorOrStandard = http.ResponseWriter
 
 // CORSMiddleware permite requisições cross-origin para a API REST
 func CORSMiddleware(next http.Handler) http.Handler {
