@@ -38,7 +38,7 @@ func NewStorageService() (*StorageService, error) {
 	service := &StorageService{
 		db: db,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 15 * time.Second,
 		},
 	}
 
@@ -60,7 +60,9 @@ func (s *StorageService) initSchema() error {
 		upload_mbps REAL NOT NULL,
 		ping_gateway REAL NOT NULL,
 		synced INTEGER NOT NULL DEFAULT 0,
-		error_message TEXT
+		error_message TEXT,
+		system_info_json TEXT,
+		switch_info_json TEXT
 	);
 	CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics (timestamp DESC);
 	CREATE INDEX IF NOT EXISTS idx_metrics_synced ON metrics (synced);
@@ -69,6 +71,11 @@ func (s *StorageService) initSchema() error {
 	if err != nil {
 		return fmt.Errorf("falha ao criar schema sqlite: %w", err)
 	}
+
+	// Migrações dinâmicas para bases existentes
+	_, _ = s.db.Exec(`ALTER TABLE metrics ADD COLUMN system_info_json TEXT;`)
+	_, _ = s.db.Exec(`ALTER TABLE metrics ADD COLUMN switch_info_json TEXT;`)
+
 	log.Printf("[STORAGE] Banco SQLite (%s) inicializado com sucesso", dbFilename)
 	return nil
 }
@@ -83,9 +90,21 @@ func (s *StorageService) SaveMetric(m *MetricPayload, synced bool, errMsg string
 		syncedInt = 1
 	}
 
+	var sysJson, switchJson string
+	if m.SystemInfo != nil {
+		if b, err := json.Marshal(m.SystemInfo); err == nil {
+			sysJson = string(b)
+		}
+	}
+	if m.SwitchInfo != nil {
+		if b, err := json.Marshal(m.SwitchInfo); err == nil {
+			switchJson = string(b)
+		}
+	}
+
 	query := `
-	INSERT INTO metrics (node_id, location, timestamp, download_mbps, upload_mbps, ping_gateway, synced, error_message)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO metrics (node_id, location, timestamp, download_mbps, upload_mbps, ping_gateway, synced, error_message, system_info_json, switch_info_json)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	res, err := s.db.Exec(query,
 		m.NodeID,
@@ -96,6 +115,8 @@ func (s *StorageService) SaveMetric(m *MetricPayload, synced bool, errMsg string
 		m.PingGateway,
 		syncedInt,
 		errMsg,
+		sysJson,
+		switchJson,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao salvar metrica no sqlite: %w", err)
@@ -112,10 +133,12 @@ func (s *StorageService) SaveMetric(m *MetricPayload, synced bool, errMsg string
 		PingGateway:  m.PingGateway,
 		Synced:       synced,
 		ErrorMessage: errMsg,
+		SystemInfo:   m.SystemInfo,
+		SwitchInfo:   m.SwitchInfo,
 	}, nil
 }
 
-// GetRecentMetrics retorna as últimas N execuções (ordenadas da mais antiga para a mais recente para gráficos).
+// GetRecentMetrics retorna as últimas N execuções
 func (s *StorageService) GetRecentMetrics(limit int) ([]LocalMetricRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -125,7 +148,8 @@ func (s *StorageService) GetRecentMetrics(limit int) ([]LocalMetricRecord, error
 	}
 
 	query := `
-	SELECT id, node_id, location, timestamp, download_mbps, upload_mbps, ping_gateway, synced, COALESCE(error_message, '')
+	SELECT id, node_id, location, timestamp, download_mbps, upload_mbps, ping_gateway, synced, 
+	       COALESCE(error_message, ''), COALESCE(system_info_json, ''), COALESCE(switch_info_json, '')
 	FROM metrics
 	ORDER BY timestamp DESC
 	LIMIT ?
@@ -141,17 +165,32 @@ func (s *StorageService) GetRecentMetrics(limit int) ([]LocalMetricRecord, error
 		var r LocalMetricRecord
 		var timeStr string
 		var syncedInt int
-		if err := rows.Scan(&r.ID, &r.NodeID, &r.Location, &timeStr, &r.DownloadMbps, &r.UploadMbps, &r.PingGateway, &syncedInt, &r.ErrorMessage); err != nil {
+		var sysJson, switchJson string
+		if err := rows.Scan(&r.ID, &r.NodeID, &r.Location, &timeStr, &r.DownloadMbps, &r.UploadMbps, &r.PingGateway, &syncedInt, &r.ErrorMessage, &sysJson, &switchJson); err != nil {
 			log.Printf("[STORAGE] Erro scan: %v", err)
 			continue
 		}
 		t, _ := time.Parse(time.RFC3339, timeStr)
 		r.Timestamp = t
 		r.Synced = (syncedInt == 1)
+
+		if sysJson != "" {
+			var si SystemInfo
+			if errU := json.Unmarshal([]byte(sysJson), &si); errU == nil {
+				r.SystemInfo = &si
+			}
+		}
+		if switchJson != "" {
+			var sw SwitchInfo
+			if errU := json.Unmarshal([]byte(switchJson), &sw); errU == nil {
+				r.SwitchInfo = &sw
+			}
+		}
+
 		descList = append(descList, r)
 	}
 
-	// Inverte para ficar cronológico (mais antigo -> mais recente) ideal para plotar no Chart.js
+	// Inverte para ficar cronológico (mais antigo -> mais recente)
 	ascList := make([]LocalMetricRecord, len(descList))
 	for i, item := range descList {
 		ascList[len(descList)-1-i] = item
@@ -160,7 +199,7 @@ func (s *StorageService) GetRecentMetrics(limit int) ([]LocalMetricRecord, error
 	return ascList, nil
 }
 
-// GetPendingCount retorna o total de registros sincronizados e pendentes.
+// GetCounts retorna o total de registros sincronizados e pendentes.
 func (s *StorageService) GetCounts() (synced int, pending int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -171,7 +210,6 @@ func (s *StorageService) GetCounts() (synced int, pending int) {
 }
 
 // SendToServer envia a medição via POST HTTPS para o servidor central.
-// Caso falhe, efetua log detalhado e retorna o erro sem travar a aplicação.
 func (s *StorageService) SendToServer(ctx context.Context, payload *MetricPayload, serverURL, apiToken string) error {
 	endpoint := strings.TrimRight(serverURL, "/") + "/api/v1/metrics"
 
@@ -188,10 +226,9 @@ func (s *StorageService) SendToServer(ctx context.Context, payload *MetricPayloa
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiToken)
 
-	log.Printf("[STORAGE] Enviando metricas para %s...", endpoint)
+	log.Printf("[STORAGE] Enviando metricas enriquecidas para %s...", endpoint)
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		// Loga o erro sem travar
 		log.Printf("[STORAGE][AVISO] Falha de conexao com servidor central (%s): %v", endpoint, err)
 		return fmt.Errorf("servidor inalcancavel: %w", err)
 	}

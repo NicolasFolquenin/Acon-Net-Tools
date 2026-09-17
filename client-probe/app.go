@@ -20,8 +20,10 @@ type App struct {
 	statusText   string
 	lastRun      *time.Time
 	nextRun      *time.Time
-	lastMetric   *LocalMetricRecord
-	mu           sync.Mutex
+	lastMetric    *LocalMetricRecord
+	currentPC     *SystemInfo
+	currentSwitch *SwitchInfo
+	mu            sync.Mutex
 }
 
 // NewApp cria uma nova instância de App
@@ -55,7 +57,31 @@ func (a *App) startup(ctx context.Context) {
 	if len(history) > 0 {
 		a.lastMetric = &history[len(history)-1]
 		a.lastRun = &a.lastMetric.Timestamp
+		if a.lastMetric.SystemInfo != nil {
+			a.currentPC = a.lastMetric.SystemInfo
+		}
+		if a.lastMetric.SwitchInfo != nil {
+			a.currentSwitch = a.lastMetric.SwitchInfo
+		}
 	}
+
+	// 4. Coleta dados de hardware do PC imediatamente na inicialização
+	go func() {
+		pc := CollectSystemInfo()
+		a.mu.Lock()
+		a.currentPC = &pc
+		a.mu.Unlock()
+		a.emitStatus()
+
+		// Busca inicial de LLDP em background
+		lldpCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		defer cancel()
+		sw := DiscoverSwitchLLDP(lldpCtx)
+		a.mu.Lock()
+		a.currentSwitch = &sw
+		a.mu.Unlock()
+		a.emitStatus()
+	}()
 
 	interval := time.Duration(cfg.IntervalMinutes) * time.Minute
 	if interval < 1*time.Minute {
@@ -202,14 +228,16 @@ func (a *App) GetStatus() ProbeStatus {
 	}
 
 	return ProbeStatus{
-		IsRunning:    a.isRunning,
-		StatusText:   a.statusText,
-		LastRun:      a.lastRun,
-		NextRun:      a.nextRun,
-		LastMetric:   a.lastMetric,
-		ServerStatus: serverStatus,
-		TotalSynced:  syncedCount,
-		TotalPending: pendingCount,
+		IsRunning:     a.isRunning,
+		StatusText:    a.statusText,
+		LastRun:       a.lastRun,
+		NextRun:       a.nextRun,
+		LastMetric:    a.lastMetric,
+		ServerStatus:  serverStatus,
+		TotalSynced:   syncedCount,
+		TotalPending:  pendingCount,
+		CurrentPC:     a.currentPC,
+		CurrentSwitch: a.currentSwitch,
 	}
 }
 
