@@ -38,7 +38,6 @@ func (h *MetricsHandler) PostMetric(w http.ResponseWriter, r *http.Request) {
 
 	var payload models.MetricPayloadInput
 	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(&payload); err != nil {
 		log.Printf("[API][ERRO] Payload invalido: %v", err)
