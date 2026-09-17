@@ -168,13 +168,13 @@ func (m *MongoDBClient) GetMetricsLast24Hours(ctx context.Context, nodeIDFilter 
 
 // GetDistinctNodes retorna a lista de todos os nós registrados
 func (m *MongoDBClient) GetDistinctNodes(ctx context.Context) ([]string, error) {
-	results, err := m.Collection.Distinct(ctx, "metadata.node_id", bson.M{})
+	rawValues, err := m.Collection.Distinct(ctx, "metadata.node_id", bson.M{}).Decode(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var nodes []string
-	for _, val := range results {
+	for _, val := range rawValues {
 		if s, ok := val.(string); ok && s != "" {
 			nodes = append(nodes, s)
 		}
