@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Servidor Central de Telemetria (Go 1.22)
   central-server:
