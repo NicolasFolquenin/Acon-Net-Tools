@@ -181,6 +181,9 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 	if sendErr != nil {
 		synced = false
 		errMsg = sendErr.Error()
+		log.Printf("[APP][SYNC] Falha ao enviar para o servidor central: %v", sendErr)
+	} else {
+		log.Printf("[APP][SYNC] Enviado com sucesso para o servidor central!")
 	}
 
 	// 3. Persiste no SQLite local
