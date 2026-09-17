@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NOC Central - Monitoramento de Throughput & Latência</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <!-- Navbar / Header -->
+    <header class="navbar">
+      <div class="nav-brand">
+        <div class="logo-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h2>NETWORK <span>CENTRAL NOC</span></h2>
+          <p>Coletor Distribuído Go + MongoDB Time Series</p>
+        </div>
+      </div>
+
+      <div class="nav-controls">
+        <!-- Node Selector -->
+        <div class="control-group">
+          <label for="select-node" class="control-label">Filtrar Sonda:</label>
+          <div class="select-wrapper">
+            <select id="select-node" class="select-custom">
+              <option value="all">⚡ Todos os Nós (Consolidado)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Botão Atualizar -->
+        <button id="btn-refresh" class="btn btn-glass" title="Recarregar Métricas">
+          <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span>Atualizar</span>
+        </button>
+
+        <!-- Botão Popular Dados Exemplo -->
+        <button id="btn-seed" class="btn btn-seed" title="Gerar 24h de dados de exemplo para demonstração">
+          <span>+ Gerar Test Data</span>
+        </button>
+
+        <div class="live-pill">
+          <span class="live-indicator"></span>
+          <span id="auto-refresh-timer">Auto: 15s</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="dashboard-body">
+      <!-- Section: Data Center Summary Cards -->
+      <section class="section-block">
+        <div class="section-title-row">
+          <div>
+            <h3>Status dos Data Centers & Nós Monitorados</h3>
+            <p class="section-subtitle">Últimas leituras coletadas por telemetria de cada mini PC</p>
+          </div>
+          <div id="nodes-count-badge" class="count-badge">
+            <span id="active-nodes-count">0</span> Sondas Registradas
+          </div>
+        </div>
+
+        <!-- Grid de Cartões dos Data Centers -->
+        <div id="nodes-summary-grid" class="summary-grid">
+          <div class="card-loading">
+            <div class="spinner"></div>
+            <span>Carregando dados dos data centers...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Comparative Charts -->
+      <section class="section-block">
+        <div class="charts-grid">
+          <!-- Chart 1: Bandwidth Comparison (Download & Upload) -->
+          <div class="chart-panel">
+            <div class="panel-header">
+              <div>
+                <h4>Comparativo de Banda (Download & Upload)</h4>
+                <p class="panel-desc">Throughput das últimas 24 horas por nó e data center (Mbps)</p>
+              </div>
+              <div class="panel-tag">Throughput (Mbps)</div>
+            </div>
+            <div class="chart-canvas-container">
+              <canvas id="centralBandwidthChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Chart 2: Latency Comparison (Gateway Ping) -->
+          <div class="chart-panel">
+            <div class="panel-header">
+              <div>
+                <h4>Comparativo de Latência de Gateway (Ping)</h4>
+                <p class="panel-desc">Round-trip time em milissegundos (ms) monitorado continuamente</p>
+              </div>
+              <div class="panel-tag tag-latency">Latência (ms)</div>
+            </div>
+            <div class="chart-canvas-container">
+              <canvas id="centralLatencyChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Telemetry Stream Feed -->
+      <section class="section-block">
+        <div class="panel-header">
+          <div>
+            <h4>Feed de Telemetria em Tempo Real (Últimas Leituras)</h4>
+            <p class="panel-desc">Registro histórico ingerido na coleção Time Series <code>network_central.metrics</code></p>
+          </div>
+          <span id="last-ingest-time" class="text-subtle">Aguardando dados...</span>
+        </div>
+        <div class="table-container">
+          <table class="telemetry-table">
+            <thead>
+              <tr>
+                <th>Timestamp (UTC)</th>
+                <th>Nó (Node ID)</th>
+                <th>Localização</th>
+                <th>Download</th>
+                <th>Upload</th>
+                <th>Ping Gateway</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="telemetry-table-body">
+              <tr>
+                <td colspan="7" class="text-center text-muted">Carregando feed de telemetria...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer-bar">
+      <div class="footer-left">
+        <span class="status-dot"></span> Servidor Central Go 1.22+ • MongoDB v2 Driver • Time Series Collection
+      </div>
+      <div class="footer-right">
+        <span>Contrato API: <code>POST /api/v1/metrics</code></span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,216 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
+	_ "modernc.org/sqlite"
+)
+
+// StorageService gerencia a persistência local em SQLite e a sincronização com o servidor central.
+type StorageService struct {
+	db         *sql.DB
+	httpClient *http.Client
+	mu         sync.Mutex
+}
+
+const dbFilename = "probe_local.db"
+
+// NewStorageService inicializa a conexão com o banco SQLite local probe_local.db.
+func NewStorageService() (*StorageService, error) {
+	db, err := sql.Open("sqlite", dbFilename)
+	if err != nil {
+		return nil, fmt.Errorf("falha ao abrir sqlite: %w", err)
+	}
+
+	// Otimizações de concorrência para SQLite
+	db.SetMaxOpenConns(1)
+
+	service := &StorageService{
+		db: db,
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
+	}
+
+	if err := service.initSchema(); err != nil {
+		return nil, err
+	}
+
+	return service, nil
+}
+
+func (s *StorageService) initSchema() error {
+	schema := `
+	CREATE TABLE IF NOT EXISTS metrics (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		node_id TEXT NOT NULL,
+		location TEXT NOT NULL,
+		timestamp DATETIME NOT NULL,
+		download_mbps REAL NOT NULL,
+		upload_mbps REAL NOT NULL,
+		ping_gateway REAL NOT NULL,
+		synced INTEGER NOT NULL DEFAULT 0,
+		error_message TEXT
+	);
+	CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics (timestamp DESC);
+	CREATE INDEX IF NOT EXISTS idx_metrics_synced ON metrics (synced);
+	`
+	_, err := s.db.Exec(schema)
+	if err != nil {
+		return fmt.Errorf("falha ao criar schema sqlite: %w", err)
+	}
+	log.Printf("[STORAGE] Banco SQLite (%s) inicializado com sucesso", dbFilename)
+	return nil
+}
+
+// SaveMetric insere uma nova leitura no banco local.
+func (s *StorageService) SaveMetric(m *MetricPayload, synced bool, errMsg string) (*LocalMetricRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	syncedInt := 0
+	if synced {
+		syncedInt = 1
+	}
+
+	query := `
+	INSERT INTO metrics (node_id, location, timestamp, download_mbps, upload_mbps, ping_gateway, synced, error_message)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	res, err := s.db.Exec(query,
+		m.NodeID,
+		m.Location,
+		m.Timestamp.Format(time.RFC3339),
+		m.DownloadMbps,
+		m.UploadMbps,
+		m.PingGateway,
+		syncedInt,
+		errMsg,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao salvar metrica no sqlite: %w", err)
+	}
+
+	id, _ := res.LastInsertId()
+	return &LocalMetricRecord{
+		ID:           id,
+		NodeID:       m.NodeID,
+		Location:     m.Location,
+		Timestamp:    m.Timestamp,
+		DownloadMbps: m.DownloadMbps,
+		UploadMbps:   m.UploadMbps,
+		PingGateway:  m.PingGateway,
+		Synced:       synced,
+		ErrorMessage: errMsg,
+	}, nil
+}
+
+// GetRecentMetrics retorna as últimas N execuções (ordenadas da mais antiga para a mais recente para gráficos).
+func (s *StorageService) GetRecentMetrics(limit int) ([]LocalMetricRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if limit <= 0 {
+		limit = 24
+	}
+
+	query := `
+	SELECT id, node_id, location, timestamp, download_mbps, upload_mbps, ping_gateway, synced, COALESCE(error_message, '')
+	FROM metrics
+	ORDER BY timestamp DESC
+	LIMIT ?
+	`
+	rows, err := s.db.Query(query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao consultar metricas: %w", err)
+	}
+	defer rows.Close()
+
+	var descList []LocalMetricRecord
+	for rows.Next() {
+		var r LocalMetricRecord
+		var timeStr string
+		var syncedInt int
+		if err := rows.Scan(&r.ID, &r.NodeID, &r.Location, &timeStr, &r.DownloadMbps, &r.UploadMbps, &r.PingGateway, &syncedInt, &r.ErrorMessage); err != nil {
+			log.Printf("[STORAGE] Erro scan: %v", err)
+			continue
+		}
+		t, _ := time.Parse(time.RFC3339, timeStr)
+		r.Timestamp = t
+		r.Synced = (syncedInt == 1)
+		descList = append(descList, r)
+	}
+
+	// Inverte para ficar cronológico (mais antigo -> mais recente) ideal para plotar no Chart.js
+	ascList := make([]LocalMetricRecord, len(descList))
+	for i, item := range descList {
+		ascList[len(descList)-1-i] = item
+	}
+
+	return ascList, nil
+}
+
+// GetPendingCount retorna o total de registros sincronizados e pendentes.
+func (s *StorageService) GetCounts() (synced int, pending int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM metrics WHERE synced = 1").Scan(&synced)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM metrics WHERE synced = 0").Scan(&pending)
+	return synced, pending
+}
+
+// SendToServer envia a medição via POST HTTPS para o servidor central.
+// Caso falhe, efetua log detalhado e retorna o erro sem travar a aplicação.
+func (s *StorageService) SendToServer(ctx context.Context, payload *MetricPayload, serverURL, apiToken string) error {
+	endpoint := strings.TrimRight(serverURL, "/") + "/api/v1/metrics"
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("falha na serializacao json: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("falha ao criar requisicao http: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiToken)
+
+	log.Printf("[STORAGE] Enviando metricas para %s...", endpoint)
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		// Loga o erro sem travar
+		log.Printf("[STORAGE][AVISO] Falha de conexao com servidor central (%s): %v", endpoint, err)
+		return fmt.Errorf("servidor inalcancavel: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		errMsg := fmt.Sprintf("status code %d: %s", resp.StatusCode, string(bodyBytes))
+		log.Printf("[STORAGE][AVISO] Servidor central recusou envio: %s", errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	log.Printf("[STORAGE][SUCESSO] Metricas sincronizadas com servidor central (HTTP %d)", resp.StatusCode)
+	return nil
+}
+
+// Close fecha a conexão SQLite
+func (s *StorageService) Close() {
+	if s.db != nil {
+		_ = s.db.Close()
+	}
+}

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Network Probe Agent</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="top-header">
+      <div class="brand-group">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+            <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+            <line x1="12" y1="20" x2="12.01" y2="20"></line>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <h1>PROBE <span>AGENT</span></h1>
+          <div class="node-meta">
+            <span id="node-id-display" class="mono-badge">minipc-dc-01</span>
+            <span id="node-location-display" class="location-badge">Guarapuava-DC1</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Status Badge -->
+        <div id="status-badge" class="status-badge scheduled">
+          <span class="status-pulse"></span>
+          <span id="status-text">Agendado (1h)</span>
+        </div>
+
+        <!-- Botão Rodar Teste Agora -->
+        <button id="btn-run-test" class="btn btn-primary">
+          <svg id="btn-icon-play" class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span id="btn-spinner" class="spinner hidden"></span>
+          <span id="btn-label">Rodar Teste Agora</span>
+        </button>
+
+        <!-- Botão Configurações -->
+        <button id="btn-open-settings" class="btn btn-secondary" title="Configurações">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Metric Cards Grid -->
+      <section class="cards-grid">
+        <!-- Download Card -->
+        <div class="card card-stat card-cyan">
+          <div class="card-header">
+            <div class="card-title">DOWNLOAD</div>
+            <div class="card-icon cyan">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="stat-value">
+              <span id="stat-download">--</span>
+              <span class="stat-unit">Mbps</span>
+            </div>
+            <div class="stat-subtext">Taxa de transferência atual</div>
+          </div>
+          <div class="card-footer-glow cyan-glow"></div>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="card card-stat card-purple">
+          <div class="card-header">
+            <div class="card-title">UPLOAD</div>
+            <div class="card-icon purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="stat-value">
+              <span id="stat-upload">--</span>
+              <span class="stat-unit">Mbps</span>
+            </div>
+            <div class="stat-subtext">Taxa de envio corporativo</div>
+          </div>
+          <div class="card-footer-glow purple-glow"></div>
+        </div>
+
+        <!-- Ping Card -->
+        <div class="card card-stat card-emerald">
+          <div class="card-header">
+            <div class="card-title">PING GATEWAY</div>
+            <div class="card-icon emerald">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="stat-value">
+              <span id="stat-ping">--</span>
+              <span class="stat-unit">ms</span>
+            </div>
+            <div class="stat-subtext">Latência round-trip do gateway</div>
+          </div>
+          <div class="card-footer-glow emerald-glow"></div>
+        </div>
+
+        <!-- Central Sync Card -->
+        <div class="card card-stat card-blue">
+          <div class="card-header">
+            <div class="card-title">SYNC CENTRAL</div>
+            <div class="card-icon blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"></path>
+                <line x1="8" y1="16" x2="8.01" y2="16"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                <line x1="16" y1="16" x2="16.01" y2="16"></line>
+              </svg>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="stat-value text-sm">
+              <span id="stat-sync">Conectando...</span>
+            </div>
+            <div class="stat-subtext">
+              <span id="stat-sync-detail">0 sincronizados | 0 pendentes</span>
+            </div>
+          </div>
+          <div class="card-footer-glow blue-glow"></div>
+        </div>
+      </section>
+
+      <!-- Charts Section (Last 24 runs) -->
+      <section class="charts-container">
+        <!-- Throughput Chart -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div>
+              <h3>Histórico de Throughput (Últimas 24 execuções)</h3>
+              <p class="chart-subtitle">Taxas de Download e Upload em Megabits por segundo (Mbps)</p>
+            </div>
+            <div class="chart-legend-custom">
+              <span class="legend-badge cyan-dot">Download</span>
+              <span class="legend-badge purple-dot">Upload</span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="throughputChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Latency Chart -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div>
+              <h3>Histórico de Latência (Gateway)</h3>
+              <p class="chart-subtitle">Tempo de resposta em milissegundos (ms)</p>
+            </div>
+            <div class="chart-legend-custom">
+              <span class="legend-badge emerald-dot">Ping Gateway</span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="latencyChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent Executions Table -->
+      <section class="table-section">
+        <div class="section-header">
+          <h3>Log de Execuções Recentes</h3>
+          <span class="text-muted" id="last-updated-text">Atualizado há poucos instantes</span>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Data & Hora</th>
+                <th>Download</th>
+                <th>Upload</th>
+                <th>Ping Gateway</th>
+                <th>Status Sync</th>
+              </tr>
+            </thead>
+            <tbody id="metrics-table-body">
+              <tr>
+                <td colspan="5" class="text-center text-muted">Carregando histórico do SQLite local...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer Bar -->
+    <footer class="app-footer">
+      <div class="footer-item">
+        <span class="dot-live"></span> Agente Operando em Background (Goroutine Ticker 1h)
+      </div>
+      <div class="footer-item">
+        <span>Próxima execução: <strong id="next-run-text">Calculando...</strong></span>
+      </div>
+      <div class="footer-item">
+        <span class="text-muted">Wails v2 + Go + SQLite</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Configurações da Sonda</h3>
+        <button id="btn-close-settings" class="btn-close">&times;</button>
+      </div>
+      <form id="settings-form" class="modal-body">
+        <div class="form-group">
+          <label for="cfg-node-id">Node ID (Identificador da máquina)</label>
+          <input type="text" id="cfg-node-id" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label for="cfg-location">Localização / Data Center</label>
+          <input type="text" id="cfg-location" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label for="cfg-server-url">URL do Servidor Central (HTTPS/HTTP)</label>
+          <input type="text" id="cfg-server-url" class="form-control" placeholder="http://servidor:8080" required />
+        </div>
+        <div class="form-group">
+          <label for="cfg-api-token">API Bearer Token</label>
+          <input type="password" id="cfg-api-token" class="form-control" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group col">
+            <label for="cfg-interval">Intervalo (Minutos)</label>
+            <input type="number" id="cfg-interval" class="form-control" min="1" max="1440" value="60" />
+          </div>
+          <div class="form-group col">
+            <label for="cfg-ping-target">Alvo do Ping (Gateway/IP)</label>
+            <input type="text" id="cfg-ping-target" class="form-control" placeholder="192.168.1.1" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="btn-cancel-settings" class="btn btn-secondary">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Configurações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

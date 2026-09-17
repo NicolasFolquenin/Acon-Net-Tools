@@ -1,0 +1,31 @@
+[Unit]
+Description=Central Network Telemetry Monitor Service
+After=network.target mongod.service
+Wants=mongod.service
+
+[Service]
+Type=simple
+User=debian
+Group=debian
+WorkingDirectory=/opt/central-server
+ExecStart=/opt/central-server/central-server
+Restart=always
+RestartSec=5s
+
+# Variáveis de Ambiente
+Environment=PORT=8080
+Environment=MONGO_URI=mongodb://127.0.0.1:27017
+Environment=MONGO_DB=network_central
+Environment=MONGO_COLLECTION=metrics
+Environment=API_TOKEN=super-secret-probe-token-2026
+Environment=STATIC_DIR=/opt/central-server/public
+Environment=QUERY_HOURS_LIMIT=24
+
+# Limites e Segurança do Processo
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=network-monitor
+
+[Install]
+WantedBy=multi-user.target
