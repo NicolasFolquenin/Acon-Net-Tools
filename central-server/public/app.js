@@ -294,56 +294,82 @@ function renderComparativeCharts(series, nodesList) {
     byNode[item.NodeID || item.node_id][item.timestamp] = item;
   });
 
+  // Identifica nós alvo
   const selectedNode = selectNode.value;
-  const bandwidthDatasets = [];
-  const latencyDatasets = [];
-
   const targetNodes = (selectedNode === 'all')
     ? Object.keys(byNode)
     : [selectedNode];
 
-  targetNodes.forEach((nodeId, idx) => {
-    const color = nodeColors[idx % nodeColors.length];
-    const nodeDataMap = byNode[nodeId] || {};
+  // Se estiver filtrado por 1 nó específico
+  if (selectedNode !== 'all') {
+    const nodeItems = series.filter(s => (s.NodeID || s.node_id) === selectedNode);
+    const labels = nodeItems.map(item => {
+      const d = new Date(item.timestamp);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
 
-    const downData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].download_mbps : null);
-    const upData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].upload_mbps : null);
-    const pingData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].ping_gateway : null);
+    const downData = nodeItems.map(item => item.download_mbps);
+    const upData = nodeItems.map(item => item.upload_mbps);
+    const pingData = nodeItems.map(item => item.ping_gateway);
 
-    // Se estiver filtrado por 1 nó, mostra Download e Upload do nó
-    if (selectedNode !== 'all') {
-      bandwidthDatasets.push({
-        label: `${nodeId} - Download`,
+    bandwidthChart.data.labels = labels;
+    bandwidthChart.data.datasets = [
+      {
+        label: `${selectedNode} - Download`,
         data: downData,
         borderColor: '#06b6d4',
         backgroundColor: 'rgba(6, 182, 212, 0.1)',
         tension: 0.3,
         borderWidth: 2,
         pointRadius: 3
-      });
-      bandwidthDatasets.push({
-        label: `${nodeId} - Upload`,
+      },
+      {
+        label: `${selectedNode} - Upload`,
         data: upData,
         borderColor: '#a855f7',
         backgroundColor: 'rgba(168, 85, 247, 0.08)',
         tension: 0.3,
         borderWidth: 2,
         pointRadius: 3
-      });
-    } else {
-      // Comparativo entre todos os nós (Download de cada um)
-      bandwidthDatasets.push({
-        label: `${nodeId} (Down)`,
-        data: downData,
-        borderColor: color.border,
-        backgroundColor: color.bg,
+      }
+    ];
+    bandwidthChart.update();
+
+    latencyChart.data.labels = labels;
+    latencyChart.data.datasets = [
+      {
+        label: `${selectedNode} (Ping)`,
+        data: pingData,
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
         tension: 0.3,
         borderWidth: 2,
-        pointRadius: 2
-      });
-    }
+        pointRadius: 3
+      }
+    ];
+    latencyChart.update();
+    return;
+  }
+  const bandwidthDatasets = [];
+  const latencyDatasets = [];
 
-    // Latência do nó
+  targetNodes.forEach((nodeId, idx) => {
+    const color = nodeColors[idx % nodeColors.length];
+    const nodeDataMap = byNode[nodeId] || {};
+
+    const downData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].download_mbps : null);
+    const pingData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].ping_gateway : null);
+
+    bandwidthDatasets.push({
+      label: `${nodeId} (Down)`,
+      data: downData,
+      borderColor: color.border,
+      backgroundColor: color.bg,
+      tension: 0.3,
+      borderWidth: 2,
+      pointRadius: 3
+    });
+
     latencyDatasets.push({
       label: `${nodeId}`,
       data: pingData,
@@ -351,16 +377,14 @@ function renderComparativeCharts(series, nodesList) {
       backgroundColor: color.bg,
       tension: 0.3,
       borderWidth: 2,
-      pointRadius: 2
+      pointRadius: 3
     });
   });
 
-  // Atualiza Throughput
   bandwidthChart.data.labels = labels;
   bandwidthChart.data.datasets = bandwidthDatasets;
   bandwidthChart.update();
 
-  // Atualiza Latência
   latencyChart.data.labels = labels;
   latencyChart.data.datasets = latencyDatasets;
   latencyChart.update();

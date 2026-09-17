@@ -96,6 +96,16 @@ func (a *App) startup(ctx context.Context) {
 	a.cancelWorker = cancel
 	go a.backgroundScheduler(workerCtx, interval)
 
+	// Sincroniza medições que porventura ficaram pendentes offline
+	go func() {
+		time.Sleep(2 * time.Second)
+		syncCtx, syncCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer syncCancel()
+		if count := a.storage.SyncPendingMetrics(syncCtx, cfg.ServerURL, cfg.APIToken); count > 0 {
+			a.emitStatus()
+		}
+	}()
+
 	log.Println("[APP] Probe inicializada com sucesso e pronta para operacao.")
 }
 
@@ -191,6 +201,17 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 	if err != nil {
 		log.Printf("[APP] Erro ao gravar historico local: %v", err)
 		return nil, err
+	}
+
+	// Se esta leitura sincronizou e há leituras pendentes antigas, sincroniza-as em background
+	if synced {
+		go func() {
+			syncCtx, syncCancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer syncCancel()
+			if count := a.storage.SyncPendingMetrics(syncCtx, cfg.ServerURL, cfg.APIToken); count > 0 {
+				a.emitStatus()
+			}
+		}()
 	}
 
 	now := time.Now()

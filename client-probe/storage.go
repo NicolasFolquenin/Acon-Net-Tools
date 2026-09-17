@@ -209,6 +209,63 @@ func (s *StorageService) GetCounts() (synced int, pending int) {
 	return synced, pending
 }
 
+// SyncPendingMetrics busca leituras pendentes (synced = 0) e tenta reenviá-las ao servidor
+func (s *StorageService) SyncPendingMetrics(ctx context.Context, serverURL, apiToken string) int {
+	s.mu.Lock()
+	rows, err := s.db.Query(`
+		SELECT id, node_id, location, timestamp, download_mbps, upload_mbps, ping_gateway, 
+		       COALESCE(system_info_json, ''), COALESCE(switch_info_json, '')
+		FROM metrics WHERE synced = 0 ORDER BY id ASC LIMIT 20
+	`)
+	if err != nil {
+		s.mu.Unlock()
+		return 0
+	}
+	defer rows.Close()
+
+	type pendingItem struct {
+		id int64
+		p  MetricPayload
+	}
+	var list []pendingItem
+	for rows.Next() {
+		var item pendingItem
+		var timeStr, sysJson, swJson string
+		if err := rows.Scan(&item.id, &item.p.NodeID, &item.p.Location, &timeStr, &item.p.DownloadMbps, &item.p.UploadMbps, &item.p.PingGateway, &sysJson, &swJson); err != nil {
+			continue
+		}
+		item.p.Timestamp, _ = time.Parse(time.RFC3339, timeStr)
+		if sysJson != "" {
+			var si SystemInfo
+			if errU := json.Unmarshal([]byte(sysJson), &si); errU == nil {
+				item.p.SystemInfo = &si
+			}
+		}
+		if swJson != "" {
+			var sw SwitchInfo
+			if errU := json.Unmarshal([]byte(swJson), &sw); errU == nil {
+				item.p.SwitchInfo = &sw
+			}
+		}
+		list = append(list, item)
+	}
+	s.mu.Unlock()
+
+	syncedCount := 0
+	for _, item := range list {
+		if err := s.SendToServer(ctx, &item.p, serverURL, apiToken); err == nil {
+			s.mu.Lock()
+			_, _ = s.db.Exec("UPDATE metrics SET synced = 1, error_message = '' WHERE id = ?", item.id)
+			s.mu.Unlock()
+			syncedCount++
+		}
+	}
+	if syncedCount > 0 {
+		log.Printf("[STORAGE][SYNC] %d metricas pendentes foram sincronizadas com sucesso!", syncedCount)
+	}
+	return syncedCount
+}
+
 // SendToServer envia a medição via POST HTTPS para o servidor central.
 func (s *StorageService) SendToServer(ctx context.Context, payload *MetricPayload, serverURL, apiToken string) error {
 	endpoint := strings.TrimRight(serverURL, "/") + "/api/v1/metrics"
@@ -237,6 +294,16 @@ func (s *StorageService) SendToServer(ctx context.Context, payload *MetricPayloa
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		errMsg := fmt.Sprintf("status code %d: %s", resp.StatusCode, string(bodyBytes))
+
+		// Se o servidor for uma versão legada que usa DisallowUnknownFields, reenvia sem os metadados extras
+		if resp.StatusCode == 400 && strings.Contains(string(bodyBytes), "unknown field") && (payload.SystemInfo != nil || payload.SwitchInfo != nil) {
+			log.Printf("[STORAGE][COMPATIBILIDADE] Servidor central em versao legada. Reenviando payload basico para garantir sincronizacao...")
+			fallbackPayload := *payload
+			fallbackPayload.SystemInfo = nil
+			fallbackPayload.SwitchInfo = nil
+			return s.SendToServer(ctx, &fallbackPayload, serverURL, apiToken)
+		}
+
 		log.Printf("[STORAGE][AVISO] Servidor central recusou envio: %s", errMsg)
 		return fmt.Errorf(errMsg)
 	}
