@@ -22,18 +22,30 @@ func DiscoverSwitchLLDP(ctx context.Context) SwitchInfo {
 	psScript := `
 	$ErrorActionPreference = 'SilentlyContinue'
 
-	# 1. Tenta PSDiscoveryProtocol se instalado
+	# 1. Tenta via PSDiscoveryProtocol se disponivel (captura LLDP e CDP de switches Cisco/HP/Aruba/Huawei/Mikrotik)
 	if (Get-Module -ListAvailable -Name PSDiscoveryProtocol) {
 		try {
-			$data = Invoke-DiscoveryProtocolCapture -Type LLDP -Duration 10 | Get-DiscoveryProtocolData
-			if ($data) {
-				[PSCustomObject]@{
-					SwitchName = $data.Device
-					Port = $data.Port
-					Vlan = $data.Vlan
-					Model = $data.Model
-				} | ConvertTo-Json -Compress
-				exit 0
+			Import-Module PSDiscoveryProtocol -ErrorAction SilentlyContinue
+			$capture = Invoke-DiscoveryProtocolCapture -Duration 15 -Force -ErrorAction SilentlyContinue
+			if ($capture) {
+				$data = $capture | Get-DiscoveryProtocolData -ErrorAction SilentlyContinue
+				if ($data -is [array]) { $data = $data[0] }
+				if ($data) {
+					$swName = if ($data.Device) { [string]$data.Device } elseif ($data.SysName) { [string]$data.SysName } else { "" }
+					$swPort = if ($data.Port) { [string]$data.Port } else { "" }
+					$swModel = if ($data.Model) { [string]$data.Model } elseif ($data.Type) { [string]$data.Type } else { "" }
+					$swVlan = if ($data.VLAN) { [int]$data.VLAN } else { 0 }
+
+					if ($swName -or $swPort) {
+						[PSCustomObject]@{
+							SwitchName = if ($swName) { $swName } else { "Switch Corporativo" }
+							Port       = if ($swPort) { $swPort } else { "--" }
+							Vlan       = $swVlan
+							Model      = if ($swModel) { $swModel } else { "Switch Gerenciável" }
+						} | ConvertTo-Json -Compress
+						exit 0
+					}
+				}
 			}
 		} catch {}
 	}
@@ -44,15 +56,15 @@ func DiscoverSwitchLLDP(ctx context.Context) SwitchInfo {
 		if ($lldp) {
 			[PSCustomObject]@{
 				SwitchName = $lldp.ChassisId
-				Port = $lldp.PortId
-				Vlan = $lldp.VlanId
-				Model = "Switch Gerenciável"
+				Port       = $lldp.PortId
+				Vlan       = $lldp.VlanId
+				Model      = "Switch Gerenciável"
 			} | ConvertTo-Json -Compress
 			exit 0
 		}
 	} catch {}
 
-	# Retorno padrão vazio caso não haja anúncio no momento
+	# Retorno padrao vazio caso nao haja anuncio no momento
 	"{}"
 	`
 

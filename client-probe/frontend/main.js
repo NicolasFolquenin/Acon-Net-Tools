@@ -80,7 +80,7 @@ const WailsApp = {
     return {
       node_id: 'minipc-dc-01',
       location: 'Guarapuava-DC1',
-      server_url: 'http://localhost:8080',
+      server_url: 'http://localhost:8090',
       api_token: 'super-secret-probe-token-2026',
       interval_minutes: 60,
       ping_target: '192.168.1.1'

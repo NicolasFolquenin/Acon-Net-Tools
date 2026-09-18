@@ -114,7 +114,7 @@ func LoadConfig(customPath string) (*Config, error) {
 		cfg.Location = "Escritorio-Local"
 	}
 	if cfg.ServerURL == "" {
-		cfg.ServerURL = "http://localhost:8080"
+		cfg.ServerURL = "http://localhost:8090"
 	}
 	if cfg.APIToken == "" {
 		cfg.APIToken = "super-secret-probe-token-2026"
@@ -147,7 +147,7 @@ func GetCurrentConfig() Config {
 		return Config{
 			NodeID:          "meu-pc-windows",
 			Location:        "Escritorio-Local",
-			ServerURL:       "http://localhost:8080",
+			ServerURL:       "http://localhost:8090",
 			APIToken:        "super-secret-probe-token-2026",
 			IntervalMinutes: 60,
 			PingTarget:      "1.1.1.1",
@@ -169,7 +169,8 @@ func SaveConfig(cfg Config) error {
 
 	executableDir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 	targetJsonPath := filepath.Join(executableDir, defaultConfigFilename)
-	if err := os.WriteFile(defaultConfigFilename, data, 0644); err != nil {
+	_ = os.WriteFile(defaultConfigFilename, data, 0644)
+	if targetJsonPath != defaultConfigFilename {
 		_ = os.WriteFile(targetJsonPath, data, 0644)
 	}
 
@@ -188,7 +189,8 @@ func SaveConfig(cfg Config) error {
 	}, "\n")
 
 	targetEnvPath := filepath.Join(executableDir, defaultEnvFilename)
-	if err := os.WriteFile(defaultEnvFilename, []byte(envContent), 0644); err != nil {
+	_ = os.WriteFile(defaultEnvFilename, []byte(envContent), 0644)
+	if targetEnvPath != defaultEnvFilename {
 		_ = os.WriteFile(targetEnvPath, []byte(envContent), 0644)
 	}
 
