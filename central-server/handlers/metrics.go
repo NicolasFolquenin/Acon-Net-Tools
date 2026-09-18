@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"central-server/config"
@@ -37,7 +40,6 @@ func (h *MetricsHandler) PostMetric(w http.ResponseWriter, r *http.Request) {
 
 	var payload models.MetricPayloadInput
 	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(&payload); err != nil {
 		log.Printf("[API][ERRO] Payload invalido: %v", err)
@@ -138,49 +140,54 @@ func (h *MetricsHandler) GetDashboardMetrics(w http.ResponseWriter, r *http.Requ
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// SeedSampleData popula o MongoDB com dados realistas de exemplo caso o banco esteja vazio
-func (h *MetricsHandler) SeedSampleData(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	nodes := []struct {
-		ID       string
-		Location string
-		BaseDown float64
-		BaseUp   float64
-		BasePing float64
-	}{
-		{"minipc-dc-01", "Guarapuava-DC1", 850.0, 720.0, 1.2},
-		{"minipc-dc-02", "Curitiba-DC2", 920.0, 810.0, 3.4},
-		{"minipc-dc-03", "SaoPaulo-DC3", 780.0, 690.0, 8.5},
+// DeleteNode lida com DELETE /api/v1/nodes?node_id={id} para remover um computador do sistema
+func (h *MetricsHandler) DeleteNode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		http.Error(w, `{"error": "metodo nao permitido"}`, http.StatusMethodNotAllowed)
+		return
 	}
 
-	now := time.Now().UTC()
-	ctx := r.Context()
-	totalInserted := 0
+	w.Header().Set("Content-Type", "application/json")
 
-	for _, n := range nodes {
-		for i := 23; i >= 0; i-- {
-			t := now.Add(-time.Duration(i) * time.Hour)
-			down := n.BaseDown + float64((i*7)%35) - 15.0
-			up := n.BaseUp + float64((i*5)%25) - 10.0
-			ping := n.BasePing + float64((i*3)%10)*0.1
-
-			_ = h.db.InsertMetric(ctx, &models.MetricPayloadInput{
-				NodeID:       n.ID,
-				Location:     n.Location,
-				Timestamp:    t,
-				DownloadMbps: down,
-				UploadMbps:   up,
-				PingGateway:  ping,
-			})
-			totalInserted++
+	nodeID := strings.TrimSpace(r.URL.Query().Get("node_id"))
+	if nodeID == "" {
+		// Tenta ler do body caso não esteja na query string
+		var bodyReq struct {
+			NodeID string `json:"node_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&bodyReq); err == nil {
+			nodeID = strings.TrimSpace(bodyReq.NodeID)
 		}
 	}
 
+	if nodeID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error": "parametro 'node_id' e obrigatorio",
+		})
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	count, err := h.db.DeleteNode(ctx, nodeID)
+	if err != nil {
+		log.Printf("[API][ERRO] Falha ao excluir no '%s': %v", nodeID, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error": "falha ao excluir no do banco de dados",
+		})
+		return
+	}
+
+	log.Printf("[API] No '%s' excluido com sucesso pelo administrador (%d registros removidos)", nodeID, count)
+
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":         "seeded",
-		"total_inserted": totalInserted,
-		"message":        "Dados simulados de 24 horas gerados com sucesso!",
+		"status":        "success",
+		"message":       fmt.Sprintf("Computador '%s' e suas metricas foram excluidos com sucesso", nodeID),
+		"node_id":       nodeID,
+		"deleted_count": count,
 	})
 }
 
@@ -216,6 +223,8 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 			LastPing:        agg.latest.PingGateway,
 			IsHealthy:       isHealthy,
 			TotalReadings24: agg.count,
+			SystemInfo:      agg.latest.SystemInfo,
+			SwitchInfo:      agg.latest.SwitchInfo,
 		})
 	}
 

@@ -72,7 +72,7 @@ func (m *MongoDBClient) ensureTimeSeriesCollection(ctx context.Context) error {
 	log.Printf("[MONGODB] Criando coleção Time Series '%s.%s' (timeField: timestamp, metaField: metadata, granularity: hours)...",
 		m.cfg.DatabaseName, m.cfg.CollectionName)
 
-	// Criação via comando MongoDB padrão (compatível com todas as versões 5.0+)
+	// Criação via comando MongoDB padrão
 	createCmd := bson.D{
 		{Key: "create", Value: m.cfg.CollectionName},
 		{Key: "timeseries", Value: bson.D{
@@ -84,10 +84,13 @@ func (m *MongoDBClient) ensureTimeSeriesCollection(ctx context.Context) error {
 
 	var result bson.M
 	if err := m.Database.RunCommand(ctx, createCmd).Decode(&result); err != nil {
-		return fmt.Errorf("falha ao criar Time Series collection: %w", err)
+		log.Printf("[MONGODB][AVISO] Engine Time Series não disponível (%v). Criando coleção padrão com índices...", err)
+		if errCreate := m.Database.CreateCollection(ctx, m.cfg.CollectionName); errCreate != nil {
+			log.Printf("[MONGODB] Coleção padrão já pronta ou criada: %v", errCreate)
+		}
+	} else {
+		log.Println("[MONGODB] Coleção Time Series criada com sucesso!")
 	}
-
-	log.Println("[MONGODB] Coleção Time Series criada com sucesso!")
 
 	// Cria índices secundários para pesquisas ultra rápidas
 	indexModel := mongo.IndexModel{
@@ -112,6 +115,8 @@ func (m *MongoDBClient) InsertMetric(ctx context.Context, payload *models.Metric
 		DownloadMbps: payload.DownloadMbps,
 		UploadMbps:   payload.UploadMbps,
 		PingGateway:  payload.PingGateway,
+		SystemInfo:   payload.SystemInfo,
+		SwitchInfo:   payload.SwitchInfo,
 	}
 
 	_, err := m.Collection.InsertOne(ctx, doc)
@@ -160,6 +165,8 @@ func (m *MongoDBClient) GetMetricsLast24Hours(ctx context.Context, nodeIDFilter 
 			DownloadMbps: doc.DownloadMbps,
 			UploadMbps:   doc.UploadMbps,
 			PingGateway:  doc.PingGateway,
+			SystemInfo:   doc.SystemInfo,
+			SwitchInfo:   doc.SwitchInfo,
 		})
 	}
 
@@ -168,18 +175,36 @@ func (m *MongoDBClient) GetMetricsLast24Hours(ctx context.Context, nodeIDFilter 
 
 // GetDistinctNodes retorna a lista de todos os nós registrados
 func (m *MongoDBClient) GetDistinctNodes(ctx context.Context) ([]string, error) {
-	results, err := m.Collection.Distinct(ctx, "metadata.node_id", bson.M{})
-	if err != nil {
+	res := m.Collection.Distinct(ctx, "metadata.node_id", bson.M{})
+	if err := res.Err(); err != nil {
 		return nil, err
 	}
 
 	var nodes []string
-	for _, val := range results {
-		if s, ok := val.(string); ok && s != "" {
-			nodes = append(nodes, s)
-		}
+	if err := res.Decode(&nodes); err != nil {
+		return nil, err
 	}
+
 	return nodes, nil
+}
+
+// DeleteNode remove todos os registros e métricas pertencentes a um determinado nó
+func (m *MongoDBClient) DeleteNode(ctx context.Context, nodeID string) (int64, error) {
+	if m.Collection == nil {
+		return 0, fmt.Errorf("colecao mongodb nao inicializada")
+	}
+
+	filter := bson.M{
+		"metadata.node_id": nodeID,
+	}
+
+	res, err := m.Collection.DeleteMany(ctx, filter)
+	if err != nil {
+		return 0, fmt.Errorf("erro ao excluir no '%s': %w", nodeID, err)
+	}
+
+	log.Printf("[MONGODB] No '%s' excluido do sistema. Total de registros removidos: %d", nodeID, res.DeletedCount)
+	return res.DeletedCount, nil
 }
 
 // Disconnect encerra a conexão com o MongoDB
@@ -189,3 +214,4 @@ func (m *MongoDBClient) Disconnect(ctx context.Context) error {
 	}
 	return nil
 }
+

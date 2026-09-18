@@ -80,7 +80,7 @@ const WailsApp = {
     return {
       node_id: 'minipc-dc-01',
       location: 'Guarapuava-DC1',
-      server_url: 'http://localhost:8080',
+      server_url: 'http://localhost:8090',
       api_token: 'super-secret-probe-token-2026',
       interval_minutes: 60,
       ping_target: '192.168.1.1'
@@ -183,6 +183,34 @@ function updateStatusBadge(status) {
       statSync.textContent = 'Sincronizado';
       statSync.style.color = '#10b981';
     }
+  }
+
+  // Preenche dados do PC
+  if (status.current_pc) {
+    const pc = status.current_pc;
+    const pcModel = document.getElementById('pc-model');
+    const pcCpu = document.getElementById('pc-cpu');
+    const pcRam = document.getElementById('pc-ram');
+    const pcIpMac = document.getElementById('pc-ip-mac');
+    const pcAdapter = document.getElementById('pc-adapter');
+
+    if (pcModel) pcModel.textContent = pc.model || pc.hostname || 'Dell Pro Micro';
+    if (pcCpu) pcCpu.textContent = pc.cpu || 'Intel Core Ultra';
+    if (pcRam) pcRam.textContent = pc.ram_total_gb ? `${pc.ram_total_gb.toFixed(1)} GB` : '-- GB';
+    if (pcIpMac) pcIpMac.textContent = `${pc.ip_address || '--'} / ${pc.mac_address || '--'}`;
+    if (pcAdapter) pcAdapter.textContent = pc.network_adapter || 'Ethernet';
+  }
+
+  // Preenche dados do Switch LLDP
+  if (status.current_switch) {
+    const sw = status.current_switch;
+    const swName = document.getElementById('switch-name');
+    const swPort = document.getElementById('switch-port');
+    const swVlan = document.getElementById('switch-vlan');
+
+    if (swName) swName.textContent = sw.switch_name || 'Aguardando frame LLDP...';
+    if (swPort) swPort.textContent = sw.switch_port || '--';
+    if (swVlan) swVlan.textContent = sw.vlan ? `VLAN ${sw.vlan}` : (sw.switch_model || '--');
   }
 }
 

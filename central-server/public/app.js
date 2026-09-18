@@ -1,19 +1,50 @@
 /**
  * Central NOC Dashboard - Web App Logic
+ * Inclui: Autenticação com perfis, Inspeção de configurações do PC ao clicar no card,
+ * Exclusão de computadores por Admin e remoção completa de dados simulados.
  */
 
 let bandwidthChart = null;
 let latencyChart = null;
+let currentUser = null;
+let currentSummaries = [];
+let pendingDeleteNodeId = null;
 
-// Elementos DOM
+// Elementos DOM principais
 const selectNode = document.getElementById('select-node');
 const btnRefresh = document.getElementById('btn-refresh');
-const btnSeed = document.getElementById('btn-seed');
 const nodesSummaryGrid = document.getElementById('nodes-summary-grid');
 const telemetryTableBody = document.getElementById('telemetry-table-body');
 const activeNodesCount = document.getElementById('active-nodes-count');
 const lastIngestTime = document.getElementById('last-ingest-time');
 const autoRefreshTimer = document.getElementById('auto-refresh-timer');
+
+// Elementos de Autenticação / Perfil
+const loginModalOverlay = document.getElementById('login-modal-overlay');
+const loginForm = document.getElementById('login-form');
+const loginUsernameInput = document.getElementById('login-username');
+const loginPasswordInput = document.getElementById('login-password');
+const loginErrorAlert = document.getElementById('login-error-alert');
+const loginErrorText = document.getElementById('login-error-text');
+const btnLoginSubmit = document.getElementById('btn-login-submit');
+const navUsername = document.getElementById('nav-username');
+const navRoleBadge = document.getElementById('nav-role-badge');
+const btnLogout = document.getElementById('btn-logout');
+
+// Elementos do Modal de Configurações do PC
+const pcModal = document.getElementById('pc-modal');
+const modalPcClose = document.getElementById('modal-pc-close');
+const modalBtnCloseBottom = document.getElementById('modal-btn-close-bottom');
+const modalBtnDeletePc = document.getElementById('modal-btn-delete-pc');
+
+// Elementos do Modal de Confirmação de Exclusão
+const deleteConfirmModal = document.getElementById('delete-confirm-modal');
+const deleteTargetNode = document.getElementById('delete-target-node');
+const btnCancelDelete = document.getElementById('btn-cancel-delete');
+const btnConfirmDelete = document.getElementById('btn-confirm-delete');
+
+// Toast Container
+const toastContainer = document.getElementById('toast-container');
 
 // Paleta de cores para gráficos comparativos multi-nós
 const nodeColors = [
@@ -26,16 +57,120 @@ const nodeColors = [
 ];
 
 let refreshCountdown = 15;
-let currentData = null;
+let refreshInterval = null;
 
+// Inicialização
 document.addEventListener('DOMContentLoaded', async () => {
   initCharts();
-  setupEvents();
-  await loadDashboardData();
-  startAutoRefresh();
+  setupEventListeners();
+  await checkAuthAndInitialize();
 });
 
-function setupEvents() {
+/* ==========================================================================
+   1. Autenticação & Sessão
+   ========================================================================== */
+
+async function checkAuthAndInitialize() {
+  try {
+    const res = await fetch('/api/v1/auth/me');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.authenticated && data.user) {
+        setAuthenticatedUser(data.user);
+        await loadDashboardData();
+        startAutoRefresh();
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Verificação de sessão:', err);
+  }
+
+  // Se não estiver logado, exibe a tela de login
+  showLoginModal();
+}
+
+function setAuthenticatedUser(user) {
+  currentUser = user;
+  loginModalOverlay.style.display = 'none';
+
+  navUsername.textContent = user.username;
+  navRoleBadge.textContent = user.role === 'admin' ? 'Administrador' : 'Operador';
+  navRoleBadge.className = `role-badge ${user.role}`;
+
+  // Se for admin, o botão de deletar estará disponível
+  if (user.role === 'admin') {
+    modalBtnDeletePc.style.display = 'inline-flex';
+  } else {
+    modalBtnDeletePc.style.display = 'none';
+  }
+}
+
+function showLoginModal() {
+  currentUser = null;
+  loginModalOverlay.style.display = 'flex';
+  navUsername.textContent = 'Não conectado';
+  navRoleBadge.textContent = '--';
+  navRoleBadge.className = 'role-badge';
+  loginErrorAlert.style.display = 'none';
+  loginUsernameInput.value = '';
+  loginPasswordInput.value = '';
+  if (refreshInterval) clearInterval(refreshInterval);
+}
+
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  const username = loginUsernameInput.value.trim();
+  const password = loginPasswordInput.value.trim();
+
+  if (!username || !password) return;
+
+  btnLoginSubmit.disabled = true;
+  loginErrorAlert.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Falha ao autenticar');
+    }
+
+    setAuthenticatedUser(data.user);
+    showToast(`Bem-vindo, ${data.user.username}!`, 'toast-success');
+    await loadDashboardData();
+    startAutoRefresh();
+  } catch (err) {
+    loginErrorText.textContent = err.message || 'Usuário ou senha incorretos';
+    loginErrorAlert.style.display = 'flex';
+  } finally {
+    btnLoginSubmit.disabled = false;
+  }
+}
+
+async function handleLogout() {
+  try {
+    await fetch('/api/v1/auth/logout', { method: 'POST' });
+  } catch (err) {
+    console.error('Erro ao sair:', err);
+  }
+  showToast('Sessão encerrada com sucesso', 'toast-info');
+  showLoginModal();
+}
+
+/* ==========================================================================
+   2. Configuração de Eventos
+   ========================================================================== */
+
+function setupEventListeners() {
+  loginForm.addEventListener('submit', handleLoginSubmit);
+  btnLogout.addEventListener('click', handleLogout);
+
   selectNode.addEventListener('change', () => {
     loadDashboardData();
   });
@@ -45,25 +180,41 @@ function setupEvents() {
     loadDashboardData();
   });
 
-  btnSeed.addEventListener('click', async () => {
-    try {
-      btnSeed.disabled = true;
-      btnSeed.textContent = 'Gerando...';
-      const res = await fetch('/api/v1/seed', { method: 'POST' });
-      const data = await res.json();
-      alert(`Sucesso: ${data.total_inserted} métricas simuladas foram geradas no MongoDB!`);
-      await loadDashboardData();
-    } catch (err) {
-      alert('Erro ao gerar dados de teste: ' + err.message);
-    } finally {
-      btnSeed.disabled = false;
-      btnSeed.textContent = '+ Gerar Test Data';
+  // Fechamento do Modal de PC
+  modalPcClose.addEventListener('click', closePCModal);
+  modalBtnCloseBottom.addEventListener('click', closePCModal);
+  pcModal.addEventListener('click', (e) => {
+    if (e.target === pcModal) closePCModal();
+  });
+
+  // Botão de Excluir dentro do Modal de PC
+  modalBtnDeletePc.addEventListener('click', () => {
+    const nodeId = modalBtnDeletePc.getAttribute('data-node-id');
+    if (nodeId) promptDeleteNode(nodeId);
+  });
+
+  // Confirmação de Exclusão
+  btnCancelDelete.addEventListener('click', closeDeleteModal);
+  deleteConfirmModal.addEventListener('click', (e) => {
+    if (e.target === deleteConfirmModal) closeDeleteModal();
+  });
+  btnConfirmDelete.addEventListener('click', executeDeleteNode);
+
+  // Fechar modais ao pressionar tecla ESC
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (deleteConfirmModal.style.display !== 'none') {
+        closeDeleteModal();
+      } else if (pcModal.style.display !== 'none') {
+        closePCModal();
+      }
     }
   });
 }
 
 function startAutoRefresh() {
-  setInterval(() => {
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(() => {
     refreshCountdown--;
     if (refreshCountdown <= 0) {
       refreshCountdown = 15;
@@ -73,8 +224,13 @@ function startAutoRefresh() {
   }, 1000);
 }
 
-// Carrega dados da API do Central Server
+/* ==========================================================================
+   3. Carregamento de Métricas do Dashboard
+   ========================================================================== */
+
 async function loadDashboardData() {
+  if (!currentUser) return;
+
   const selected = selectNode.value || 'all';
   let url = '/api/v1/dashboard/metrics';
   if (selected !== 'all') {
@@ -83,12 +239,17 @@ async function loadDashboardData() {
 
   try {
     const res = await fetch(url);
+    if (res.status === 401) {
+      showLoginModal();
+      return;
+    }
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+
     const data = await res.json();
-    currentData = data;
+    currentSummaries = data.summaries || [];
 
     updateNodeSelector(data.nodes_list || []);
-    renderSummaryCards(data.summaries || []);
+    renderSummaryCards(currentSummaries);
     renderComparativeCharts(data.metrics_series || [], data.nodes_list || []);
     renderTelemetryTable(data.metrics_series || []);
 
@@ -98,39 +259,46 @@ async function loadDashboardData() {
     }
   } catch (err) {
     console.error('Falha ao carregar métricas:', err);
-    // Se não houver servidor rodando ainda, exibe estado mock para navegação estática
-    useFallbackMock();
+    nodesSummaryGrid.innerHTML = `
+      <div class="card-loading">
+        <p class="text-rose font-bold">Falha ao conectar com o servidor central.</p>
+        <p class="text-subtle">${err.message}</p>
+      </div>
+    `;
   }
 }
 
-// Atualiza o seletor de nós dinamicamente
 function updateNodeSelector(nodes) {
   const currentVal = selectNode.value;
-  const existingOptions = Array.from(selectNode.options).map(o => o.value);
+  selectNode.innerHTML = '<option value="all">⚡ Todos os Nós (Consolidado)</option>';
 
   nodes.forEach(node => {
-    if (!existingOptions.includes(node)) {
-      const opt = document.createElement('option');
-      opt.value = node;
-      opt.textContent = `🖥️ ${node}`;
-      selectNode.appendChild(opt);
-    }
+    const opt = document.createElement('option');
+    opt.value = node;
+    opt.textContent = `🖥️ ${node}`;
+    selectNode.appendChild(opt);
   });
 
-  selectNode.value = currentVal || 'all';
+  selectNode.value = nodes.includes(currentVal) ? currentVal : 'all';
 }
 
-// Renderiza os cartões de resumo com última leitura de cada data center
+/* ==========================================================================
+   4. Renderização dos Cards dos Computadores (com clique interativo)
+   ========================================================================== */
+
 function renderSummaryCards(summaries) {
   if (!summaries || summaries.length === 0) {
     nodesSummaryGrid.innerHTML = `
       <div class="card-loading">
-        <p>Nenhuma sonda enviou métricas ainda.</p>
-        <p class="text-subtle">Aguardando telemetria do Desktop Probe ou clique em <strong>"+ Gerar Test Data"</strong> acima.</p>
+        <div style="font-size: 2rem; margin-bottom: 4px;">📡</div>
+        <p class="font-bold text-white">Nenhum computador ou sonda registrada ainda.</p>
+        <p class="text-subtle">Aguardando a primeira telemetria enviada pelo agente client-probe instalado nas máquinas.</p>
       </div>
     `;
     return;
   }
+
+  const isAdmin = currentUser && currentUser.role === 'admin';
 
   nodesSummaryGrid.innerHTML = summaries.map(s => {
     const lastDate = new Date(s.last_seen);
@@ -139,19 +307,29 @@ function renderSummaryCards(summaries) {
     const healthText = s.is_healthy ? 'Ativo (1h)' : 'Sem sinal recente';
 
     return `
-      <div class="dc-card">
+      <div class="dc-card" data-node-id="${escapeHtml(s.node_id)}" title="Clique para ver as configurações detalhadas">
         <div class="dc-card-top">
           <div class="dc-name-group">
-            <h4>${s.node_id}</h4>
+            <h4>${escapeHtml(s.node_id)}</h4>
             <div class="dc-location">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path>
                 <circle cx="12" cy="10" r="3"></circle>
               </svg>
-              <span>${s.location}</span>
+              <span>${escapeHtml(s.location)}</span>
             </div>
           </div>
-          <span class="dc-health-badge ${healthClass}">● ${healthText}</span>
+          <div class="dc-card-top-actions">
+            <span class="dc-health-badge ${healthClass}">● ${healthText}</span>
+            ${isAdmin ? `
+              <button class="card-quick-delete" data-node-id="${escapeHtml(s.node_id)}" title="Excluir computador do sistema">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            ` : ''}
+          </div>
         </div>
 
         <div class="dc-metrics-row">
@@ -172,16 +350,166 @@ function renderSummaryCards(summaries) {
           </div>
         </div>
 
+        ${s.system_info || s.switch_info ? `
+        <div class="dc-hardware-box">
+          ${s.system_info ? `
+          <div class="hw-line">
+            <span class="hw-tag">HOST</span>
+            <span class="hw-desc" title="${escapeHtml(s.system_info.cpu || '')}">${escapeHtml(s.system_info.model || s.system_info.hostname || 'PC')} (${s.system_info.ram_total_gb ? s.system_info.ram_total_gb.toFixed(0) + 'GB' : '--'}) • IP: ${escapeHtml(s.system_info.ip_address || '--')}</span>
+          </div>` : ''}
+          ${s.switch_info && s.switch_info.switch_name ? `
+          <div class="hw-line">
+            <span class="hw-tag switch">LLDP</span>
+            <span class="hw-desc font-bold text-cyan" title="${escapeHtml(s.switch_info.switch_model || '')}">SW: ${escapeHtml(s.switch_info.switch_name)} [${escapeHtml(s.switch_info.switch_port || '--')}] ${s.switch_info.vlan ? '• VLAN ' + s.switch_info.vlan : ''}</span>
+          </div>` : ''}
+        </div>` : ''}
+
         <div class="dc-footer">
           <span>Último sync: ${timeAgo}</span>
-          <span>${s.total_readings_24h} leituras / 24h</span>
+          <span style="color: var(--accent-cyan); font-weight: 500;">🔍 Ver configs &raquo;</span>
         </div>
       </div>
     `;
   }).join('');
+
+  // Atribui evento de clique em cada card para abrir o modal de configurações
+  nodesSummaryGrid.querySelectorAll('.dc-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      // Se clicou no botão de exclusão rápida, não abre o modal de detalhes
+      if (e.target.closest('.card-quick-delete')) {
+        e.stopPropagation();
+        const nodeId = e.target.closest('.card-quick-delete').getAttribute('data-node-id');
+        promptDeleteNode(nodeId);
+        return;
+      }
+
+      const nodeId = card.getAttribute('data-node-id');
+      const summary = currentSummaries.find(item => item.node_id === nodeId);
+      if (summary) {
+        openPCDetailsModal(summary);
+      }
+    });
+  });
 }
 
-// Inicializa instâncias do Chart.js
+/* ==========================================================================
+   5. Modal de Detalhes & Configurações do Computador
+   ========================================================================== */
+
+function openPCDetailsModal(s) {
+  // Cabeçalho
+  document.getElementById('modal-pc-nodeid').textContent = s.node_id;
+  document.getElementById('modal-pc-location').textContent = `Localização: ${s.location || 'Não informada'}`;
+
+  const healthBadge = document.getElementById('modal-pc-health');
+  healthBadge.className = `dc-health-badge ${s.is_healthy ? 'online' : 'stale'}`;
+  healthBadge.textContent = s.is_healthy ? '● Online (Última hora)' : '● Sem sinal recente';
+
+  // 1. Métricas
+  document.getElementById('modal-pc-down').textContent = `${s.last_download.toFixed(1)} Mbps`;
+  document.getElementById('modal-pc-up').textContent = `${s.last_upload.toFixed(1)} Mbps`;
+  document.getElementById('modal-pc-ping').textContent = `${s.last_ping.toFixed(1)} ms`;
+  document.getElementById('modal-pc-readings').textContent = `${s.total_readings_24h} medições`;
+
+  // 2. Hardware e SO
+  const sys = s.system_info || {};
+  document.getElementById('modal-hw-hostname').textContent = sys.hostname || '--';
+  document.getElementById('modal-hw-model').textContent = sys.model || 'Mini PC / Computador Genérico';
+  document.getElementById('modal-hw-cpu').textContent = sys.cpu || '--';
+  document.getElementById('modal-hw-ram').textContent = sys.ram_total_gb ? `${sys.ram_total_gb.toFixed(1)} GB` : '--';
+  document.getElementById('modal-hw-os').textContent = sys.os || '--';
+
+  // 3. Rede Local
+  document.getElementById('modal-net-ip').textContent = sys.ip_address || '--';
+  document.getElementById('modal-net-mac').textContent = sys.mac_address || '--';
+  document.getElementById('modal-net-gateway').textContent = sys.gateway || '--';
+  document.getElementById('modal-net-adapter').textContent = sys.network_adapter || '--';
+
+  // 4. Switch & LLDP
+  const sw = s.switch_info || {};
+  document.getElementById('modal-lldp-switch').textContent = sw.switch_name || 'Não descoberto via LLDP';
+  document.getElementById('modal-lldp-port').textContent = sw.switch_port || '--';
+  document.getElementById('modal-lldp-vlan').textContent = sw.vlan ? `VLAN ${sw.vlan}` : '--';
+  document.getElementById('modal-lldp-model').textContent = sw.switch_model || '--';
+  document.getElementById('modal-lldp-proto').textContent = sw.protocol ? `${sw.protocol} (${sw.discovered_at ? new Date(sw.discovered_at).toLocaleTimeString() : ''})` : '--';
+
+  // Permissão de exclusão
+  if (currentUser && currentUser.role === 'admin') {
+    modalBtnDeletePc.style.display = 'inline-flex';
+    modalBtnDeletePc.setAttribute('data-node-id', s.node_id);
+  } else {
+    modalBtnDeletePc.style.display = 'none';
+  }
+
+  pcModal.style.display = 'flex';
+}
+
+function closePCModal() {
+  pcModal.style.display = 'none';
+}
+
+/* ==========================================================================
+   6. Exclusão Administrativa de Computadores
+   ========================================================================== */
+
+function promptDeleteNode(nodeId) {
+  pendingDeleteNodeId = nodeId;
+  deleteTargetNode.textContent = nodeId;
+  deleteConfirmModal.style.display = 'flex';
+}
+
+function closeDeleteModal() {
+  pendingDeleteNodeId = null;
+  deleteConfirmModal.style.display = 'none';
+}
+
+async function executeDeleteNode() {
+  if (!pendingDeleteNodeId) return;
+
+  const nodeId = pendingDeleteNodeId;
+  btnConfirmDelete.disabled = true;
+  btnConfirmDelete.innerHTML = '<span>Excluindo...</span>';
+
+  try {
+    const res = await fetch(`/api/v1/nodes?node_id=${encodeURIComponent(nodeId)}`, {
+      method: 'DELETE'
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Falha ao excluir computador');
+    }
+
+    closeDeleteModal();
+    closePCModal();
+
+    showToast(`Computador "${nodeId}" foi excluído com sucesso!`, 'toast-success');
+
+    // Se o nó excluído era o filtro selecionado, reseta para "all"
+    if (selectNode.value === nodeId) {
+      selectNode.value = 'all';
+    }
+
+    await loadDashboardData();
+  } catch (err) {
+    showToast(`Erro ao excluir: ${err.message}`, 'toast-error');
+  } finally {
+    btnConfirmDelete.disabled = false;
+    btnConfirmDelete.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+      <span>Sim, Excluir Definitivamente</span>
+    `;
+  }
+}
+
+/* ==========================================================================
+   7. Gráficos Comparativos Chart.js
+   ========================================================================== */
+
 function initCharts() {
   const chartOpts = {
     responsive: true,
@@ -216,7 +544,6 @@ function initCharts() {
     }
   };
 
-  // 1. Bandwidth Chart
   const ctxBandwidth = document.getElementById('centralBandwidthChart').getContext('2d');
   bandwidthChart = new Chart(ctxBandwidth, {
     type: 'line',
@@ -233,7 +560,6 @@ function initCharts() {
     }
   });
 
-  // 2. Latency Chart
   const ctxLatency = document.getElementById('centralLatencyChart').getContext('2d');
   latencyChart = new Chart(ctxLatency, {
     type: 'line',
@@ -251,7 +577,6 @@ function initCharts() {
   });
 }
 
-// Renderiza os gráficos comparativos agrupados por nó
 function renderComparativeCharts(series, nodesList) {
   if (!series || series.length === 0) {
     bandwidthChart.data.labels = [];
@@ -264,72 +589,94 @@ function renderComparativeCharts(series, nodesList) {
     return;
   }
 
-  // Identifica timestamps únicos ordenados
   const timestamps = Array.from(new Set(series.map(s => s.timestamp))).sort();
   const labels = timestamps.map(t => {
     const d = new Date(t);
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   });
 
-  // Agrupa métricas por nó
   const byNode = {};
   series.forEach(item => {
-    if (!byNode[item.NodeID || item.node_id]) {
-      byNode[item.NodeID || item.node_id] = {};
-    }
-    byNode[item.NodeID || item.node_id][item.timestamp] = item;
+    const id = item.node_id || item.NodeID;
+    if (!byNode[id]) byNode[id] = {};
+    byNode[id][item.timestamp] = item;
   });
 
   const selectedNode = selectNode.value;
-  const bandwidthDatasets = [];
-  const latencyDatasets = [];
-
   const targetNodes = (selectedNode === 'all')
     ? Object.keys(byNode)
     : [selectedNode];
 
-  targetNodes.forEach((nodeId, idx) => {
-    const color = nodeColors[idx % nodeColors.length];
-    const nodeDataMap = byNode[nodeId] || {};
+  if (selectedNode !== 'all') {
+    const nodeItems = series.filter(s => (s.node_id || s.NodeID) === selectedNode);
+    const nodeLabels = nodeItems.map(item => {
+      const d = new Date(item.timestamp);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
 
-    const downData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].download_mbps : null);
-    const upData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].upload_mbps : null);
-    const pingData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].ping_gateway : null);
+    const downData = nodeItems.map(item => item.download_mbps);
+    const upData = nodeItems.map(item => item.upload_mbps);
+    const pingData = nodeItems.map(item => item.ping_gateway);
 
-    // Se estiver filtrado por 1 nó, mostra Download e Upload do nó
-    if (selectedNode !== 'all') {
-      bandwidthDatasets.push({
-        label: `${nodeId} - Download`,
+    bandwidthChart.data.labels = nodeLabels;
+    bandwidthChart.data.datasets = [
+      {
+        label: `${selectedNode} - Download`,
         data: downData,
         borderColor: '#06b6d4',
         backgroundColor: 'rgba(6, 182, 212, 0.1)',
         tension: 0.3,
         borderWidth: 2,
         pointRadius: 3
-      });
-      bandwidthDatasets.push({
-        label: `${nodeId} - Upload`,
+      },
+      {
+        label: `${selectedNode} - Upload`,
         data: upData,
         borderColor: '#a855f7',
         backgroundColor: 'rgba(168, 85, 247, 0.08)',
         tension: 0.3,
         borderWidth: 2,
         pointRadius: 3
-      });
-    } else {
-      // Comparativo entre todos os nós (Download de cada um)
-      bandwidthDatasets.push({
-        label: `${nodeId} (Down)`,
-        data: downData,
-        borderColor: color.border,
-        backgroundColor: color.bg,
+      }
+    ];
+    bandwidthChart.update();
+
+    latencyChart.data.labels = nodeLabels;
+    latencyChart.data.datasets = [
+      {
+        label: `${selectedNode} (Ping)`,
+        data: pingData,
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
         tension: 0.3,
         borderWidth: 2,
-        pointRadius: 2
-      });
-    }
+        pointRadius: 3
+      }
+    ];
+    latencyChart.update();
+    return;
+  }
 
-    // Latência do nó
+  const bandwidthDatasets = [];
+  const latencyDatasets = [];
+
+  targetNodes.forEach((nodeId, idx) => {
+    const color = nodeColors[idx % nodeColors.length];
+    const nodeDataMap = byNode[nodeId] || {};
+
+    const downData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].download_mbps : null);
+    const pingData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].ping_gateway : null);
+
+    bandwidthDatasets.push({
+      label: `${nodeId} (Down)`,
+      data: downData,
+      borderColor: color.border,
+      backgroundColor: color.bg,
+      tension: 0.3,
+      borderWidth: 2,
+      pointRadius: 3
+    });
+
     latencyDatasets.push({
       label: `${nodeId}`,
       data: pingData,
@@ -337,40 +684,41 @@ function renderComparativeCharts(series, nodesList) {
       backgroundColor: color.bg,
       tension: 0.3,
       borderWidth: 2,
-      pointRadius: 2
+      pointRadius: 3
     });
   });
 
-  // Atualiza Throughput
   bandwidthChart.data.labels = labels;
   bandwidthChart.data.datasets = bandwidthDatasets;
   bandwidthChart.update();
 
-  // Atualiza Latência
   latencyChart.data.labels = labels;
   latencyChart.data.datasets = latencyDatasets;
   latencyChart.update();
 }
 
-// Renderiza a tabela de telemetria
+/* ==========================================================================
+   8. Tabela de Feed de Telemetria
+   ========================================================================== */
+
 function renderTelemetryTable(series) {
   if (!series || series.length === 0) {
     telemetryTableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhuma telemetria recebida até o momento.</td></tr>';
     return;
   }
 
-  // Mostra as últimas 15 leituras em ordem decrescente
   const recent = [...series].reverse().slice(0, 15);
 
   telemetryTableBody.innerHTML = recent.map(item => {
     const d = new Date(item.timestamp);
     const dateFormatted = `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+    const id = item.node_id || item.NodeID;
 
     return `
       <tr>
         <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${dateFormatted}</td>
-        <td><span class="telemetry-node-tag">${item.node_id}</span></td>
-        <td>${item.location}</td>
+        <td><span class="telemetry-node-tag">${escapeHtml(id)}</span></td>
+        <td>${escapeHtml(item.location || 'Desconhecido')}</td>
         <td><strong style="color: var(--accent-cyan);">${item.download_mbps.toFixed(1)}</strong> Mbps</td>
         <td><strong style="color: #c084fc;">${item.upload_mbps.toFixed(1)}</strong> Mbps</td>
         <td><strong style="color: #34d399;">${item.ping_gateway.toFixed(1)}</strong> ms</td>
@@ -379,6 +727,10 @@ function renderTelemetryTable(series) {
     `;
   }).join('');
 }
+
+/* ==========================================================================
+   9. Utilitários & Toasts
+   ========================================================================== */
 
 function formatTimeAgo(date) {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -389,27 +741,29 @@ function formatTimeAgo(date) {
   return `há ${hours}h`;
 }
 
-// Fallback visual caso a API ainda esteja iniciando
-function useFallbackMock() {
-  const nodes = ['minipc-dc-01', 'minipc-dc-02', 'minipc-dc-03'];
-  const locations = {
-    'minipc-dc-01': 'Guarapuava-DC1',
-    'minipc-dc-02': 'Curitiba-DC2',
-    'minipc-dc-03': 'SaoPaulo-DC3'
-  };
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
-  const summaries = nodes.map(id => ({
-    node_id: id,
-    location: locations[id],
-    last_seen: new Date().toISOString(),
-    last_download: id === 'minipc-dc-01' ? 850.5 : (id === 'minipc-dc-02' ? 920.0 : 780.0),
-    last_upload: id === 'minipc-dc-01' ? 720.0 : (id === 'minipc-dc-02' ? 810.0 : 690.0),
-    last_ping: id === 'minipc-dc-01' ? 1.2 : (id === 'minipc-dc-02' ? 3.4 : 8.5),
-    is_healthy: true,
-    total_readings_24h: 24
-  }));
+function showToast(message, type = 'toast-info') {
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
 
-  updateNodeSelector(nodes);
-  renderSummaryCards(summaries);
-  activeNodesCount.textContent = nodes.length;
+  let icon = 'ℹ️';
+  if (type === 'toast-success') icon = '✅';
+  if (type === 'toast-error') icon = '⚠️';
+
+  toast.innerHTML = `<span>${icon}</span><span>${escapeHtml(message)}</span>`;
+  toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
 }

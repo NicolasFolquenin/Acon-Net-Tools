@@ -1,10 +1,11 @@
 /**
- * Client Probe - Desktop Wails Frontend Logic (Dist Bundle)
+ * Client Probe - Desktop Wails Frontend Logic
  */
 
 let throughputChart = null;
 let latencyChart = null;
 
+// Elementos DOM
 const btnRunTest = document.getElementById('btn-run-test');
 const btnIconPlay = document.getElementById('btn-icon-play');
 const btnSpinner = document.getElementById('btn-spinner');
@@ -24,12 +25,14 @@ const nextRunText = document.getElementById('next-run-text');
 const metricsTableBody = document.getElementById('metrics-table-body');
 const lastUpdatedText = document.getElementById('last-updated-text');
 
+// Modal Settings Elements
 const modalSettings = document.getElementById('settings-modal');
 const btnOpenSettings = document.getElementById('btn-open-settings');
 const btnCloseSettings = document.getElementById('btn-close-settings');
 const btnCancelSettings = document.getElementById('btn-cancel-settings');
 const settingsForm = document.getElementById('settings-form');
 
+// Helper para invocar métodos Wails com fallback seguro
 const WailsApp = {
   async getStatus() {
     if (window.go && window.go.main && window.go.main.App) {
@@ -49,6 +52,7 @@ const WailsApp = {
     if (window.go && window.go.main && window.go.main.App) {
       return await window.go.main.App.GetHistory();
     }
+    // Mock para desenvolvimento/preview no navegador
     return generateMockHistory(24);
   },
 
@@ -76,7 +80,7 @@ const WailsApp = {
     return {
       node_id: 'minipc-dc-01',
       location: 'Guarapuava-DC1',
-      server_url: 'http://localhost:8080',
+      server_url: 'http://localhost:8090',
       api_token: 'super-secret-probe-token-2026',
       interval_minutes: 60,
       ping_target: '192.168.1.1'
@@ -92,12 +96,14 @@ const WailsApp = {
   }
 };
 
+// Inicialização da aplicação
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   initCharts();
   await loadAppConfig();
   await refreshDashboard();
 
+  // Escuta eventos Wails se disponíveis
   if (window.runtime) {
     window.runtime.EventsOn('status_updated', updateStatusBadge);
     window.runtime.EventsOn('metric_added', (record) => {
@@ -105,6 +111,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Polling leve para sincronizar UI caso não haja Wails runtime
   setInterval(async () => {
     const status = await WailsApp.getStatus();
     updateStatusBadge(status);
@@ -119,12 +126,13 @@ function setupEventListeners() {
   settingsForm.addEventListener('submit', onSaveSettings);
 }
 
+// Handler do botão "Rodar Teste Agora" com estado visual de loading
 async function onRunTestClicked() {
   setLoadingState(true);
   updateStatusBadge({ is_running: true, status_text: 'Executando teste manual...' });
 
   try {
-    await WailsApp.runTestNow();
+    const newMetric = await WailsApp.runTestNow();
     await refreshDashboard();
   } catch (err) {
     console.error('Erro ao executar teste:', err);
@@ -176,8 +184,37 @@ function updateStatusBadge(status) {
       statSync.style.color = '#10b981';
     }
   }
+
+  // Preenche dados do PC
+  if (status.current_pc) {
+    const pc = status.current_pc;
+    const pcModel = document.getElementById('pc-model');
+    const pcCpu = document.getElementById('pc-cpu');
+    const pcRam = document.getElementById('pc-ram');
+    const pcIpMac = document.getElementById('pc-ip-mac');
+    const pcAdapter = document.getElementById('pc-adapter');
+
+    if (pcModel) pcModel.textContent = pc.model || pc.hostname || 'Dell Pro Micro';
+    if (pcCpu) pcCpu.textContent = pc.cpu || 'Intel Core Ultra';
+    if (pcRam) pcRam.textContent = pc.ram_total_gb ? `${pc.ram_total_gb.toFixed(1)} GB` : '-- GB';
+    if (pcIpMac) pcIpMac.textContent = `${pc.ip_address || '--'} / ${pc.mac_address || '--'}`;
+    if (pcAdapter) pcAdapter.textContent = pc.network_adapter || 'Ethernet';
+  }
+
+  // Preenche dados do Switch LLDP
+  if (status.current_switch) {
+    const sw = status.current_switch;
+    const swName = document.getElementById('switch-name');
+    const swPort = document.getElementById('switch-port');
+    const swVlan = document.getElementById('switch-vlan');
+
+    if (swName) swName.textContent = sw.switch_name || 'Aguardando frame LLDP...';
+    if (swPort) swPort.textContent = sw.switch_port || '--';
+    if (swVlan) swVlan.textContent = sw.vlan ? `VLAN ${sw.vlan}` : (sw.switch_model || '--');
+  }
 }
 
+// Inicialização dos Gráficos com Chart.js
 function initCharts() {
   const commonOptions = {
     responsive: true,
@@ -206,6 +243,7 @@ function initCharts() {
     }
   };
 
+  // 1. Throughput Chart (Download & Upload)
   const ctxThroughput = document.getElementById('throughputChart').getContext('2d');
   throughputChart = new Chart(ctxThroughput, {
     type: 'line',
@@ -248,6 +286,7 @@ function initCharts() {
     }
   });
 
+  // 2. Latency Chart (Ping)
   const ctxLatency = document.getElementById('latencyChart').getContext('2d');
   latencyChart = new Chart(ctxLatency, {
     type: 'line',
@@ -280,6 +319,7 @@ function initCharts() {
   });
 }
 
+// Atualiza Dashboard com métricas do SQLite
 async function refreshDashboard() {
   const history = await WailsApp.getHistory();
   const status = await WailsApp.getStatus();
@@ -289,10 +329,12 @@ async function refreshDashboard() {
   if (history && history.length > 0) {
     const latest = history[history.length - 1];
 
+    // Atualiza cards numéricos
     statDownload.textContent = latest.download_mbps.toFixed(1);
     statUpload.textContent = latest.upload_mbps.toFixed(1);
     statPing.textContent = latest.ping_gateway.toFixed(1);
 
+    // Formata timestamps e alimenta gráficos (últimas 24 execuções)
     const labels = history.map(item => {
       const d = new Date(item.timestamp);
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -302,15 +344,18 @@ async function refreshDashboard() {
     const uploads = history.map(item => item.upload_mbps);
     const pings = history.map(item => item.ping_gateway);
 
+    // Atualiza Chart Throughput
     throughputChart.data.labels = labels;
     throughputChart.data.datasets[0].data = downloads;
     throughputChart.data.datasets[1].data = uploads;
     throughputChart.update();
 
+    // Atualiza Chart Latência
     latencyChart.data.labels = labels;
     latencyChart.data.datasets[0].data = pings;
     latencyChart.update();
 
+    // Renderiza tabela de log recente (inversa para mostrar mais novo no topo)
     renderTable([...history].reverse());
     lastUpdatedText.textContent = `Última leitura: ${new Date(latest.timestamp).toLocaleTimeString()}`;
   } else {
@@ -345,6 +390,7 @@ function renderTable(records) {
   }).join('');
 }
 
+// Configurações
 async function loadAppConfig() {
   const cfg = await WailsApp.getConfig();
   nodeIdDisplay.textContent = cfg.node_id || 'node-01';
@@ -387,6 +433,7 @@ async function onSaveSettings(e) {
   }
 }
 
+// Fallback Mock generator
 function generateMockHistory(count) {
   const list = [];
   const now = Date.now();

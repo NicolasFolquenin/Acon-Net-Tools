@@ -5,13 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Network Probe Agent</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- Google Fonts Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="app-container">
+    <!-- Header -->
     <header class="top-header">
       <div class="brand-group">
         <div class="brand-icon">
@@ -32,11 +35,13 @@
       </div>
 
       <div class="header-actions">
+        <!-- Status Badge -->
         <div id="status-badge" class="status-badge scheduled">
           <span class="status-pulse"></span>
           <span id="status-text">Agendado (1h)</span>
         </div>
 
+        <!-- Botão Rodar Teste Agora -->
         <button id="btn-run-test" class="btn btn-primary">
           <svg id="btn-icon-play" class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -45,6 +50,7 @@
           <span id="btn-label">Rodar Teste Agora</span>
         </button>
 
+        <!-- Botão Configurações -->
         <button id="btn-open-settings" class="btn btn-secondary" title="Configurações">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
@@ -54,8 +60,11 @@
       </div>
     </header>
 
+    <!-- Main Content -->
     <main class="main-content">
+      <!-- Metric Cards Grid -->
       <section class="cards-grid">
+        <!-- Download Card -->
         <div class="card card-stat card-cyan">
           <div class="card-header">
             <div class="card-title">DOWNLOAD</div>
@@ -77,6 +86,7 @@
           <div class="card-footer-glow cyan-glow"></div>
         </div>
 
+        <!-- Upload Card -->
         <div class="card card-stat card-purple">
           <div class="card-header">
             <div class="card-title">UPLOAD</div>
@@ -98,6 +108,7 @@
           <div class="card-footer-glow purple-glow"></div>
         </div>
 
+        <!-- Ping Card -->
         <div class="card card-stat card-emerald">
           <div class="card-header">
             <div class="card-title">PING GATEWAY</div>
@@ -118,6 +129,7 @@
           <div class="card-footer-glow emerald-glow"></div>
         </div>
 
+        <!-- Central Sync Card -->
         <div class="card card-stat card-blue">
           <div class="card-header">
             <div class="card-title">SYNC CENTRAL</div>
@@ -142,7 +154,83 @@
         </div>
       </section>
 
+      <!-- Hardware & LLDP Switch Information Section -->
+      <section class="device-info-section">
+        <!-- PC Specs Card -->
+        <div class="info-box-card">
+          <div class="info-box-header">
+            <div class="info-box-icon cyan">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+            </div>
+            <div>
+              <h4>Hardware do Host</h4>
+              <p class="text-muted text-xs">Especificações do nó de teste</p>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">Computador:</span>
+              <span class="info-val" id="pc-model">Detectando...</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Processador:</span>
+              <span class="info-val" id="pc-cpu">Detectando...</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Memória RAM:</span>
+              <span class="info-val" id="pc-ram">-- GB</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">IP Local / MAC:</span>
+              <span class="info-val font-mono" id="pc-ip-mac">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Switch LLDP Card -->
+        <div class="info-box-card">
+          <div class="info-box-header">
+            <div class="info-box-icon purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              </svg>
+            </div>
+            <div>
+              <h4>Conexão de Switch (LLDP)</h4>
+              <p class="text-muted text-xs">Descoberta em tempo real da porta de rede</p>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">Nome do Switch:</span>
+              <span class="info-val font-bold text-cyan" id="switch-name">Aguardando frame LLDP...</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Porta Conectada:</span>
+              <span class="info-val font-bold" id="switch-port">--</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">VLAN de Acesso:</span>
+              <span class="info-val" id="switch-vlan">--</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Placa Local:</span>
+              <span class="info-val" id="pc-adapter">--</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Charts Section (Last 24 runs) -->
       <section class="charts-container">
+        <!-- Throughput Chart -->
         <div class="chart-card">
           <div class="chart-card-header">
             <div>
@@ -159,6 +247,7 @@
           </div>
         </div>
 
+        <!-- Latency Chart -->
         <div class="chart-card">
           <div class="chart-card-header">
             <div>
@@ -175,6 +264,7 @@
         </div>
       </section>
 
+      <!-- Recent Executions Table -->
       <section class="table-section">
         <div class="section-header">
           <h3>Log de Execuções Recentes</h3>
@@ -201,6 +291,7 @@
       </section>
     </main>
 
+    <!-- Footer Bar -->
     <footer class="app-footer">
       <div class="footer-item">
         <span class="dot-live"></span> Agente Operando em Background (Goroutine Ticker 1h)
@@ -214,6 +305,7 @@
     </footer>
   </div>
 
+  <!-- Settings Modal -->
   <div id="settings-modal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
