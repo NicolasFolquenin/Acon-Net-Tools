@@ -188,6 +188,25 @@ func (m *MongoDBClient) GetDistinctNodes(ctx context.Context) ([]string, error) 
 	return nodes, nil
 }
 
+// DeleteNode remove todos os registros e métricas pertencentes a um determinado nó
+func (m *MongoDBClient) DeleteNode(ctx context.Context, nodeID string) (int64, error) {
+	if m.Collection == nil {
+		return 0, fmt.Errorf("colecao mongodb nao inicializada")
+	}
+
+	filter := bson.M{
+		"metadata.node_id": nodeID,
+	}
+
+	res, err := m.Collection.DeleteMany(ctx, filter)
+	if err != nil {
+		return 0, fmt.Errorf("erro ao excluir no '%s': %w", nodeID, err)
+	}
+
+	log.Printf("[MONGODB] No '%s' excluido do sistema. Total de registros removidos: %d", nodeID, res.DeletedCount)
+	return res.DeletedCount, nil
+}
+
 // Disconnect encerra a conexão com o MongoDB
 func (m *MongoDBClient) Disconnect(ctx context.Context) error {
 	if m.Client != nil {
@@ -195,3 +214,4 @@ func (m *MongoDBClient) Disconnect(ctx context.Context) error {
 	}
 	return nil
 }
+

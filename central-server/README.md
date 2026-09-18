@@ -103,9 +103,17 @@ Ou filtrar por um nó específico:
 curl -s "http://localhost:8080/api/v1/dashboard/metrics?node_id=minipc-dc-01" | jq .
 ```
 
-### 3. Geração Rápida de Dados de Teste de 24h
+### 3. Autenticação do Dashboard (`POST /api/v1/auth/login`)
 ```bash
-curl -X POST http://localhost:8080/api/v1/seed
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin123"}'
+```
+
+### 4. Exclusão de Computador por Admin (`DELETE /api/v1/nodes`)
+```bash
+curl -X DELETE "http://localhost:8080/api/v1/nodes?node_id=minipc-dc-01" \
+  --cookie "noc_session=<TOKEN_ADMIN>"
 ```
 
 ---

@@ -41,6 +41,7 @@ func main() {
 
 	// 3. Inicializa Handlers
 	metricsHandler := handlers.NewMetricsHandler(mongoClient, cfg)
+	authHandler := handlers.NewAuthHandler(cfg)
 
 	mux := http.NewServeMux()
 
@@ -58,15 +59,20 @@ func main() {
 	mux.HandleFunc("/api/v1/speedtest/download", handlers.SpeedtestDownloadHandler)
 	mux.HandleFunc("/api/v1/speedtest/upload", handlers.SpeedtestUploadHandler)
 
+	// Endpoints de Autenticação (Login, Logout, Sessão Atual)
+	mux.HandleFunc("/api/v1/auth/login", authHandler.Login)
+	mux.HandleFunc("/api/v1/auth/logout", authHandler.Logout)
+	mux.HandleFunc("/api/v1/auth/me", authHandler.Me)
+
 	// Endpoints da API oficial
 	// POST /api/v1/metrics protegido por Bearer Token
 	mux.HandleFunc("/api/v1/metrics", handlers.RequireBearerToken(cfg.APIToken, metricsHandler.PostMetric))
 
-	// GET /api/v1/dashboard/metrics
-	mux.HandleFunc("/api/v1/dashboard/metrics", metricsHandler.GetDashboardMetrics)
+	// GET /api/v1/dashboard/metrics protegido por Autenticação (Admin ou Operador)
+	mux.HandleFunc("/api/v1/dashboard/metrics", authHandler.RequireAuth(metricsHandler.GetDashboardMetrics))
 
-	// POST /api/v1/seed (utilitário para gerar histórico de 24h para demonstração visual)
-	mux.HandleFunc("/api/v1/seed", metricsHandler.SeedSampleData)
+	// DELETE /api/v1/nodes protegido exclusivamente para perfil Administrador
+	mux.HandleFunc("/api/v1/nodes", authHandler.RequireAdmin(metricsHandler.DeleteNode))
 
 	// Envolve com middlewares de CORS e Logging
 	rootHandler := handlers.CORSMiddleware(handlers.LoggerMiddleware(mux))

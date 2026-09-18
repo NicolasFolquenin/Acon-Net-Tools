@@ -73,8 +73,8 @@ func (a *App) startup(ctx context.Context) {
 		a.mu.Unlock()
 		a.emitStatus()
 
-		// Busca inicial de LLDP em background
-		lldpCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		// Busca inicial de LLDP em background (captura resiliente)
+		lldpCtx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 		defer cancel()
 		sw := DiscoverSwitchLLDP(lldpCtx)
 		a.mu.Lock()
@@ -181,6 +181,16 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 		return nil, err
 	}
 
+	// Se a sonda já possuía o switch detectado e a medição rápida não capturou, preserva o switch conhecido
+	if (payload.SwitchInfo == nil || payload.SwitchInfo.SwitchName == "" || payload.SwitchInfo.SwitchName == "Aguardando frame LLDP") &&
+		a.currentSwitch != nil && a.currentSwitch.SwitchName != "" && a.currentSwitch.SwitchName != "Aguardando frame LLDP" {
+		payload.SwitchInfo = a.currentSwitch
+	} else if payload.SwitchInfo != nil && payload.SwitchInfo.SwitchName != "" && payload.SwitchInfo.SwitchName != "Aguardando frame LLDP" {
+		a.mu.Lock()
+		a.currentSwitch = payload.SwitchInfo
+		a.mu.Unlock()
+	}
+
 	// 2. Envia para o servidor central (POST com Bearer token)
 	sendCtx, cancelSend := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancelSend()
@@ -272,7 +282,17 @@ func (a *App) GetConfig() Config {
 
 // SaveConfig atualiza as configurações a partir da UI
 func (a *App) SaveConfig(cfg Config) error {
-	return SaveConfig(cfg)
+	err := SaveConfig(cfg)
+	if err == nil {
+		go func() {
+			syncCtx, syncCancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer syncCancel()
+			if count := a.storage.SyncPendingMetrics(syncCtx, cfg.ServerURL, cfg.APIToken); count > 0 {
+				a.emitStatus()
+			}
+		}()
+	}
+	return err
 }
 
 func (a *App) emitStatus() {

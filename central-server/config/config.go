@@ -17,6 +17,11 @@ type AppConfig struct {
 	APIToken        string
 	StaticDir       string
 	QueryHoursLimit int
+	AdminUser       string
+	AdminPass       string
+	ViewerUser      string
+	ViewerPass      string
+	SessionSecret   string
 }
 
 // LoadEnvFile faz o parse de um arquivo .env simples (chave=valor) sem dependências externas
@@ -51,14 +56,26 @@ func LoadConfig() *AppConfig {
 	// Tenta carregar .env local caso esteja rodando diretamente (ex: go run main.go)
 	LoadEnvFile(".env")
 
+	staticDir := getEnv("STATIC_DIR", "./public")
+	if _, err := os.Stat(staticDir); os.IsNotExist(err) {
+		if _, err2 := os.Stat("./public"); err2 == nil {
+			staticDir = "./public"
+		}
+	}
+
 	cfg := &AppConfig{
 		Port:            getEnv("PORT", "8080"),
 		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		DatabaseName:    getEnv("MONGO_DB", "network_central"),
 		CollectionName:  getEnv("MONGO_COLLECTION", "metrics"),
 		APIToken:        getEnv("API_TOKEN", "super-secret-probe-token-2026"),
-		StaticDir:       getEnv("STATIC_DIR", "./public"),
+		StaticDir:       staticDir,
 		QueryHoursLimit: getEnvAsInt("QUERY_HOURS_LIMIT", 24),
+		AdminUser:       getEnv("AUTH_ADMIN_USER", "admin"),
+		AdminPass:       getEnv("AUTH_ADMIN_PASSWORD", "admin123"),
+		ViewerUser:      getEnv("AUTH_VIEWER_USER", "operador"),
+		ViewerPass:      getEnv("AUTH_VIEWER_PASSWORD", "operador123"),
+		SessionSecret:   getEnv("SESSION_SECRET", "super-secret-session-key-change-in-prod-2026"),
 	}
 
 	log.Printf("[CONFIG] Servidor configurado: Port=%s, MongoURI=%s, DB=%s, Collection=%s",
