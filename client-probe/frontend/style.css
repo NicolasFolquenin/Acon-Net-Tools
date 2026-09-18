@@ -156,37 +156,30 @@ body {
   gap: 14px;
 }
 
-.brand-icon {
-  width: 42px;
-  height: 42px;
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(168, 85, 247, 0.2));
-  border: 1px solid rgba(6, 182, 212, 0.4);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--cyan-light);
-  box-shadow: 0 0 12px var(--cyan-glow);
+.brand-logo {
+  height: 38px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+  display: block;
   flex-shrink: 0;
 }
 
-.brand-icon svg {
-  width: 22px;
-  height: 22px;
+[data-theme="dark"] .brand-logo,
+:root:not([data-theme="light"]) .brand-logo {
+  filter: brightness(0) invert(1);
+}
+
+[data-theme="light"] .brand-logo {
+  filter: none;
 }
 
 .brand-info h1 {
-  font-size: 1.2rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   line-height: 1.2;
-}
-
-.brand-info h1 span {
-  background: linear-gradient(90deg, var(--cyan-light), var(--purple-light));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 .node-meta {
