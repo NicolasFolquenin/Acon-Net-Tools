@@ -117,10 +117,13 @@
           <div class="chart-panel">
             <div class="panel-header">
               <div>
-                <h4>Comparativo de Banda (Download & Upload)</h4>
-                <p class="panel-desc">Throughput das últimas 24 horas por nó e data center (Mbps)</p>
+                <h4>Histórico de Throughput (Download & Upload)</h4>
+                <p class="panel-desc">Taxas de Download e Upload em Megabits por segundo (Mbps)</p>
               </div>
-              <div class="panel-tag">Throughput (Mbps)</div>
+              <div id="bandwidth-legend-container" class="chart-legend-custom">
+                <span class="legend-badge cyan-dot">Download</span>
+                <span class="legend-badge purple-dot">Upload</span>
+              </div>
             </div>
             <div class="chart-canvas-container">
               <canvas id="centralBandwidthChart"></canvas>
@@ -131,10 +134,12 @@
           <div class="chart-panel">
             <div class="panel-header">
               <div>
-                <h4>Comparativo de Latência de Gateway (Ping)</h4>
-                <p class="panel-desc">Round-trip time em milissegundos (ms) monitorado continuamente</p>
+                <h4>Histórico de Latência (Gateway)</h4>
+                <p class="panel-desc">Tempo de resposta em milissegundos (ms)</p>
               </div>
-              <div class="panel-tag tag-latency">Latência (ms)</div>
+              <div id="latency-legend-container" class="chart-legend-custom">
+                <span class="legend-badge emerald-dot">Ping Gateway</span>
+              </div>
             </div>
             <div class="chart-canvas-container">
               <canvas id="centralLatencyChart"></canvas>
