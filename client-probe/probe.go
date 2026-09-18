@@ -54,6 +54,14 @@ func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config) (*MetricPaylo
 	uploadMbps := p.measureUpload(ctx, cfg.ServerURL)
 	log.Printf("[PROBE] Upload estimado: %.2f Mbps", uploadMbps)
 
+	// 4. Coleta Informações da Máquina Local (Hardware, CPU, RAM, IP, MAC)
+	sysInfo := CollectSystemInfo()
+
+	// 5. Coleta Informações do Switch via LLDP (Timeout rápido de 8s para não atrasar medição)
+	lldpCtx, cancelLldp := context.WithTimeout(ctx, 8*time.Second)
+	switchInfo := DiscoverSwitchLLDP(lldpCtx)
+	cancelLldp()
+
 	payload := &MetricPayload{
 		NodeID:       cfg.NodeID,
 		Location:     cfg.Location,
@@ -61,6 +69,8 @@ func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config) (*MetricPaylo
 		DownloadMbps: math.Round(downloadMbps*100) / 100,
 		UploadMbps:   math.Round(uploadMbps*100) / 100,
 		PingGateway:  math.Round(pingMs*100) / 100,
+		SystemInfo:   &sysInfo,
+		SwitchInfo:   &switchInfo,
 	}
 
 	return payload, nil
@@ -95,7 +105,7 @@ func (p *NetworkProbe) pingViaExec(target string) (float64, error) {
 	} else {
 		cmd = exec.Command("ping", "-c", "2", "-W", "1", target)
 	}
-
+	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, err

@@ -20,8 +20,10 @@ type App struct {
 	statusText   string
 	lastRun      *time.Time
 	nextRun      *time.Time
-	lastMetric   *LocalMetricRecord
-	mu           sync.Mutex
+	lastMetric    *LocalMetricRecord
+	currentPC     *SystemInfo
+	currentSwitch *SwitchInfo
+	mu            sync.Mutex
 }
 
 // NewApp cria uma nova instância de App
@@ -55,7 +57,31 @@ func (a *App) startup(ctx context.Context) {
 	if len(history) > 0 {
 		a.lastMetric = &history[len(history)-1]
 		a.lastRun = &a.lastMetric.Timestamp
+		if a.lastMetric.SystemInfo != nil {
+			a.currentPC = a.lastMetric.SystemInfo
+		}
+		if a.lastMetric.SwitchInfo != nil {
+			a.currentSwitch = a.lastMetric.SwitchInfo
+		}
 	}
+
+	// 4. Coleta dados de hardware do PC imediatamente na inicialização
+	go func() {
+		pc := CollectSystemInfo()
+		a.mu.Lock()
+		a.currentPC = &pc
+		a.mu.Unlock()
+		a.emitStatus()
+
+		// Busca inicial de LLDP em background (captura resiliente)
+		lldpCtx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
+		sw := DiscoverSwitchLLDP(lldpCtx)
+		a.mu.Lock()
+		a.currentSwitch = &sw
+		a.mu.Unlock()
+		a.emitStatus()
+	}()
 
 	interval := time.Duration(cfg.IntervalMinutes) * time.Minute
 	if interval < 1*time.Minute {
@@ -69,6 +95,16 @@ func (a *App) startup(ctx context.Context) {
 	workerCtx, cancel := context.WithCancel(context.Background())
 	a.cancelWorker = cancel
 	go a.backgroundScheduler(workerCtx, interval)
+
+	// Sincroniza medições que porventura ficaram pendentes offline
+	go func() {
+		time.Sleep(2 * time.Second)
+		syncCtx, syncCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer syncCancel()
+		if count := a.storage.SyncPendingMetrics(syncCtx, cfg.ServerURL, cfg.APIToken); count > 0 {
+			a.emitStatus()
+		}
+	}()
 
 	log.Println("[APP] Probe inicializada com sucesso e pronta para operacao.")
 }
@@ -145,6 +181,16 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 		return nil, err
 	}
 
+	// Se a sonda já possuía o switch detectado e a medição rápida não capturou, preserva o switch conhecido
+	if (payload.SwitchInfo == nil || payload.SwitchInfo.SwitchName == "" || payload.SwitchInfo.SwitchName == "Aguardando frame LLDP") &&
+		a.currentSwitch != nil && a.currentSwitch.SwitchName != "" && a.currentSwitch.SwitchName != "Aguardando frame LLDP" {
+		payload.SwitchInfo = a.currentSwitch
+	} else if payload.SwitchInfo != nil && payload.SwitchInfo.SwitchName != "" && payload.SwitchInfo.SwitchName != "Aguardando frame LLDP" {
+		a.mu.Lock()
+		a.currentSwitch = payload.SwitchInfo
+		a.mu.Unlock()
+	}
+
 	// 2. Envia para o servidor central (POST com Bearer token)
 	sendCtx, cancelSend := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancelSend()
@@ -155,6 +201,9 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 	if sendErr != nil {
 		synced = false
 		errMsg = sendErr.Error()
+		log.Printf("[APP][SYNC] Falha ao enviar para o servidor central: %v", sendErr)
+	} else {
+		log.Printf("[APP][SYNC] Enviado com sucesso para o servidor central!")
 	}
 
 	// 3. Persiste no SQLite local
@@ -162,6 +211,17 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 	if err != nil {
 		log.Printf("[APP] Erro ao gravar historico local: %v", err)
 		return nil, err
+	}
+
+	// Se esta leitura sincronizou e há leituras pendentes antigas, sincroniza-as em background
+	if synced {
+		go func() {
+			syncCtx, syncCancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer syncCancel()
+			if count := a.storage.SyncPendingMetrics(syncCtx, cfg.ServerURL, cfg.APIToken); count > 0 {
+				a.emitStatus()
+			}
+		}()
 	}
 
 	now := time.Now()
@@ -202,14 +262,16 @@ func (a *App) GetStatus() ProbeStatus {
 	}
 
 	return ProbeStatus{
-		IsRunning:    a.isRunning,
-		StatusText:   a.statusText,
-		LastRun:      a.lastRun,
-		NextRun:      a.nextRun,
-		LastMetric:   a.lastMetric,
-		ServerStatus: serverStatus,
-		TotalSynced:  syncedCount,
-		TotalPending: pendingCount,
+		IsRunning:     a.isRunning,
+		StatusText:    a.statusText,
+		LastRun:       a.lastRun,
+		NextRun:       a.nextRun,
+		LastMetric:    a.lastMetric,
+		ServerStatus:  serverStatus,
+		TotalSynced:   syncedCount,
+		TotalPending:  pendingCount,
+		CurrentPC:     a.currentPC,
+		CurrentSwitch: a.currentSwitch,
 	}
 }
 
@@ -220,7 +282,17 @@ func (a *App) GetConfig() Config {
 
 // SaveConfig atualiza as configurações a partir da UI
 func (a *App) SaveConfig(cfg Config) error {
-	return SaveConfig(cfg)
+	err := SaveConfig(cfg)
+	if err == nil {
+		go func() {
+			syncCtx, syncCancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer syncCancel()
+			if count := a.storage.SyncPendingMetrics(syncCtx, cfg.ServerURL, cfg.APIToken); count > 0 {
+				a.emitStatus()
+			}
+		}()
+	}
+	return err
 }
 
 func (a *App) emitStatus() {
