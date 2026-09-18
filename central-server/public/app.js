@@ -61,6 +61,7 @@ let refreshInterval = null;
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   initCharts();
   setupEventListeners();
   await checkAuthAndInitialize();
@@ -161,6 +162,34 @@ async function handleLogout() {
   }
   showToast('Sessão encerrada com sucesso', 'toast-info');
   showLoginModal();
+}
+
+/* ==========================================================================
+   Tema Claro / Escuro
+   ========================================================================== */
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('noc-theme') ||
+    (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  applyTheme(savedTheme, false);
+
+  const btnTheme = document.getElementById('btn-theme-toggle');
+  if (btnTheme) {
+    btnTheme.addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      applyTheme(next, true);
+    });
+  }
+}
+
+function applyTheme(theme, notify = false) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('noc-theme', theme);
+  updateChartsTheme(theme);
+  if (notify) {
+    showToast(`Tema alternado para Modo ${theme === 'dark' ? 'Escuro' : 'Claro'}`, 'toast-info');
+  }
 }
 
 /* ==========================================================================
@@ -292,7 +321,7 @@ function renderSummaryCards(summaries) {
       <div class="card-loading">
         <div style="font-size: 2rem; margin-bottom: 4px;">📡</div>
         <p class="font-bold text-white">Nenhum computador ou sonda registrada ainda.</p>
-        <p class="text-subtle">Aguardando a primeira telemetria enviada pelo agente client-probe instalado nas máquinas.</p>
+        <p class="text-subtle">Aguardando a primeira telemetria enviada pelo agente UEPG-Net-Tools instalado nas máquinas.</p>
       </div>
     `;
     return;
@@ -507,39 +536,98 @@ async function executeDeleteNode() {
 }
 
 /* ==========================================================================
-   7. Gráficos Comparativos Chart.js
+   7. Gráficos Comparativos Chart.js (Com Gradientes, Curvas Suaves e Temas)
    ========================================================================== */
 
+function getChartThemeColors(theme) {
+  const isLight = theme === 'light';
+  return {
+    textColor: isLight ? '#475569' : '#94a3b8',
+    gridColor: isLight ? 'rgba(0, 0, 0, 0.07)' : 'rgba(255, 255, 255, 0.06)',
+    tooltipBg: isLight ? '#ffffff' : '#0f172a',
+    tooltipTitle: isLight ? '#0f172a' : '#ffffff',
+    tooltipBody: isLight ? '#334155' : '#e2e8f0',
+    tooltipBorder: isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)'
+  };
+}
+
+function updateChartsTheme(theme) {
+  if (!bandwidthChart || !latencyChart) return;
+  const currentTheme = theme || document.documentElement.getAttribute('data-theme') || 'dark';
+  const colors = getChartThemeColors(currentTheme);
+
+  [bandwidthChart, latencyChart].forEach(chart => {
+    if (!chart) return;
+    chart.options.scales.x.grid.color = colors.gridColor;
+    chart.options.scales.x.ticks.color = colors.textColor;
+    chart.options.scales.y.grid.color = colors.gridColor;
+    chart.options.scales.y.ticks.color = colors.textColor;
+    if (chart.options.scales.y.title) {
+      chart.options.scales.y.title.color = colors.textColor;
+    }
+    if (chart.options.plugins.legend) {
+      chart.options.plugins.legend.labels.color = colors.textColor;
+    }
+    if (chart.options.plugins.tooltip) {
+      chart.options.plugins.tooltip.backgroundColor = colors.tooltipBg;
+      chart.options.plugins.tooltip.titleColor = colors.tooltipTitle;
+      chart.options.plugins.tooltip.bodyColor = colors.tooltipBody;
+      chart.options.plugins.tooltip.borderColor = colors.tooltipBorder;
+    }
+    chart.update('none');
+  });
+}
+
+function createFillGradient(ctx, colorTop, colorBottom, height = 280) {
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, colorTop);
+  grad.addColorStop(1, colorBottom);
+  return grad;
+}
+
 function initCharts() {
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  const colors = getChartThemeColors(currentTheme);
+
   const chartOpts = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
     plugins: {
       legend: {
         position: 'top',
         labels: {
-          color: '#94a3b8',
-          font: { size: 11 },
-          boxWidth: 12
+          color: colors.textColor,
+          font: { size: 11, weight: '600', family: "'Inter', sans-serif" },
+          boxWidth: 10,
+          usePointStyle: true,
+          pointStyle: 'circle',
+          padding: 14
         }
       },
       tooltip: {
-        backgroundColor: '#1e293b',
-        titleColor: '#fff',
-        bodyColor: '#e2e8f0',
-        borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: colors.tooltipBg,
+        titleColor: colors.tooltipTitle,
+        bodyColor: colors.tooltipBody,
+        borderColor: colors.tooltipBorder,
         borderWidth: 1,
-        padding: 10
+        padding: 12,
+        cornerRadius: 8,
+        titleFont: { size: 12, weight: '700' },
+        bodyFont: { size: 12 }
       }
     },
     scales: {
       x: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#64748b', font: { size: 10 } }
+        grid: { color: colors.gridColor, drawBorder: false },
+        ticks: { color: colors.textColor, font: { size: 10, family: "'JetBrains Mono', monospace" } }
       },
       y: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#64748b', font: { size: 10 } }
+        grid: { color: colors.gridColor, drawBorder: false },
+        ticks: { color: colors.textColor, font: { size: 10, family: "'JetBrains Mono', monospace" } }
       }
     }
   };
@@ -550,11 +638,20 @@ function initCharts() {
     data: { labels: [], datasets: [] },
     options: {
       ...chartOpts,
+      plugins: {
+        ...chartOpts.plugins,
+        tooltip: {
+          ...chartOpts.plugins.tooltip,
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + ' Mbps' : '--'}`
+          }
+        }
+      },
       scales: {
         ...chartOpts.scales,
         y: {
           ...chartOpts.scales.y,
-          title: { display: true, text: 'Mbps', color: '#94a3b8' }
+          title: { display: true, text: 'Taxa (Mbps)', color: colors.textColor, font: { size: 11, weight: '600' } }
         }
       }
     }
@@ -566,11 +663,20 @@ function initCharts() {
     data: { labels: [], datasets: [] },
     options: {
       ...chartOpts,
+      plugins: {
+        ...chartOpts.plugins,
+        tooltip: {
+          ...chartOpts.plugins.tooltip,
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + ' ms' : '--'}`
+          }
+        }
+      },
       scales: {
         ...chartOpts.scales,
         y: {
           ...chartOpts.scales.y,
-          title: { display: true, text: 'ms (Latência)', color: '#94a3b8' }
+          title: { display: true, text: 'Latência Ping (ms)', color: colors.textColor, font: { size: 11, weight: '600' } }
         }
       }
     }
@@ -607,6 +713,9 @@ function renderComparativeCharts(series, nodesList) {
     ? Object.keys(byNode)
     : [selectedNode];
 
+  const ctxBandwidth = document.getElementById('centralBandwidthChart').getContext('2d');
+  const ctxLatency = document.getElementById('centralLatencyChart').getContext('2d');
+
   if (selectedNode !== 'all') {
     const nodeItems = series.filter(s => (s.node_id || s.NodeID) === selectedNode);
     const nodeLabels = nodeItems.map(item => {
@@ -624,19 +733,29 @@ function renderComparativeCharts(series, nodesList) {
         label: `${selectedNode} - Download`,
         data: downData,
         borderColor: '#06b6d4',
-        backgroundColor: 'rgba(6, 182, 212, 0.1)',
-        tension: 0.3,
-        borderWidth: 2,
-        pointRadius: 3
+        backgroundColor: createFillGradient(ctxBandwidth, 'rgba(6, 182, 212, 0.28)', 'rgba(6, 182, 212, 0.01)'),
+        fill: true,
+        tension: 0.38,
+        borderWidth: 2.5,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#06b6d4',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 1.5
       },
       {
         label: `${selectedNode} - Upload`,
         data: upData,
         borderColor: '#a855f7',
-        backgroundColor: 'rgba(168, 85, 247, 0.08)',
-        tension: 0.3,
-        borderWidth: 2,
-        pointRadius: 3
+        backgroundColor: createFillGradient(ctxBandwidth, 'rgba(168, 85, 247, 0.22)', 'rgba(168, 85, 247, 0.01)'),
+        fill: true,
+        tension: 0.38,
+        borderWidth: 2.5,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#a855f7',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 1.5
       }
     ];
     bandwidthChart.update();
@@ -647,10 +766,15 @@ function renderComparativeCharts(series, nodesList) {
         label: `${selectedNode} (Ping)`,
         data: pingData,
         borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        tension: 0.3,
-        borderWidth: 2,
-        pointRadius: 3
+        backgroundColor: createFillGradient(ctxLatency, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
+        fill: true,
+        tension: 0.38,
+        borderWidth: 2.5,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#10b981',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 1.5
       }
     ];
     latencyChart.update();
@@ -671,20 +795,24 @@ function renderComparativeCharts(series, nodesList) {
       label: `${nodeId} (Down)`,
       data: downData,
       borderColor: color.border,
-      backgroundColor: color.bg,
-      tension: 0.3,
+      backgroundColor: createFillGradient(ctxBandwidth, color.bg, 'rgba(0,0,0,0)'),
+      fill: true,
+      tension: 0.35,
       borderWidth: 2,
-      pointRadius: 3
+      pointRadius: 2.5,
+      pointHoverRadius: 5
     });
 
     latencyDatasets.push({
       label: `${nodeId}`,
       data: pingData,
       borderColor: color.border,
-      backgroundColor: color.bg,
-      tension: 0.3,
+      backgroundColor: createFillGradient(ctxLatency, color.bg, 'rgba(0,0,0,0)'),
+      fill: true,
+      tension: 0.35,
       borderWidth: 2,
-      pointRadius: 3
+      pointRadius: 2.5,
+      pointHoverRadius: 5
     });
   });
 
@@ -729,7 +857,7 @@ function renderTelemetryTable(series) {
 }
 
 /* ==========================================================================
-   9. Utilitários & Toasts
+   9. Utilitários & Toasts (Snappy)
    ========================================================================== */
 
 function formatTimeAgo(date) {
@@ -763,7 +891,6 @@ function showToast(message, type = 'toast-info') {
   toastContainer.appendChild(toast);
 
   setTimeout(() => {
-    toast.style.opacity = '0';
-    setTimeout(() => toast.remove(), 300);
-  }, 4000);
+    toast.remove();
+  }, 3500);
 }

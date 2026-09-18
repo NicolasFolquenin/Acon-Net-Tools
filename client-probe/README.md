@@ -1,4 +1,4 @@
-# Probe Agent (Client Desktop Wails v2 - Windows)
+# UEPG-Net-Tools (Client Desktop Wails v2 - Windows)
 
 Agente de monitoramento contínuo de throughput e latência de rede desenvolvido em **Go 1.22+** e **Wails v2**, projetado para rodar em mini PCs e servidores locais no Windows.
 

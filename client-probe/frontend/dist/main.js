@@ -98,6 +98,7 @@ const WailsApp = {
 
 // Inicialização da aplicação
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   setupEventListeners();
   initCharts();
   await loadAppConfig();
@@ -214,31 +215,110 @@ function updateStatusBadge(status) {
   }
 }
 
-// Inicialização dos Gráficos com Chart.js
+/* ==========================================================================
+   Tema Claro / Escuro
+   ========================================================================== */
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('probe-theme') ||
+    (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  applyTheme(savedTheme);
+
+  const btnTheme = document.getElementById('btn-theme-toggle');
+  if (btnTheme) {
+    btnTheme.addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+    });
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('probe-theme', theme);
+  updateChartsTheme(theme);
+}
+
+function getChartThemeColors(theme) {
+  const isLight = theme === 'light';
+  return {
+    textColor: isLight ? '#475569' : '#9ca3af',
+    gridColor: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)',
+    tooltipBg: isLight ? '#ffffff' : '#111827',
+    tooltipTitle: isLight ? '#0f172a' : '#ffffff',
+    tooltipBody: isLight ? '#334155' : '#e5e7eb',
+    tooltipBorder: isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)'
+  };
+}
+
+function updateChartsTheme(theme) {
+  if (!throughputChart || !latencyChart) return;
+  const currentTheme = theme || document.documentElement.getAttribute('data-theme') || 'dark';
+  const colors = getChartThemeColors(currentTheme);
+
+  [throughputChart, latencyChart].forEach(chart => {
+    if (!chart) return;
+    chart.options.scales.x.grid.color = colors.gridColor;
+    chart.options.scales.x.ticks.color = colors.textColor;
+    chart.options.scales.y.grid.color = colors.gridColor;
+    chart.options.scales.y.ticks.color = colors.textColor;
+    if (chart.options.scales.y.title) {
+      chart.options.scales.y.title.color = colors.textColor;
+    }
+    chart.options.plugins.tooltip.backgroundColor = colors.tooltipBg;
+    chart.options.plugins.tooltip.titleColor = colors.tooltipTitle;
+    chart.options.plugins.tooltip.bodyColor = colors.tooltipBody;
+    chart.options.plugins.tooltip.borderColor = colors.tooltipBorder;
+    chart.update('none');
+  });
+}
+
+function createFillGradient(ctx, topColor, bottomColor, height = 240) {
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, topColor);
+  grad.addColorStop(1, bottomColor);
+  return grad;
+}
+
+// Inicialização dos Gráficos com Chart.js (Com Gradientes, Curvas Suaves e Temas)
 function initCharts() {
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  const colors = getChartThemeColors(currentTheme);
+
   const commonOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#1f2937',
-        titleColor: '#fff',
-        bodyColor: '#e5e7eb',
-        borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: colors.tooltipBg,
+        titleColor: colors.tooltipTitle,
+        bodyColor: colors.tooltipBody,
+        borderColor: colors.tooltipBorder,
         borderWidth: 1,
-        padding: 10,
-        displayColors: false,
+        padding: 12,
+        cornerRadius: 8,
+        titleFont: { size: 12, weight: '700' },
+        bodyFont: { size: 12 },
+        displayColors: true,
+        boxWidth: 8,
+        boxHeight: 8,
+        usePointStyle: true
       }
     },
     scales: {
       x: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#9ca3af', font: { size: 10 } }
+        grid: { color: colors.gridColor, drawBorder: false },
+        ticks: { color: colors.textColor, font: { size: 10, family: "'JetBrains Mono', monospace" } }
       },
       y: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#9ca3af', font: { size: 10 } }
+        grid: { color: colors.gridColor, drawBorder: false },
+        ticks: { color: colors.textColor, font: { size: 10, family: "'JetBrains Mono', monospace" } }
       }
     }
   };
@@ -251,36 +331,51 @@ function initCharts() {
       labels: [],
       datasets: [
         {
-          label: 'Download (Mbps)',
+          label: 'Download',
           data: [],
           borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6, 182, 212, 0.1)',
+          backgroundColor: createFillGradient(ctxThroughput, 'rgba(6, 182, 212, 0.28)', 'rgba(6, 182, 212, 0.01)'),
           fill: true,
-          tension: 0.35,
-          borderWidth: 2,
+          tension: 0.38,
+          borderWidth: 2.5,
           pointRadius: 3,
-          pointHoverRadius: 6
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#06b6d4',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
         },
         {
-          label: 'Upload (Mbps)',
+          label: 'Upload',
           data: [],
           borderColor: '#a855f7',
-          backgroundColor: 'rgba(168, 85, 247, 0.08)',
+          backgroundColor: createFillGradient(ctxThroughput, 'rgba(168, 85, 247, 0.22)', 'rgba(168, 85, 247, 0.01)'),
           fill: true,
-          tension: 0.35,
-          borderWidth: 2,
+          tension: 0.38,
+          borderWidth: 2.5,
           pointRadius: 3,
-          pointHoverRadius: 6
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#a855f7',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
         }
       ]
     },
     options: {
       ...commonOptions,
+      plugins: {
+        ...commonOptions.plugins,
+        tooltip: {
+          ...commonOptions.plugins.tooltip,
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + ' Mbps' : '--'}`
+          }
+        }
+      },
       scales: {
         ...commonOptions.scales,
         y: {
           ...commonOptions.scales.y,
-          title: { display: true, text: 'Mbps', color: '#9ca3af', font: { size: 11 } }
+          title: { display: true, text: 'Mbps', color: colors.textColor, font: { size: 11, weight: '600' } }
         }
       }
     }
@@ -294,25 +389,37 @@ function initCharts() {
       labels: [],
       datasets: [
         {
-          label: 'Ping Gateway (ms)',
+          label: 'Ping Gateway',
           data: [],
           borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+          backgroundColor: createFillGradient(ctxLatency, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
           fill: true,
-          tension: 0.3,
-          borderWidth: 2,
+          tension: 0.38,
+          borderWidth: 2.5,
           pointRadius: 3,
-          pointHoverRadius: 6
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#10b981',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
         }
       ]
     },
     options: {
       ...commonOptions,
+      plugins: {
+        ...commonOptions.plugins,
+        tooltip: {
+          ...commonOptions.plugins.tooltip,
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + ' ms' : '--'}`
+          }
+        }
+      },
       scales: {
         ...commonOptions.scales,
         y: {
           ...commonOptions.scales.y,
-          title: { display: true, text: 'ms', color: '#9ca3af', font: { size: 11 } }
+          title: { display: true, text: 'ms', color: colors.textColor, font: { size: 11, weight: '600' } }
         }
       }
     }
