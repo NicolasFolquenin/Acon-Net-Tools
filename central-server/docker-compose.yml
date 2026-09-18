@@ -18,6 +18,11 @@ services:
       - API_TOKEN=${API_TOKEN:-super-secret-probe-token-2026}
       - STATIC_DIR=${STATIC_DIR:-/app/public}
       - QUERY_HOURS_LIMIT=${QUERY_HOURS_LIMIT:-24}
+      - AUTH_ADMIN_USER=${AUTH_ADMIN_USER:-admin}
+      - AUTH_ADMIN_PASSWORD=${AUTH_ADMIN_PASSWORD:-admin123}
+      - AUTH_VIEWER_USER=${AUTH_VIEWER_USER:-operador}
+      - AUTH_VIEWER_PASSWORD=${AUTH_VIEWER_PASSWORD:-operador123}
+      - SESSION_SECRET=${SESSION_SECRET:-super-secret-session-key-change-in-prod-2026}
     depends_on:
       mongo:
         condition: service_healthy
@@ -32,7 +37,8 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
+      # Volume persistente no diretório local do host (evita perda de dados ao executar 'docker compose down' ou 'down -v')
+      - ./mongo_data:/data/db
     command: ["mongod", "--bind_ip_all"]
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
@@ -43,10 +49,7 @@ services:
     networks:
       - monitoring-net
 
-volumes:
-  mongo_data:
-    driver: local
-
 networks:
   monitoring-net:
     driver: bridge
+
