@@ -69,12 +69,30 @@ Content-Type: application/json
 Corpo da requisição:
 ```json
 {
-  "node_id": "minipc-dc-01",
-  "location": "Guarapuava-DC1",
-  "timestamp": "2026-09-11T15:00:00Z",
+  "node_id": "meu-pc-windows",
+  "location": "Escritorio-Local",
+  "timestamp": "2026-09-18T15:00:00Z",
   "download_mbps": 850.5,
   "upload_mbps": 720.0,
-  "ping_gateway": 1.2
+  "ping_gateway": 1.2,
+  "system_info": {
+    "hostname": "PC-TI-01",
+    "model": "OptiPlex 7090",
+    "cpu": "11th Gen Intel Core i7",
+    "ram_total_gb": 16.0,
+    "os": "windows",
+    "ip_address": "192.168.1.105",
+    "mac_address": "00:1A:2B:3C:4D:5E",
+    "gateway": "192.168.1.1",
+    "network_adapter": "Realtek PCIe GbE Family Controller"
+  },
+  "switch_info": {
+    "switch_name": "SW-CORE-01",
+    "switch_port": "GigabitEthernet1/0/12",
+    "vlan": 100,
+    "switch_model": "Cisco Catalyst 2960",
+    "protocol": "LLDP"
+  }
 }
 ```
 
@@ -87,12 +105,11 @@ Corpo da requisição:
 cd central-server
 docker compose up -d --build
 ```
-Acesse o Dashboard Web em: `http://localhost:8080`
+Acesse o Dashboard Web em: `http://localhost:8085`
 
-Para gerar dados de demonstração imediatos de 24 horas:
-```bash
-curl -X POST http://localhost:8080/api/v1/seed
-```
+**Credenciais padrão de acesso:**
+- **Administrador:** `admin` / `admin123` (acesso total + exclusão de computadores)
+- **Operador:** `operador` / `operador123` (somente visualização de telemetria e hardware)
 
 ### 2. Inicializando o Client Desktop (Windows)
 ```powershell
@@ -104,3 +121,4 @@ Ou compilar executável `.exe` de produção:
 wails build -clean -platform windows/amd64
 ```
 O executável será gerado em `client-probe/build/bin/probe-app.exe`.
+
