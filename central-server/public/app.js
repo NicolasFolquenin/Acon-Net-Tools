@@ -46,14 +46,14 @@ const btnConfirmDelete = document.getElementById('btn-confirm-delete');
 // Toast Container
 const toastContainer = document.getElementById('toast-container');
 
-// Paleta de cores para gráficos comparativos multi-nós
+// Paleta de cores para gráficos comparativos multi-nós (Gradientes e bordas de alta definição)
 const nodeColors = [
-  { border: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },    // Cyan
-  { border: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)' },   // Purple
-  { border: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },   // Emerald
-  { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },   // Amber
-  { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },   // Blue
-  { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)' },   // Pink
+  { border: '#06b6d4', fillTop: 'rgba(6, 182, 212, 0.28)', fillBottom: 'rgba(6, 182, 212, 0.01)' }, // Cyan
+  { border: '#a855f7', fillTop: 'rgba(168, 85, 247, 0.22)', fillBottom: 'rgba(168, 85, 247, 0.01)' }, // Purple
+  { border: '#10b981', fillTop: 'rgba(16, 185, 129, 0.25)', fillBottom: 'rgba(16, 185, 129, 0.01)' }, // Emerald
+  { border: '#f59e0b', fillTop: 'rgba(245, 158, 11, 0.22)', fillBottom: 'rgba(245, 158, 11, 0.01)' }, // Amber
+  { border: '#3b82f6', fillTop: 'rgba(59, 130, 246, 0.25)', fillBottom: 'rgba(59, 130, 246, 0.01)' }, // Blue
+  { border: '#ec4899', fillTop: 'rgba(236, 72, 153, 0.22)', fillBottom: 'rgba(236, 72, 153, 0.01)' }, // Pink
 ];
 
 let refreshCountdown = 15;
@@ -597,17 +597,7 @@ function initCharts() {
       intersect: false
     },
     plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          color: colors.textColor,
-          font: { size: 11, weight: '600', family: "'Inter', sans-serif" },
-          boxWidth: 10,
-          usePointStyle: true,
-          pointStyle: 'circle',
-          padding: 14
-        }
-      },
+      legend: { display: false },
       tooltip: {
         backgroundColor: colors.tooltipBg,
         titleColor: colors.tooltipTitle,
@@ -617,7 +607,11 @@ function initCharts() {
         padding: 12,
         cornerRadius: 8,
         titleFont: { size: 12, weight: '700' },
-        bodyFont: { size: 12 }
+        bodyFont: { size: 12 },
+        displayColors: true,
+        boxWidth: 8,
+        boxHeight: 8,
+        usePointStyle: true
       }
     },
     scales: {
@@ -651,7 +645,7 @@ function initCharts() {
         ...chartOpts.scales,
         y: {
           ...chartOpts.scales.y,
-          title: { display: true, text: 'Taxa (Mbps)', color: colors.textColor, font: { size: 11, weight: '600' } }
+          title: { display: true, text: 'Mbps', color: colors.textColor, font: { size: 11, weight: '600' } }
         }
       }
     }
@@ -676,7 +670,7 @@ function initCharts() {
         ...chartOpts.scales,
         y: {
           ...chartOpts.scales.y,
-          title: { display: true, text: 'Latência Ping (ms)', color: colors.textColor, font: { size: 11, weight: '600' } }
+          title: { display: true, text: 'ms', color: colors.textColor, font: { size: 11, weight: '600' } }
         }
       }
     }
@@ -684,6 +678,9 @@ function initCharts() {
 }
 
 function renderComparativeCharts(series, nodesList) {
+  const bandwidthLegendEl = document.getElementById('bandwidth-legend-container');
+  const latencyLegendEl = document.getElementById('latency-legend-container');
+
   if (!series || series.length === 0) {
     bandwidthChart.data.labels = [];
     bandwidthChart.data.datasets = [];
@@ -695,29 +692,28 @@ function renderComparativeCharts(series, nodesList) {
     return;
   }
 
-  const timestamps = Array.from(new Set(series.map(s => s.timestamp))).sort();
-  const labels = timestamps.map(t => {
-    const d = new Date(t);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  });
-
-  const byNode = {};
-  series.forEach(item => {
-    const id = item.node_id || item.NodeID;
-    if (!byNode[id]) byNode[id] = {};
-    byNode[id][item.timestamp] = item;
-  });
-
   const selectedNode = selectNode.value;
-  const targetNodes = (selectedNode === 'all')
-    ? Object.keys(byNode)
-    : [selectedNode];
-
   const ctxBandwidth = document.getElementById('centralBandwidthChart').getContext('2d');
   const ctxLatency = document.getElementById('centralLatencyChart').getContext('2d');
 
+  // Modo Sonda Individual: Foco total nas métricas de Download, Upload e Latência dessa sonda
   if (selectedNode !== 'all') {
-    const nodeItems = series.filter(s => (s.node_id || s.NodeID) === selectedNode);
+    if (bandwidthLegendEl) {
+      bandwidthLegendEl.innerHTML = `
+        <span class="legend-badge cyan-dot">Download</span>
+        <span class="legend-badge purple-dot">Upload</span>
+      `;
+    }
+    if (latencyLegendEl) {
+      latencyLegendEl.innerHTML = `
+        <span class="legend-badge emerald-dot">Ping Gateway</span>
+      `;
+    }
+
+    const nodeItems = series
+      .filter(s => (s.node_id || s.NodeID) === selectedNode)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
     const nodeLabels = nodeItems.map(item => {
       const d = new Date(item.timestamp);
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -730,12 +726,14 @@ function renderComparativeCharts(series, nodesList) {
     bandwidthChart.data.labels = nodeLabels;
     bandwidthChart.data.datasets = [
       {
-        label: `${selectedNode} - Download`,
+        label: 'Download',
         data: downData,
         borderColor: '#06b6d4',
         backgroundColor: createFillGradient(ctxBandwidth, 'rgba(6, 182, 212, 0.28)', 'rgba(6, 182, 212, 0.01)'),
         fill: true,
         tension: 0.38,
+        cubicInterpolationMode: 'monotone',
+        spanGaps: true,
         borderWidth: 2.5,
         pointRadius: 3,
         pointHoverRadius: 6,
@@ -744,12 +742,14 @@ function renderComparativeCharts(series, nodesList) {
         pointBorderWidth: 1.5
       },
       {
-        label: `${selectedNode} - Upload`,
+        label: 'Upload',
         data: upData,
         borderColor: '#a855f7',
         backgroundColor: createFillGradient(ctxBandwidth, 'rgba(168, 85, 247, 0.22)', 'rgba(168, 85, 247, 0.01)'),
         fill: true,
         tension: 0.38,
+        cubicInterpolationMode: 'monotone',
+        spanGaps: true,
         borderWidth: 2.5,
         pointRadius: 3,
         pointHoverRadius: 6,
@@ -763,12 +763,14 @@ function renderComparativeCharts(series, nodesList) {
     latencyChart.data.labels = nodeLabels;
     latencyChart.data.datasets = [
       {
-        label: `${selectedNode} (Ping)`,
+        label: 'Ping Gateway',
         data: pingData,
         borderColor: '#10b981',
         backgroundColor: createFillGradient(ctxLatency, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
         fill: true,
         tension: 0.38,
+        cubicInterpolationMode: 'monotone',
+        spanGaps: true,
         borderWidth: 2.5,
         pointRadius: 3,
         pointHoverRadius: 6,
@@ -781,6 +783,48 @@ function renderComparativeCharts(series, nodesList) {
     return;
   }
 
+  // Modo Consolidado (Todos os Nós):
+  // Agrupa os timestamps por minuto para eliminar timestamps duplicados no eixo X
+  const minuteMap = new Map();
+  const byNode = {};
+
+  series.forEach(item => {
+    const id = item.node_id || item.NodeID;
+    if (!byNode[id]) byNode[id] = {};
+
+    const d = new Date(item.timestamp);
+    d.setSeconds(0, 0);
+    const minuteKey = d.getTime();
+
+    if (!minuteMap.has(minuteKey)) {
+      minuteMap.set(minuteKey, d);
+    }
+    byNode[id][minuteKey] = item;
+  });
+
+  const sortedMinuteKeys = Array.from(minuteMap.keys()).sort((a, b) => a - b);
+  const labels = sortedMinuteKeys.map(k => {
+    const d = minuteMap.get(k);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  });
+
+  const targetNodes = Object.keys(byNode).sort();
+
+  // Atualiza as legendas HTML com bolinhas sólidas coloridas
+  if (bandwidthLegendEl) {
+    bandwidthLegendEl.innerHTML = targetNodes.map((nodeId, idx) => {
+      const color = nodeColors[idx % nodeColors.length];
+      return `<span class="legend-badge"><span class="badge-dot" style="background:${color.border};"></span>${escapeHtml(nodeId)} (Down)</span>`;
+    }).join('');
+  }
+
+  if (latencyLegendEl) {
+    latencyLegendEl.innerHTML = targetNodes.map((nodeId, idx) => {
+      const color = nodeColors[idx % nodeColors.length];
+      return `<span class="legend-badge"><span class="badge-dot" style="background:${color.border};"></span>${escapeHtml(nodeId)}</span>`;
+    }).join('');
+  }
+
   const bandwidthDatasets = [];
   const latencyDatasets = [];
 
@@ -788,31 +832,41 @@ function renderComparativeCharts(series, nodesList) {
     const color = nodeColors[idx % nodeColors.length];
     const nodeDataMap = byNode[nodeId] || {};
 
-    const downData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].download_mbps : null);
-    const pingData = timestamps.map(t => nodeDataMap[t] ? nodeDataMap[t].ping_gateway : null);
+    const downData = sortedMinuteKeys.map(k => nodeDataMap[k] ? nodeDataMap[k].download_mbps : null);
+    const pingData = sortedMinuteKeys.map(k => nodeDataMap[k] ? nodeDataMap[k].ping_gateway : null);
 
     bandwidthDatasets.push({
       label: `${nodeId} (Down)`,
       data: downData,
       borderColor: color.border,
-      backgroundColor: createFillGradient(ctxBandwidth, color.bg, 'rgba(0,0,0,0)'),
+      backgroundColor: createFillGradient(ctxBandwidth, color.fillTop, color.fillBottom),
       fill: true,
-      tension: 0.35,
-      borderWidth: 2,
-      pointRadius: 2.5,
-      pointHoverRadius: 5
+      tension: 0.38,
+      cubicInterpolationMode: 'monotone',
+      spanGaps: true,
+      borderWidth: 2.5,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+      pointBackgroundColor: color.border,
+      pointBorderColor: '#ffffff',
+      pointBorderWidth: 1.5
     });
 
     latencyDatasets.push({
       label: `${nodeId}`,
       data: pingData,
       borderColor: color.border,
-      backgroundColor: createFillGradient(ctxLatency, color.bg, 'rgba(0,0,0,0)'),
+      backgroundColor: createFillGradient(ctxLatency, color.fillTop, color.fillBottom),
       fill: true,
-      tension: 0.35,
-      borderWidth: 2,
-      pointRadius: 2.5,
-      pointHoverRadius: 5
+      tension: 0.38,
+      cubicInterpolationMode: 'monotone',
+      spanGaps: true,
+      borderWidth: 2.5,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+      pointBackgroundColor: color.border,
+      pointBorderColor: '#ffffff',
+      pointBorderWidth: 1.5
     });
   });
 
