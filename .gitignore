@@ -1,5 +1,6 @@
 # Binários e builds
-build/
+build/bin/
+**/build/bin/
 bin/
 *.exe
 *.exe~
