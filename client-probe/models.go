@@ -44,16 +44,9 @@ func (s *SwitchInfo) IsValid() bool {
 	if strings.HasPrefix(lower, "não detectado") || strings.HasPrefix(lower, "nao detectado") {
 		return false
 	}
-	return true
-}
-
-// IsRealSwitch indica se a informação é de fato um switch de rede e não um telefone IP/VoIP
-func (s *SwitchInfo) IsRealSwitch() bool {
-	if !s.IsValid() {
-		return false
-	}
-	name := strings.ToUpper(strings.TrimSpace(s.SwitchName))
-	if strings.HasPrefix(name, "SEP") && len(name) == 15 {
+	// Telefones VoIP da Cisco não são switches de rede
+	upper := strings.ToUpper(name)
+	if strings.HasPrefix(upper, "SEP") && len(upper) == 15 {
 		return false
 	}
 	model := strings.ToLower(s.SwitchModel)
@@ -61,6 +54,11 @@ func (s *SwitchInfo) IsRealSwitch() bool {
 		return false
 	}
 	return true
+}
+
+// IsRealSwitch indica se a informação é de fato um switch de rede e não um telefone IP/VoIP
+func (s *SwitchInfo) IsRealSwitch() bool {
+	return s.IsValid()
 }
 
 // MetricPayload representa o contrato oficial enviado via POST HTTPS ao servidor central.

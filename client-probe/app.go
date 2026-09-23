@@ -65,8 +65,14 @@ func (a *App) startup(ctx context.Context) {
 	if validSw := a.storage.GetLastValidSwitchInfo(); validSw != nil {
 		a.currentSwitch = validSw
 		log.Printf("[APP] Switch restaurado do cache local: %s (Porta %s)", validSw.SwitchName, validSw.SwitchPort)
-	} else if len(history) > 0 && a.lastMetric.SwitchInfo != nil {
+	} else if len(history) > 0 && a.lastMetric.SwitchInfo != nil && a.lastMetric.SwitchInfo.IsRealSwitch() {
 		a.currentSwitch = a.lastMetric.SwitchInfo
+	} else {
+		a.currentSwitch = &SwitchInfo{
+			SwitchName: "Aguardando frame LLDP...",
+			SwitchPort: "--",
+			Protocol:   "LLDP",
+		}
 	}
 
 	// 4. Coleta dados de hardware do PC imediatamente na inicialização
@@ -77,21 +83,25 @@ func (a *App) startup(ctx context.Context) {
 		a.mu.Unlock()
 		a.emitStatus()
 
-		// Busca inicial de LLDP em background (captura resiliente de 35s)
-		lldpCtx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
-		defer cancel()
-		sw := DiscoverSwitchLLDP(lldpCtx)
-		if sw.IsRealSwitch() {
-			a.mu.Lock()
-			a.currentSwitch = &sw
-			a.mu.Unlock()
-			log.Printf("[APP] Switch corporativo identificado via LLDP: %s (Porta %s)", sw.SwitchName, sw.SwitchPort)
-			a.emitStatus()
-		} else if sw.IsValid() && (a.currentSwitch == nil || !a.currentSwitch.IsRealSwitch()) {
-			a.mu.Lock()
-			a.currentSwitch = &sw
-			a.mu.Unlock()
-			a.emitStatus()
+		// Busca inicial de LLDP em background (captura resiliente)
+		// Faz até 3 tentativas (45s cada) até capturar o anúncio do switch corporativo (que emite a cada 30-60s)
+		for attempt := 1; attempt <= 3; attempt++ {
+			if a.currentSwitch != nil && a.currentSwitch.IsRealSwitch() {
+				break
+			}
+			log.Printf("[APP] LLDP: Tentativa %d de escuta do switch corporativo (45s)...", attempt)
+			lldpCtx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+			sw := DiscoverSwitchLLDP(lldpCtx)
+			cancel()
+			if sw.IsRealSwitch() {
+				a.mu.Lock()
+				a.currentSwitch = &sw
+				a.mu.Unlock()
+				log.Printf("[APP] Switch corporativo identificado via LLDP: %s (Porta %s)", sw.SwitchName, sw.SwitchPort)
+				a.emitStatus()
+				break
+			}
+			time.Sleep(3 * time.Second)
 		}
 	}()
 
