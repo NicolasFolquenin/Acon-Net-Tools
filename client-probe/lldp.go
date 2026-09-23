@@ -22,7 +22,17 @@ func DiscoverSwitchLLDP(ctx context.Context) SwitchInfo {
 	psScript := `
 	$ErrorActionPreference = 'SilentlyContinue'
 
-	# 1. Tenta via PSDiscoveryProtocol se disponivel (captura LLDP e CDP de switches Cisco/HP/Aruba/Huawei/Mikrotik)
+	# 1. Garante que o módulo PSDiscoveryProtocol esteja disponível (instala automaticamente se ausente)
+	if (-not (Get-Module -ListAvailable -Name PSDiscoveryProtocol)) {
+		try {
+			[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+			Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
+			Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser -ErrorAction SilentlyContinue | Out-Null
+			Install-Module -Name PSDiscoveryProtocol -Scope CurrentUser -Force -SkipPublisherCheck -AllowClobber -ErrorAction SilentlyContinue | Out-Null
+		} catch {}
+	}
+
+	# 2. Tenta capturar dados via PSDiscoveryProtocol (LLDP e CDP de switches Cisco/HP/Aruba/Huawei/Mikrotik)
 	if (Get-Module -ListAvailable -Name PSDiscoveryProtocol) {
 		try {
 			Import-Module PSDiscoveryProtocol -ErrorAction SilentlyContinue

@@ -91,7 +91,11 @@ func (a *App) startup(ctx context.Context) {
 				break
 			}
 			log.Printf("[APP] LLDP: Tentativa %d de escuta do switch corporativo (45s)...", attempt)
-			lldpCtx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+			timeout := 50 * time.Second
+			if attempt == 1 {
+				timeout = 75 * time.Second
+			}
+			lldpCtx, cancel := context.WithTimeout(context.Background(), timeout)
 			sw := DiscoverSwitchLLDP(lldpCtx)
 			cancel()
 			if sw.IsRealSwitch() {
