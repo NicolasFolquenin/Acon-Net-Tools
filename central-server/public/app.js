@@ -59,6 +59,49 @@ const nodeColors = [
 let refreshCountdown = 15;
 let refreshInterval = null;
 
+// Controle de Métrica de Throughput (Download / Upload / Ambos)
+let currentBandwidthMetric = 'download';
+let cachedMetricsSeries = [];
+let cachedNodesList = [];
+
+function setupSegmentedControl() {
+  const toggleContainer = document.getElementById('bandwidth-metric-toggle');
+  if (!toggleContainer) return;
+
+  const buttons = toggleContainer.querySelectorAll('.segment-btn');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const metric = btn.getAttribute('data-metric');
+      if (metric === currentBandwidthMetric) return;
+
+      currentBandwidthMetric = metric;
+      buttons.forEach(b => b.classList.toggle('active', b === btn));
+
+      if (cachedMetricsSeries.length > 0) {
+        renderComparativeCharts(cachedMetricsSeries, cachedNodesList);
+      }
+    });
+  });
+}
+
+function updateMetricToggleVisibility() {
+  const selectedNode = selectNode.value || 'all';
+  const btnBoth = document.getElementById('btn-metric-both');
+  const toggleContainer = document.getElementById('bandwidth-metric-toggle');
+  if (!btnBoth || !toggleContainer) return;
+
+  if (selectedNode === 'all') {
+    btnBoth.classList.add('hidden-metric');
+    if (currentBandwidthMetric === 'both') {
+      currentBandwidthMetric = 'download';
+      const btns = toggleContainer.querySelectorAll('.segment-btn');
+      btns.forEach(b => b.classList.toggle('active', b.getAttribute('data-metric') === 'download'));
+    }
+  } else {
+    btnBoth.classList.remove('hidden-metric');
+  }
+}
+
 // Inicialização
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
@@ -201,8 +244,11 @@ function setupEventListeners() {
   btnLogout.addEventListener('click', handleLogout);
 
   selectNode.addEventListener('change', () => {
+    updateMetricToggleVisibility();
     loadDashboardData();
   });
+
+  setupSegmentedControl();
 
   btnRefresh.addEventListener('click', () => {
     refreshCountdown = 15;
@@ -309,6 +355,7 @@ function updateNodeSelector(nodes) {
   });
 
   selectNode.value = nodes.includes(currentVal) ? currentVal : 'all';
+  updateMetricToggleVisibility();
 }
 
 /* ==========================================================================
@@ -617,7 +664,13 @@ function initCharts() {
     scales: {
       x: {
         grid: { color: colors.gridColor, drawBorder: false },
-        ticks: { color: colors.textColor, font: { size: 10, family: "'JetBrains Mono', monospace" } }
+        ticks: {
+          color: colors.textColor,
+          font: { size: 10, family: "'JetBrains Mono', monospace" },
+          maxTicksLimit: 8,
+          maxRotation: 0,
+          autoSkip: true
+        }
       },
       y: {
         grid: { color: colors.gridColor, drawBorder: false },
@@ -678,8 +731,15 @@ function initCharts() {
 }
 
 function renderComparativeCharts(series, nodesList) {
+  cachedMetricsSeries = series || [];
+  cachedNodesList = nodesList || [];
+
+  updateMetricToggleVisibility();
+
   const bandwidthLegendEl = document.getElementById('bandwidth-legend-container');
   const latencyLegendEl = document.getElementById('latency-legend-container');
+  const bandwidthChartTitle = document.getElementById('bandwidth-chart-title');
+  const bandwidthChartDesc = document.getElementById('bandwidth-chart-desc');
 
   if (!series || series.length === 0) {
     bandwidthChart.data.labels = [];
@@ -696,23 +756,14 @@ function renderComparativeCharts(series, nodesList) {
   const ctxBandwidth = document.getElementById('centralBandwidthChart').getContext('2d');
   const ctxLatency = document.getElementById('centralLatencyChart').getContext('2d');
 
-  // Modo Sonda Individual: Foco total nas métricas de Download, Upload e Latência dessa sonda
+  // Modo Sonda Individual: Foco nas métricas dessa sonda
   if (selectedNode !== 'all') {
-    if (bandwidthLegendEl) {
-      bandwidthLegendEl.innerHTML = `
-        <span class="legend-badge cyan-dot">Download</span>
-        <span class="legend-badge purple-dot">Upload</span>
-      `;
-    }
-    if (latencyLegendEl) {
-      latencyLegendEl.innerHTML = `
-        <span class="legend-badge emerald-dot">Ping Gateway</span>
-      `;
-    }
-
-    const nodeItems = series
+    const allNodeItems = series
       .filter(s => (s.node_id || s.NodeID) === selectedNode)
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    // Limita estritamente aos últimos 20 testes
+    const nodeItems = allNodeItems.slice(-20);
 
     const nodeLabels = nodeItems.map(item => {
       const d = new Date(item.timestamp);
@@ -723,9 +774,15 @@ function renderComparativeCharts(series, nodesList) {
     const upData = nodeItems.map(item => item.upload_mbps);
     const pingData = nodeItems.map(item => item.ping_gateway);
 
-    bandwidthChart.data.labels = nodeLabels;
-    bandwidthChart.data.datasets = [
-      {
+    const bandwidthDatasets = [];
+
+    if (currentBandwidthMetric === 'download') {
+      if (bandwidthChartTitle) bandwidthChartTitle.textContent = `Throughput - Download (${selectedNode})`;
+      if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxa de Download dos últimos 20 testes (Mbps)';
+      if (bandwidthLegendEl) {
+        bandwidthLegendEl.innerHTML = `<span class="legend-badge cyan-dot">Download</span>`;
+      }
+      bandwidthDatasets.push({
         label: 'Download',
         data: downData,
         borderColor: '#06b6d4',
@@ -740,8 +797,14 @@ function renderComparativeCharts(series, nodesList) {
         pointBackgroundColor: '#06b6d4',
         pointBorderColor: '#ffffff',
         pointBorderWidth: 1.5
-      },
-      {
+      });
+    } else if (currentBandwidthMetric === 'upload') {
+      if (bandwidthChartTitle) bandwidthChartTitle.textContent = `Throughput - Upload (${selectedNode})`;
+      if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxa de Upload dos últimos 20 testes (Mbps)';
+      if (bandwidthLegendEl) {
+        bandwidthLegendEl.innerHTML = `<span class="legend-badge purple-dot">Upload</span>`;
+      }
+      bandwidthDatasets.push({
         label: 'Upload',
         data: upData,
         borderColor: '#a855f7',
@@ -756,9 +819,60 @@ function renderComparativeCharts(series, nodesList) {
         pointBackgroundColor: '#a855f7',
         pointBorderColor: '#ffffff',
         pointBorderWidth: 1.5
+      });
+    } else {
+      // Modo Ambos
+      if (bandwidthChartTitle) bandwidthChartTitle.textContent = `Throughput - Comparativo (${selectedNode})`;
+      if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxas de Download e Upload dos últimos 20 testes (Mbps)';
+      if (bandwidthLegendEl) {
+        bandwidthLegendEl.innerHTML = `
+          <span class="legend-badge cyan-dot">Download</span>
+          <span class="legend-badge purple-dot">Upload</span>
+        `;
       }
-    ];
+      bandwidthDatasets.push(
+        {
+          label: 'Download',
+          data: downData,
+          borderColor: '#06b6d4',
+          backgroundColor: createFillGradient(ctxBandwidth, 'rgba(6, 182, 212, 0.28)', 'rgba(6, 182, 212, 0.01)'),
+          fill: true,
+          tension: 0.38,
+          cubicInterpolationMode: 'monotone',
+          spanGaps: true,
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#06b6d4',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
+        },
+        {
+          label: 'Upload',
+          data: upData,
+          borderColor: '#a855f7',
+          backgroundColor: createFillGradient(ctxBandwidth, 'rgba(168, 85, 247, 0.22)', 'rgba(168, 85, 247, 0.01)'),
+          fill: true,
+          tension: 0.38,
+          cubicInterpolationMode: 'monotone',
+          spanGaps: true,
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#a855f7',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
+        }
+      );
+    }
+
+    bandwidthChart.data.labels = nodeLabels;
+    bandwidthChart.data.datasets = bandwidthDatasets;
     bandwidthChart.update();
+
+    if (latencyLegendEl) {
+      latencyLegendEl.innerHTML = `<span class="legend-badge emerald-dot">Ping Gateway</span>`;
+    }
 
     latencyChart.data.labels = nodeLabels;
     latencyChart.data.datasets = [
@@ -802,7 +916,10 @@ function renderComparativeCharts(series, nodesList) {
     byNode[id][minuteKey] = item;
   });
 
-  const sortedMinuteKeys = Array.from(minuteMap.keys()).sort((a, b) => a - b);
+  const allMinuteKeys = Array.from(minuteMap.keys()).sort((a, b) => a - b);
+  // Limita estritamente aos últimos 20 testes no consolidado
+  const sortedMinuteKeys = allMinuteKeys.slice(-20);
+
   const labels = sortedMinuteKeys.map(k => {
     const d = minuteMap.get(k);
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -810,11 +927,21 @@ function renderComparativeCharts(series, nodesList) {
 
   const targetNodes = Object.keys(byNode).sort();
 
+  const isUploadMode = currentBandwidthMetric === 'upload';
+  const metricLabel = isUploadMode ? 'Upload' : 'Download';
+
+  if (bandwidthChartTitle) {
+    bandwidthChartTitle.textContent = `Histórico de Throughput (${metricLabel})`;
+  }
+  if (bandwidthChartDesc) {
+    bandwidthChartDesc.textContent = `Taxas de ${metricLabel} por Computador (últimos 20 testes em Mbps)`;
+  }
+
   // Atualiza as legendas HTML com bolinhas sólidas coloridas
   if (bandwidthLegendEl) {
     bandwidthLegendEl.innerHTML = targetNodes.map((nodeId, idx) => {
       const color = nodeColors[idx % nodeColors.length];
-      return `<span class="legend-badge"><span class="badge-dot" style="background:${color.border};"></span>${escapeHtml(nodeId)} (Down)</span>`;
+      return `<span class="legend-badge"><span class="badge-dot" style="background:${color.border};"></span>${escapeHtml(nodeId)}</span>`;
     }).join('');
   }
 
@@ -832,12 +959,15 @@ function renderComparativeCharts(series, nodesList) {
     const color = nodeColors[idx % nodeColors.length];
     const nodeDataMap = byNode[nodeId] || {};
 
-    const downData = sortedMinuteKeys.map(k => nodeDataMap[k] ? nodeDataMap[k].download_mbps : null);
+    const metricData = sortedMinuteKeys.map(k => {
+      if (!nodeDataMap[k]) return null;
+      return isUploadMode ? nodeDataMap[k].upload_mbps : nodeDataMap[k].download_mbps;
+    });
     const pingData = sortedMinuteKeys.map(k => nodeDataMap[k] ? nodeDataMap[k].ping_gateway : null);
 
     bandwidthDatasets.push({
-      label: `${nodeId} (Down)`,
-      data: downData,
+      label: `${nodeId} (${metricLabel})`,
+      data: metricData,
       borderColor: color.border,
       backgroundColor: createFillGradient(ctxBandwidth, color.fillTop, color.fillBottom),
       fill: true,
