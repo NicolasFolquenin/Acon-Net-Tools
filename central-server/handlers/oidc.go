@@ -60,7 +60,7 @@ func (o *OIDCHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 		"enabled":     o.cfg.OIDCEnabled,
 		"issuer_url":  o.cfg.OIDCIssuerURL,
 		"client_id":   o.cfg.OIDCClientID,
-		"button_text": "Entrar com Login Institucional UEPG",
+		"button_text": "Entrar com Keycloak",
 	})
 }
 
