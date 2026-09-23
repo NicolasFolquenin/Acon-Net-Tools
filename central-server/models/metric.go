@@ -47,6 +47,22 @@ func (s *SwitchInfo) IsValid() bool {
 	return true
 }
 
+// IsRealSwitch indica se a informação é de fato um switch de rede e não um telefone IP/VoIP
+func (s *SwitchInfo) IsRealSwitch() bool {
+	if !s.IsValid() {
+		return false
+	}
+	name := strings.ToUpper(strings.TrimSpace(s.SwitchName))
+	if strings.HasPrefix(name, "SEP") && len(name) == 15 {
+		return false
+	}
+	model := strings.ToLower(s.SwitchModel)
+	if strings.Contains(model, "phone") || strings.Contains(model, "telefone") || strings.Contains(model, "voip") {
+		return false
+	}
+	return true
+}
+
 // MetricPayloadInput representa o contrato exato recebido via POST /api/v1/metrics
 type MetricPayloadInput struct {
 	NodeID       string      `json:"node_id"`

@@ -218,7 +218,11 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 			cur.knownSys = item.SystemInfo
 		}
 		if item.SwitchInfo != nil && item.SwitchInfo.IsValid() {
-			if cur.knownSw == nil || item.Timestamp.After(cur.latest.Timestamp) {
+			if item.SwitchInfo.IsRealSwitch() {
+				if cur.knownSw == nil || !cur.knownSw.IsRealSwitch() || item.Timestamp.After(cur.latest.Timestamp) {
+					cur.knownSw = item.SwitchInfo
+				}
+			} else if cur.knownSw == nil {
 				cur.knownSw = item.SwitchInfo
 			}
 		}
@@ -232,8 +236,10 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 			sys = agg.knownSys
 		}
 		sw := agg.latest.SwitchInfo
-		if sw == nil || !sw.IsValid() {
-			if agg.knownSw != nil {
+		if sw == nil || !sw.IsRealSwitch() {
+			if agg.knownSw != nil && agg.knownSw.IsRealSwitch() {
+				sw = agg.knownSw
+			} else if sw == nil || !sw.IsValid() {
 				sw = agg.knownSw
 			}
 		}
