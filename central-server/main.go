@@ -41,7 +41,7 @@ func main() {
 
 	// 3. Inicializa Handlers
 	metricsHandler := handlers.NewMetricsHandler(mongoClient, cfg)
-	authHandler := handlers.NewAuthHandler(cfg)
+	authHandler := handlers.NewAuthHandler(cfg, mongoClient)
 
 	mux := http.NewServeMux()
 
@@ -63,6 +63,9 @@ func main() {
 	mux.HandleFunc("/api/v1/auth/login", authHandler.Login)
 	mux.HandleFunc("/api/v1/auth/logout", authHandler.Logout)
 	mux.HandleFunc("/api/v1/auth/me", authHandler.Me)
+
+	// Endpoints de Gerenciamento de Usuários (Apenas Administrador)
+	mux.HandleFunc("/api/v1/users", authHandler.RequireAdmin(authHandler.HandleUsers))
 
 	// Endpoints da API oficial
 	// POST /api/v1/metrics protegido por Bearer Token

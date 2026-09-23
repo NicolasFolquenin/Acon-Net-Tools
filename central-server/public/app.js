@@ -43,6 +43,21 @@ const deleteTargetNode = document.getElementById('delete-target-node');
 const btnCancelDelete = document.getElementById('btn-cancel-delete');
 const btnConfirmDelete = document.getElementById('btn-confirm-delete');
 
+// Elementos de Gerenciamento de Usuários (Admin)
+const btnOpenUsers = document.getElementById('btn-open-users');
+const usersModal = document.getElementById('users-modal');
+const modalBtnCloseUsers = document.getElementById('modal-btn-close-users');
+const modalBtnCloseUsersBottom = document.getElementById('modal-btn-close-users-bottom');
+const createUserForm = document.getElementById('create-user-form');
+const newUsernameInput = document.getElementById('new-user-username');
+const newUserPasswordInput = document.getElementById('new-user-password');
+const newUserIsAdminSwitch = document.getElementById('new-user-is-admin');
+const btnSubmitCreateUser = document.getElementById('btn-submit-create-user');
+const createUserErrorAlert = document.getElementById('create-user-error-alert');
+const createUserErrorText = document.getElementById('create-user-error-text');
+const usersTableBody = document.getElementById('users-table-body');
+const usersCountTag = document.getElementById('users-count-tag');
+
 // Toast Container
 const toastContainer = document.getElementById('toast-container');
 
@@ -157,11 +172,13 @@ function setAuthenticatedUser(user) {
   navRoleBadge.textContent = user.role === 'admin' ? 'Administrador' : 'Operador';
   navRoleBadge.className = `role-badge ${user.role}`;
 
-  // Se for admin, o botão de deletar estará disponível
+  // Se for admin, o botão de deletar PC e o botão de gerenciar usuários estarão visíveis
   if (user.role === 'admin') {
     modalBtnDeletePc.style.display = 'inline-flex';
+    if (btnOpenUsers) btnOpenUsers.style.display = 'inline-flex';
   } else {
     modalBtnDeletePc.style.display = 'none';
+    if (btnOpenUsers) btnOpenUsers.style.display = 'none';
   }
 }
 
@@ -174,6 +191,8 @@ function showLoginModal() {
   loginErrorAlert.style.display = 'none';
   loginUsernameInput.value = '';
   loginPasswordInput.value = '';
+  if (btnOpenUsers) btnOpenUsers.style.display = 'none';
+  if (usersModal) usersModal.style.display = 'none';
   if (refreshInterval) clearInterval(refreshInterval);
 }
 
@@ -290,17 +309,220 @@ function setupEventListeners() {
   });
   btnConfirmDelete.addEventListener('click', executeDeleteNode);
 
+  // Alternância de Visualização de Senha
+  initPasswordToggle('login-password', 'btn-toggle-login-password');
+  initPasswordToggle('new-user-password', 'btn-toggle-new-user-password');
+
+  // Gerenciamento de Usuários (Admin)
+  if (btnOpenUsers) {
+    btnOpenUsers.addEventListener('click', openUsersModal);
+  }
+  if (modalBtnCloseUsers) {
+    modalBtnCloseUsers.addEventListener('click', closeUsersModal);
+  }
+  if (modalBtnCloseUsersBottom) {
+    modalBtnCloseUsersBottom.addEventListener('click', closeUsersModal);
+  }
+  if (usersModal) {
+    usersModal.addEventListener('click', (e) => {
+      if (e.target === usersModal) closeUsersModal();
+    });
+  }
+  if (createUserForm) {
+    createUserForm.addEventListener('submit', handleCreateUserSubmit);
+  }
+
   // Fechar modais ao pressionar tecla ESC
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      if (deleteConfirmModal.style.display !== 'none') {
+      if (deleteConfirmModal && deleteConfirmModal.style.display !== 'none') {
         closeDeleteModal();
-      } else if (pcModal.style.display !== 'none') {
+      } else if (usersModal && usersModal.style.display !== 'none') {
+        closeUsersModal();
+      } else if (pcModal && pcModal.style.display !== 'none') {
         closePCModal();
       }
     }
   });
 }
+
+/* ==========================================================================
+   Funções de Visualização de Senha e Gerenciamento de Usuários (Admin)
+   ========================================================================== */
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, m => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[m]);
+}
+
+function initPasswordToggle(inputId, toggleBtnId) {
+  const input = document.getElementById(inputId);
+  const btn = document.getElementById(toggleBtnId);
+  if (!input || !btn) return;
+
+  const showIcon = btn.querySelector('.eye-icon-show');
+  const hideIcon = btn.querySelector('.eye-icon-hide');
+
+  btn.addEventListener('click', () => {
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+
+    if (showIcon && hideIcon) {
+      if (isPassword) {
+        showIcon.style.display = 'none';
+        hideIcon.style.display = 'inline-block';
+        btn.title = 'Ocultar senha';
+      } else {
+        showIcon.style.display = 'inline-block';
+        hideIcon.style.display = 'none';
+        btn.title = 'Mostrar senha';
+      }
+    }
+  });
+}
+
+async function openUsersModal() {
+  if (!usersModal) return;
+  usersModal.style.display = 'flex';
+  if (createUserForm) createUserForm.reset();
+  if (createUserErrorAlert) createUserErrorAlert.style.display = 'none';
+  await loadUsersList();
+}
+
+function closeUsersModal() {
+  if (usersModal) usersModal.style.display = 'none';
+}
+
+async function loadUsersList() {
+  if (!usersTableBody) return;
+  usersTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando usuários...</td></tr>`;
+
+  try {
+    const res = await fetch('/api/v1/users');
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Falha ao carregar lista de usuários');
+    }
+
+    const users = data.users || [];
+    if (usersCountTag) {
+      usersCountTag.textContent = `${users.length} usuário${users.length !== 1 ? 's' : ''}`;
+    }
+
+    if (users.length === 0) {
+      usersTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4" style="color: var(--text-muted);">Nenhum usuário cadastrado.</td></tr>`;
+      return;
+    }
+
+    usersTableBody.innerHTML = users.map(u => {
+      const isCur = currentUser && currentUser.username.toLowerCase() === u.username.toLowerCase();
+      const roleBadge = u.role === 'admin'
+        ? `<span class="role-badge-admin">👑 Administrador</span>`
+        : `<span class="role-badge-operator">👤 Operador</span>`;
+
+      let dateFormatted = '--';
+      if (u.created_at) {
+        try {
+          const d = new Date(u.created_at);
+          if (!isNaN(d.getTime())) {
+            dateFormatted = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          }
+        } catch {}
+      }
+
+      let actionHtml = '';
+      if (u.is_system) {
+        actionHtml = `<span class="system-tag">Conta do Sistema (.env)</span>`;
+      } else if (isCur) {
+        actionHtml = `<span class="system-tag">Sua Conta (Conectado)</span>`;
+      } else {
+        actionHtml = `<button class="btn-delete-user" onclick="handleDeleteUser('${escapeHtml(u.username)}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          <span>Excluir</span>
+        </button>`;
+      }
+
+      return `<tr>
+        <td><strong style="color: var(--text-main);">${escapeHtml(u.username)}</strong></td>
+        <td>${roleBadge}</td>
+        <td style="color: var(--text-muted); font-size: 0.78rem;">${dateFormatted}</td>
+        <td style="text-align: right;">${actionHtml}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    usersTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4" style="color: var(--accent-rose);">${escapeHtml(err.message || 'Erro ao carregar usuários')}</td></tr>`;
+  }
+}
+
+async function handleCreateUserSubmit(e) {
+  e.preventDefault();
+  if (!newUsernameInput || !newUserPasswordInput) return;
+
+  const username = newUsernameInput.value.trim();
+  const password = newUserPasswordInput.value.trim();
+  const isAdmin = newUserIsAdminSwitch ? newUserIsAdminSwitch.checked : false;
+
+  if (!username || !password) return;
+
+  if (createUserErrorAlert) createUserErrorAlert.style.display = 'none';
+  if (btnSubmitCreateUser) btnSubmitCreateUser.disabled = true;
+
+  try {
+    const res = await fetch('/api/v1/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username,
+        password,
+        is_admin: isAdmin
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Erro ao criar usuário');
+    }
+
+    showToast(`Usuário '${data.user?.username || username}' criado com sucesso!`, 'toast-success');
+    createUserForm.reset();
+    if (newUserIsAdminSwitch) newUserIsAdminSwitch.checked = false;
+    await loadUsersList();
+  } catch (err) {
+    if (createUserErrorText) createUserErrorText.textContent = err.message || 'Erro ao cadastrar usuário';
+    if (createUserErrorAlert) createUserErrorAlert.style.display = 'flex';
+  } finally {
+    if (btnSubmitCreateUser) btnSubmitCreateUser.disabled = false;
+  }
+}
+
+async function handleDeleteUser(username) {
+  if (!username) return;
+  if (!confirm(`Deseja realmente remover o usuário '${username}' do sistema?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/v1/users?username=${encodeURIComponent(username)}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Erro ao excluir usuário');
+    }
+
+    showToast(data.message || `Usuário '${username}' excluído com sucesso`, 'toast-info');
+    await loadUsersList();
+  } catch (err) {
+    showToast(err.message || 'Falha ao excluir usuário', 'toast-error');
+  }
+}
+window.handleDeleteUser = handleDeleteUser;
 
 function startAutoRefresh() {
   if (refreshInterval) clearInterval(refreshInterval);

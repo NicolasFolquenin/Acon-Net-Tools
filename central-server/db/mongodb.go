@@ -16,10 +16,11 @@ import (
 
 // MongoDBClient encapsula a conexão com o MongoDB e a coleção Time Series
 type MongoDBClient struct {
-	Client     *mongo.Client
-	Database   *mongo.Database
-	Collection *mongo.Collection
-	cfg        *config.AppConfig
+	Client          *mongo.Client
+	Database        *mongo.Database
+	Collection      *mongo.Collection
+	UsersCollection *mongo.Collection
+	cfg             *config.AppConfig
 }
 
 // InitMongoDB conecta ao cluster MongoDB e assegura a coleção Time Series
@@ -43,18 +44,26 @@ func InitMongoDB(ctx context.Context, cfg *config.AppConfig) (*MongoDBClient, er
 
 	database := client.Database(cfg.DatabaseName)
 	collection := database.Collection(cfg.CollectionName)
+	usersCollection := database.Collection("users")
 
 	m := &MongoDBClient{
-		Client:     client,
-		Database:   database,
-		Collection: collection,
-		cfg:        cfg,
+		Client:          client,
+		Database:        database,
+		Collection:      collection,
+		UsersCollection: usersCollection,
+		cfg:             cfg,
 	}
 
 	// Assegura criação da coleção Time Series
 	if err := m.ensureTimeSeriesCollection(ctx); err != nil {
 		log.Printf("[MONGODB][AVISO] Inicialização da Time Series collection: %v", err)
 	}
+
+	// Assegura índice único no campo username para a coleção users
+	_, _ = usersCollection.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "username", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
 
 	return m, nil
 }
@@ -205,6 +214,78 @@ func (m *MongoDBClient) DeleteNode(ctx context.Context, nodeID string) (int64, e
 
 	log.Printf("[MONGODB] No '%s' excluido do sistema. Total de registros removidos: %d", nodeID, res.DeletedCount)
 	return res.DeletedCount, nil
+}
+
+// GetUserByUsername busca um usuário pelo nome de usuário
+func (m *MongoDBClient) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
+	if m.UsersCollection == nil {
+		return nil, fmt.Errorf("colecao de usuarios nao inicializada")
+	}
+
+	var user models.User
+	err := m.UsersCollection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// CreateUser insere um novo usuário na coleção
+func (m *MongoDBClient) CreateUser(ctx context.Context, user *models.User) error {
+	if m.UsersCollection == nil {
+		return fmt.Errorf("colecao de usuarios nao inicializada")
+	}
+
+	_, err := m.UsersCollection.InsertOne(ctx, user)
+	if err != nil {
+		return fmt.Errorf("erro ao inserir usuario no MongoDB: %w", err)
+	}
+
+	log.Printf("[MONGODB] Novo usuario cadastrado: %s (perfil: %s)", user.Username, user.Role)
+	return nil
+}
+
+// ListUsers retorna todos os usuários cadastrados no banco
+func (m *MongoDBClient) ListUsers(ctx context.Context) ([]models.User, error) {
+	if m.UsersCollection == nil {
+		return nil, fmt.Errorf("colecao de usuarios nao inicializada")
+	}
+
+	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})
+	cursor, err := m.UsersCollection.Find(ctx, bson.M{}, opts)
+	if err != nil {
+		return nil, fmt.Errorf("falha ao listar usuarios: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var users []models.User
+	for cursor.Next(ctx) {
+		var u models.User
+		if err := cursor.Decode(&u); err != nil {
+			continue
+		}
+		users = append(users, u)
+	}
+
+	return users, nil
+}
+
+// DeleteUser remove um usuário pelo nome de usuário
+func (m *MongoDBClient) DeleteUser(ctx context.Context, username string) error {
+	if m.UsersCollection == nil {
+		return fmt.Errorf("colecao de usuarios nao inicializada")
+	}
+
+	res, err := m.UsersCollection.DeleteOne(ctx, bson.M{"username": username})
+	if err != nil {
+		return fmt.Errorf("erro ao deletar usuario '%s': %w", username, err)
+	}
+	if res.DeletedCount == 0 {
+		return fmt.Errorf("usuario '%s' nao encontrado", username)
+	}
+
+	log.Printf("[MONGODB] Usuario '%s' removido com sucesso", username)
+	return nil
 }
 
 // Disconnect encerra a conexão com o MongoDB
