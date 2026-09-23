@@ -48,12 +48,14 @@ const toastContainer = document.getElementById('toast-container');
 
 // Paleta de cores para gráficos comparativos multi-nós (Gradientes e bordas de alta definição)
 const nodeColors = [
-  { border: '#06b6d4', fillTop: 'rgba(6, 182, 212, 0.28)', fillBottom: 'rgba(6, 182, 212, 0.01)' }, // Cyan
-  { border: '#a855f7', fillTop: 'rgba(168, 85, 247, 0.22)', fillBottom: 'rgba(168, 85, 247, 0.01)' }, // Purple
-  { border: '#10b981', fillTop: 'rgba(16, 185, 129, 0.25)', fillBottom: 'rgba(16, 185, 129, 0.01)' }, // Emerald
-  { border: '#f59e0b', fillTop: 'rgba(245, 158, 11, 0.22)', fillBottom: 'rgba(245, 158, 11, 0.01)' }, // Amber
-  { border: '#3b82f6', fillTop: 'rgba(59, 130, 246, 0.25)', fillBottom: 'rgba(59, 130, 246, 0.01)' }, // Blue
-  { border: '#ec4899', fillTop: 'rgba(236, 72, 153, 0.22)', fillBottom: 'rgba(236, 72, 153, 0.01)' }, // Pink
+  { border: '#0284c7', fillTop: 'rgba(2, 132, 199, 0.24)', fillBottom: 'rgba(2, 132, 199, 0.01)' }, // Sky Blue
+  { border: '#4f46e5', fillTop: 'rgba(79, 70, 229, 0.20)', fillBottom: 'rgba(79, 70, 229, 0.01)' }, // Royal Indigo
+  { border: '#059669', fillTop: 'rgba(5, 150, 105, 0.22)', fillBottom: 'rgba(5, 150, 105, 0.01)' }, // Emerald
+  { border: '#d97706', fillTop: 'rgba(217, 119, 6, 0.20)', fillBottom: 'rgba(217, 119, 6, 0.01)' }, // Amber
+  { border: '#e11d48', fillTop: 'rgba(225, 29, 72, 0.20)', fillBottom: 'rgba(225, 29, 72, 0.01)' }, // Rose
+  { border: '#0d9488', fillTop: 'rgba(13, 148, 136, 0.20)', fillBottom: 'rgba(13, 148, 136, 0.01)' }, // Teal
+  { border: '#ea580c', fillTop: 'rgba(234, 88, 12, 0.20)', fillBottom: 'rgba(234, 88, 12, 0.01)' }, // Orange
+  { border: '#475569', fillTop: 'rgba(71, 85, 105, 0.20)', fillBottom: 'rgba(71, 85, 105, 0.01)' }, // Slate
 ];
 
 let refreshCountdown = 15;
@@ -820,8 +822,8 @@ function renderComparativeCharts(series, nodesList) {
       bandwidthDatasets.push({
         label: 'Upload',
         data: upData,
-        borderColor: '#a855f7',
-        backgroundColor: createFillGradient(ctxBandwidth, 'rgba(168, 85, 247, 0.22)', 'rgba(168, 85, 247, 0.01)'),
+        borderColor: '#4f46e5',
+        backgroundColor: createFillGradient(ctxBandwidth, 'rgba(79, 70, 229, 0.20)', 'rgba(79, 70, 229, 0.01)'),
         fill: true,
         tension: 0.38,
         cubicInterpolationMode: 'monotone',
@@ -829,7 +831,7 @@ function renderComparativeCharts(series, nodesList) {
         borderWidth: 2.5,
         pointRadius: 3,
         pointHoverRadius: 6,
-        pointBackgroundColor: '#a855f7',
+        pointBackgroundColor: '#4f46e5',
         pointBorderColor: '#ffffff',
         pointBorderWidth: 1.5
       });
@@ -847,8 +849,8 @@ function renderComparativeCharts(series, nodesList) {
         {
           label: 'Download',
           data: downData,
-          borderColor: '#06b6d4',
-          backgroundColor: createFillGradient(ctxBandwidth, 'rgba(6, 182, 212, 0.28)', 'rgba(6, 182, 212, 0.01)'),
+          borderColor: '#0284c7',
+          backgroundColor: createFillGradient(ctxBandwidth, 'rgba(2, 132, 199, 0.22)', 'rgba(2, 132, 199, 0.01)'),
           fill: true,
           tension: 0.38,
           cubicInterpolationMode: 'monotone',
@@ -856,15 +858,15 @@ function renderComparativeCharts(series, nodesList) {
           borderWidth: 2.5,
           pointRadius: 3,
           pointHoverRadius: 6,
-          pointBackgroundColor: '#06b6d4',
+          pointBackgroundColor: '#0284c7',
           pointBorderColor: '#ffffff',
           pointBorderWidth: 1.5
         },
         {
           label: 'Upload',
           data: upData,
-          borderColor: '#a855f7',
-          backgroundColor: createFillGradient(ctxBandwidth, 'rgba(168, 85, 247, 0.22)', 'rgba(168, 85, 247, 0.01)'),
+          borderColor: '#4f46e5',
+          backgroundColor: createFillGradient(ctxBandwidth, 'rgba(79, 70, 229, 0.20)', 'rgba(79, 70, 229, 0.01)'),
           fill: true,
           tension: 0.38,
           cubicInterpolationMode: 'monotone',
@@ -872,7 +874,7 @@ function renderComparativeCharts(series, nodesList) {
           borderWidth: 2.5,
           pointRadius: 3,
           pointHoverRadius: 6,
-          pointBackgroundColor: '#a855f7',
+          pointBackgroundColor: '#4f46e5',
           pointBorderColor: '#ffffff',
           pointBorderWidth: 1.5
         }
