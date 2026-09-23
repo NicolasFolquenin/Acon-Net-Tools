@@ -50,15 +50,21 @@ func DiscoverSwitchLLDP(ctx context.Context) SwitchInfo {
 						$data = $sorted[0]
 						$swName = if ($data.Device) { [string]$data.Device } elseif ($data.SysName) { [string]$data.SysName } else { "" }
 						$swPort = if ($data.Port) { [string]$data.Port } else { "" }
-						$swModel = if ($data.Model) { [string]$data.Model } elseif ($data.Type) { [string]$data.Type } else { "" }
+						$swModel = if ($data.Model) { [string]$data.Model } elseif ($data.Description) { [string]$data.Description } elseif ($data.SysDescr) { [string]$data.SysDescr } elseif ($data.Type) { [string]$data.Type } else { "" }
 						$swVlan = if ($data.VLAN) { [int]$data.VLAN } else { 0 }
+
+						if ($swModel -match 'S5735-[A-Za-z0-9\-]+') {
+							$swModel = "Huawei CloudEngine " + $Matches[0]
+						} elseif ($swModel -match 'Huawei|CloudEngine' -and $swModel -notmatch 'CloudEngine') {
+							$swModel = "Huawei " + $swModel
+						}
 
 						if ($swName -or $swPort) {
 							[PSCustomObject]@{
 								SwitchName = if ($swName) { $swName } else { "Switch Corporativo" }
 								Port       = if ($swPort) { $swPort } else { "--" }
 								Vlan       = $swVlan
-								Model      = if ($swModel) { $swModel } else { "Switch Gerenciável" }
+								Model      = if ($swModel) { $swModel } else { "Huawei CloudEngine S5735" }
 							} | ConvertTo-Json -Compress
 							exit 0
 						}
