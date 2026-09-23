@@ -199,6 +199,38 @@ func (s *StorageService) GetRecentMetrics(limit int) ([]LocalMetricRecord, error
 	return ascList, nil
 }
 
+// GetLastValidSwitchInfo procura nas últimas medições pelo switch válido mais recente gravado
+func (s *StorageService) GetLastValidSwitchInfo() *SwitchInfo {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `
+	SELECT switch_info_json 
+	FROM metrics 
+	WHERE switch_info_json IS NOT NULL AND switch_info_json != '' AND switch_info_json != '{}'
+	ORDER BY timestamp DESC 
+	LIMIT 30
+	`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var switchJson string
+		if err := rows.Scan(&switchJson); err == nil && switchJson != "" {
+			var sw SwitchInfo
+			if errU := json.Unmarshal([]byte(switchJson), &sw); errU == nil {
+				if sw.IsValid() {
+					return &sw
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // GetCounts retorna o total de registros sincronizados e pendentes.
 func (s *StorageService) GetCounts() (synced int, pending int) {
 	s.mu.Lock()

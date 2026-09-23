@@ -194,19 +194,32 @@ func (h *MetricsHandler) DeleteNode(w http.ResponseWriter, r *http.Request) {
 // computeNodeSummaries agrupa por nó e localiza a leitura mais recente
 func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSummaryCard {
 	type nodeAgg struct {
-		latest models.FlattenedMetricItem
-		count  int
+		latest   models.FlattenedMetricItem
+		count    int
+		knownSys *models.SystemInfo
+		knownSw  *models.SwitchInfo
 	}
 
 	aggMap := make(map[string]*nodeAgg)
 
 	for _, item := range series {
-		if cur, exists := aggMap[item.NodeID]; !exists {
-			aggMap[item.NodeID] = &nodeAgg{latest: item, count: 1}
+		cur, exists := aggMap[item.NodeID]
+		if !exists {
+			cur = &nodeAgg{latest: item, count: 1}
+			aggMap[item.NodeID] = cur
 		} else {
 			cur.count++
 			if item.Timestamp.After(cur.latest.Timestamp) {
 				cur.latest = item
+			}
+		}
+
+		if item.SystemInfo != nil && (cur.knownSys == nil || item.Timestamp.After(cur.latest.Timestamp)) {
+			cur.knownSys = item.SystemInfo
+		}
+		if item.SwitchInfo != nil && item.SwitchInfo.IsValid() {
+			if cur.knownSw == nil || item.Timestamp.After(cur.latest.Timestamp) {
+				cur.knownSw = item.SwitchInfo
 			}
 		}
 	}
@@ -214,6 +227,17 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 	var summaries []models.NodeSummaryCard
 	for _, agg := range aggMap {
 		isHealthy := time.Since(agg.latest.Timestamp) < 3*time.Hour
+		sys := agg.latest.SystemInfo
+		if sys == nil {
+			sys = agg.knownSys
+		}
+		sw := agg.latest.SwitchInfo
+		if sw == nil || !sw.IsValid() {
+			if agg.knownSw != nil {
+				sw = agg.knownSw
+			}
+		}
+
 		summaries = append(summaries, models.NodeSummaryCard{
 			NodeID:          agg.latest.NodeID,
 			Location:        agg.latest.Location,
@@ -223,8 +247,8 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 			LastPing:        agg.latest.PingGateway,
 			IsHealthy:       isHealthy,
 			TotalReadings24: agg.count,
-			SystemInfo:      agg.latest.SystemInfo,
-			SwitchInfo:      agg.latest.SwitchInfo,
+			SystemInfo:      sys,
+			SwitchInfo:      sw,
 		})
 	}
 
