@@ -26,47 +26,42 @@ func DiscoverSwitchLLDP(ctx context.Context) SwitchInfo {
 	if (Get-Module -ListAvailable -Name PSDiscoveryProtocol) {
 		try {
 			Import-Module PSDiscoveryProtocol -ErrorAction SilentlyContinue
-			$capture = Invoke-DiscoveryProtocolCapture -Duration 20 -Force -ErrorAction SilentlyContinue
+			$capture = Invoke-DiscoveryProtocolCapture -Duration 35 -Force -ErrorAction SilentlyContinue
 			if ($capture) {
 				$rawList = $capture | Get-DiscoveryProtocolData -ErrorAction SilentlyContinue
 				if ($rawList) {
-					$candidates = @($rawList)
-					$sorted = $candidates | Sort-Object -Descending -Property {
-						$score = 0
+					# Filtra ESTRITAMENTE apenas SWITCHES de rede reais, descartando telefones VoIP e dispositivos SEP
+					$realSwitches = @($rawList) | Where-Object {
 						$dev = if ($_.Device) { [string]$_.Device } elseif ($_.SysName) { [string]$_.SysName } else { "" }
 						$model = if ($_.Model) { [string]$_.Model } elseif ($_.Type) { [string]$_.Type } else { "" }
-						$port = if ($_.Port) { [string]$_.Port } else { "" }
-						$vlan = if ($_.VLAN) { [int]$_.VLAN } else { 0 }
-
-						# Prioridade maxima: Dispositivo de rede real (nao eh telefone IP Cisco com SEP...)
-						if ($dev -notmatch '^SEP[0-9A-Fa-f]{12}' -and $model -notmatch 'Phone|Telefone|VoIP') {
-							$score += 100
-						}
-						# Prioridade 2: Anuncio que informa VLAN de acesso (> 0)
-						if ($vlan -gt 0) {
-							$score += 50
-						}
-						# Prioridade 3: Identificador de porta padrao de switch (GE, Gi, Fa, Te, Eth, Gigabit)
-						if ($port -match '^(GE|Gi|Fa|Te|Eth|TenGig|Gigabit|Port-channel|swp)') {
-							$score += 30
-						}
-						$score
+						$dev -notmatch '^SEP[0-9A-Fa-f]{12}' -and $model -notmatch 'Phone|Telefone|VoIP'
 					}
 
-					$data = $sorted[0]
-					$swName = if ($data.Device) { [string]$data.Device } elseif ($data.SysName) { [string]$data.SysName } else { "" }
-					$swPort = if ($data.Port) { [string]$data.Port } else { "" }
-					$swModel = if ($data.Model) { [string]$data.Model } elseif ($data.Type) { [string]$data.Type } else { "" }
-					$swVlan = if ($data.VLAN) { [int]$data.VLAN } else { 0 }
+					if ($realSwitches) {
+						$sorted = $realSwitches | Sort-Object -Descending -Property {
+							$score = 0
+							$port = if ($_.Port) { [string]$_.Port } else { "" }
+							$vlan = if ($_.VLAN) { [int]$_.VLAN } else { 0 }
+							if ($vlan -gt 0) { $score += 50 }
+							if ($port -match '^(GE|Gi|Fa|Te|Eth|TenGig|Gigabit|Port-channel|swp)') { $score += 30 }
+							$score
+						}
 
-					if ($swName -or $swPort) {
-						[PSCustomObject]@{
-							SwitchName = if ($swName) { $swName } else { "Switch Corporativo" }
-							Port       = if ($swPort) { $swPort } else { "--" }
-							Vlan       = $swVlan
-							Model      = if ($swModel) { $swModel } else { "Switch Gerenciável" }
-						} | ConvertTo-Json -Compress
-						exit 0
+						$data = $sorted[0]
+						$swName = if ($data.Device) { [string]$data.Device } elseif ($data.SysName) { [string]$data.SysName } else { "" }
+						$swPort = if ($data.Port) { [string]$data.Port } else { "" }
+						$swModel = if ($data.Model) { [string]$data.Model } elseif ($data.Type) { [string]$data.Type } else { "" }
+						$swVlan = if ($data.VLAN) { [int]$data.VLAN } else { 0 }
+
+						if ($swName -or $swPort) {
+							[PSCustomObject]@{
+								SwitchName = if ($swName) { $swName } else { "Switch Corporativo" }
+								Port       = if ($swPort) { $swPort } else { "--" }
+								Vlan       = $swVlan
+								Model      = if ($swModel) { $swModel } else { "Switch Gerenciável" }
+							} | ConvertTo-Json -Compress
+							exit 0
+						}
 					}
 				}
 			}
