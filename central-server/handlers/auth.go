@@ -10,10 +10,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"central-server/config"
+	"central-server/db"
+	"central-server/models"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type contextKey string
@@ -24,18 +29,23 @@ const sessionCookieName = "noc_session"
 // UserSessionPayload armazena os dados do usuário autenticado no token
 type UserSessionPayload struct {
 	Username  string    `json:"username"`
-	Role      string    `json:"role"` // "admin" ou "viewer"
+	Role      string    `json:"role"` // "admin" ou "viewer" / "operator"
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-// AuthHandler gerencia login, logout e verificação de perfil
+// AuthHandler gerencia login, logout, verificação de perfil e gestão de usuários
 type AuthHandler struct {
-	cfg *config.AppConfig
+	cfg      *config.AppConfig
+	dbClient *db.MongoDBClient
 }
 
 // NewAuthHandler cria uma nova instância de AuthHandler
-func NewAuthHandler(cfg *config.AppConfig) *AuthHandler {
-	return &AuthHandler{cfg: cfg}
+func NewAuthHandler(cfg *config.AppConfig, dbClient ...*db.MongoDBClient) *AuthHandler {
+	h := &AuthHandler{cfg: cfg}
+	if len(dbClient) > 0 {
+		h.dbClient = dbClient[0]
+	}
+	return h
 }
 
 // LoginRequest corpo da requisição POST /api/v1/auth/login
@@ -64,11 +74,22 @@ func (a *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	req.Password = strings.TrimSpace(req.Password)
 
 	var role string
+	// 1. Verifica contas mestras do ambiente (.env)
 	if req.Username == a.cfg.AdminUser && req.Password == a.cfg.AdminPass {
 		role = "admin"
 	} else if req.Username == a.cfg.ViewerUser && req.Password == a.cfg.ViewerPass {
 		role = "viewer"
-	} else {
+	} else if a.dbClient != nil {
+		// 2. Verifica se existe na base de dados de usuários do MongoDB
+		dbUser, err := a.dbClient.GetUserByUsername(r.Context(), strings.ToLower(req.Username))
+		if err == nil && dbUser != nil {
+			if errBcrypt := bcrypt.CompareHashAndPassword([]byte(dbUser.PasswordHash), []byte(req.Password)); errBcrypt == nil {
+				role = dbUser.Role
+			}
+		}
+	}
+
+	if role == "" {
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Usuario ou senha incorretos"})
 		return
@@ -262,4 +283,198 @@ func (a *AuthHandler) computeHmac(message string) string {
 	mac := hmac.New(sha256.New, []byte(a.cfg.SessionSecret))
 	mac.Write([]byte(message))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// HandleUsers processa GET (listar), POST (criar) e DELETE (remover) usuários
+func (a *AuthHandler) HandleUsers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	switch r.Method {
+	case http.MethodGet:
+		a.listUsers(w, r)
+	case http.MethodPost:
+		a.createUser(w, r)
+	case http.MethodDelete:
+		a.deleteUser(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "metodo nao permitido"})
+	}
+}
+
+func (a *AuthHandler) listUsers(w http.ResponseWriter, r *http.Request) {
+	var userList []models.UserResponse
+
+	// 1. Adiciona usuários padrão do sistema (.env)
+	if a.cfg.AdminUser != "" {
+		userList = append(userList, models.UserResponse{
+			Username:  a.cfg.AdminUser,
+			Role:      "admin",
+			CreatedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+			IsSystem:  true,
+		})
+	}
+	if a.cfg.ViewerUser != "" {
+		userList = append(userList, models.UserResponse{
+			Username:  a.cfg.ViewerUser,
+			Role:      "operator",
+			CreatedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+			IsSystem:  true,
+		})
+	}
+
+	// 2. Adiciona usuários criados no MongoDB
+	if a.dbClient != nil {
+		dbUsers, err := a.dbClient.ListUsers(r.Context())
+		if err == nil {
+			for _, u := range dbUsers {
+				userList = append(userList, models.UserResponse{
+					Username:  u.Username,
+					Role:      u.Role,
+					CreatedAt: u.CreatedAt,
+					IsSystem:  false,
+				})
+			}
+		}
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"users":  userList,
+	})
+}
+
+func (a *AuthHandler) createUser(w http.ResponseWriter, r *http.Request) {
+	var req models.CreateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "corpo da requisicao invalido"})
+		return
+	}
+
+	req.Username = strings.TrimSpace(strings.ToLower(req.Username))
+	req.Password = strings.TrimSpace(req.Password)
+
+	if len(req.Username) < 3 || len(req.Username) > 32 {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "O nome de usuario deve ter entre 3 e 32 caracteres"})
+		return
+	}
+
+	validUsername := regexp.MustCompile(`^[a-z0-9_\.\-]+$`)
+	if !validUsername.MatchString(req.Username) {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Nome de usuario contem caracteres invalidos. Use apenas letras minusculas, numeros, ponto, hifen ou sublinhado."})
+		return
+	}
+
+	if len(req.Password) < 4 {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "A senha deve ter pelo menos 4 caracteres"})
+		return
+	}
+
+	// Verifica se conflita com contas do sistema
+	if req.Username == strings.ToLower(a.cfg.AdminUser) || req.Username == strings.ToLower(a.cfg.ViewerUser) {
+		w.WriteHeader(http.StatusConflict)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Este nome de usuario e reservado pelo sistema"})
+		return
+	}
+
+	if a.dbClient == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "banco de dados nao conectado"})
+		return
+	}
+
+	// Verifica se já existe no banco
+	existing, _ := a.dbClient.GetUserByUsername(r.Context(), req.Username)
+	if existing != nil {
+		w.WriteHeader(http.StatusConflict)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Ja existe um usuario cadastrado com este nome"})
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "falha ao processar senha"})
+		return
+	}
+
+	role := "operator"
+	if req.IsAdmin {
+		role = "admin"
+	}
+
+	curUser, _ := r.Context().Value(userContextKey).(*UserSessionPayload)
+	createdBy := "admin"
+	if curUser != nil {
+		createdBy = curUser.Username
+	}
+
+	newUser := &models.User{
+		Username:     req.Username,
+		PasswordHash: string(hash),
+		Role:         role,
+		CreatedAt:    time.Now().UTC(),
+		CreatedBy:    createdBy,
+	}
+
+	if err := a.dbClient.CreateUser(r.Context(), newUser); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "falha ao salvar usuario no banco de dados"})
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "success",
+		"message": "Usuario criado com sucesso",
+		"user": models.UserResponse{
+			Username:  newUser.Username,
+			Role:      newUser.Role,
+			CreatedAt: newUser.CreatedAt,
+			IsSystem:  false,
+		},
+	})
+}
+
+func (a *AuthHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
+	if a.dbClient == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "banco de dados nao conectado"})
+		return
+	}
+
+	target := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("username")))
+	if target == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "parametro 'username' e obrigatorio"})
+		return
+	}
+
+	if target == strings.ToLower(a.cfg.AdminUser) || target == strings.ToLower(a.cfg.ViewerUser) {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Usuarios padrao do sistema nao podem ser removidos"})
+		return
+	}
+
+	curUser, _ := r.Context().Value(userContextKey).(*UserSessionPayload)
+	if curUser != nil && strings.ToLower(curUser.Username) == target {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Voce nao pode excluir o usuario que esta atualmente conectado"})
+		return
+	}
+
+	if err := a.dbClient.DeleteUser(r.Context(), target); err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "success",
+		"message": fmt.Sprintf("Usuario '%s' excluido com sucesso", target),
+	})
 }
