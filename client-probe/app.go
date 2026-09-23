@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -105,18 +106,24 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}()
 
-	interval := time.Duration(cfg.IntervalMinutes) * time.Minute
-	if interval < 1*time.Minute {
-		interval = 60 * time.Minute
+	var next time.Time
+	if cfg.IsCentralSynced() {
+		next = getNextSyncSlot(time.Now())
+		a.statusText = "Sincronizado com o servidor central"
+	} else {
+		interval := time.Duration(cfg.IntervalMinutes) * time.Minute
+		if interval < 1*time.Minute {
+			interval = 60 * time.Minute
+		}
+		next = time.Now().Add(interval)
+		a.statusText = fmt.Sprintf("Agendado (%dh)", int(interval.Hours()))
 	}
-	next := time.Now().Add(interval)
 	a.nextRun = &next
-	a.statusText = fmt.Sprintf("Agendado (%dh)", int(interval.Hours()))
 
-	// 4. Inicia goroutine de agendamento em segundo plano (a cada 1 hora)
+	// 4. Inicia goroutine de agendamento em segundo plano (:00 e :30 se sincronizado com servidor central)
 	workerCtx, cancel := context.WithCancel(context.Background())
 	a.cancelWorker = cancel
-	go a.backgroundScheduler(workerCtx, interval)
+	go a.backgroundScheduler(workerCtx)
 
 	// Sincroniza medições que porventura ficaram pendentes offline
 	go func() {
@@ -142,24 +149,63 @@ func (a *App) shutdown(ctx context.Context) {
 	}
 }
 
-// backgroundScheduler roda em background disparando testes no intervalo configurado (1 hora)
-func (a *App) backgroundScheduler(ctx context.Context, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+// getNextSyncSlot calcula o próximo horário fixo (:00 ou :30) do relógio de parede
+func getNextSyncSlot(now time.Time) time.Time {
+	var target time.Time
+	if now.Minute() < 30 {
+		target = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 30, 0, 0, now.Location())
+	} else {
+		nextHour := now.Add(1 * time.Hour)
+		target = time.Date(nextHour.Year(), nextHour.Month(), nextHour.Day(), nextHour.Hour(), 0, 0, 0, now.Location())
+	}
+	if !target.After(now) {
+		target = target.Add(30 * time.Minute)
+	}
+	return target
+}
 
+// backgroundScheduler gerencia a execução periódica de testes.
+// Quando configurado para sincronizar com o Servidor Central, todos os clientes disparam nos mesmos horários (:00 e :30).
+func (a *App) backgroundScheduler(ctx context.Context) {
 	for {
+		cfg := GetCurrentConfig()
+		var next time.Time
+		var statusLabel string
+
+		if cfg.IsCentralSynced() {
+			next = getNextSyncSlot(time.Now())
+			statusLabel = "Sincronizado com o servidor central"
+		} else {
+			interval := time.Duration(cfg.IntervalMinutes) * time.Minute
+			if interval < 1*time.Minute {
+				interval = 60 * time.Minute
+			}
+			next = time.Now().Add(interval)
+			statusLabel = fmt.Sprintf("Agendado (%dh)", int(interval.Hours()))
+		}
+
+		a.mu.Lock()
+		a.nextRun = &next
+		if !a.isRunning {
+			a.statusText = statusLabel
+		}
+		a.mu.Unlock()
+		a.emitStatus()
+
+		waitDuration := time.Until(next)
+		if waitDuration < 0 {
+			waitDuration = 50 * time.Millisecond
+		}
+
+		timer := time.NewTimer(waitDuration)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			log.Println("[SCHEDULER] Goroutine em segundo plano finalizada.")
 			return
-		case <-ticker.C:
-			log.Println("[SCHEDULER] Intervalo atingido! Executando teste programado...")
+		case <-timer.C:
+			log.Printf("[SCHEDULER] Horário de medição atingido (%s)! Executando teste programado...", time.Now().Format("15:04:05"))
 			_, _ = a.ExecuteTest("Agendado")
-			next := time.Now().Add(interval)
-			a.mu.Lock()
-			a.nextRun = &next
-			a.mu.Unlock()
-			a.emitStatus()
 		}
 	}
 }
@@ -185,8 +231,12 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 		a.mu.Lock()
 		a.isRunning = false
 		cfg := GetCurrentConfig()
-		interval := time.Duration(cfg.IntervalMinutes) * time.Minute
-		a.statusText = fmt.Sprintf("Agendado (%dh)", int(interval.Hours()))
+		if cfg.IsCentralSynced() {
+			a.statusText = "Sincronizado com o servidor central"
+		} else {
+			interval := time.Duration(cfg.IntervalMinutes) * time.Minute
+			a.statusText = fmt.Sprintf("Agendado (%dh)", int(interval.Hours()))
+		}
 		a.mu.Unlock()
 		a.emitStatus()
 	}()
@@ -288,17 +338,25 @@ func (a *App) GetStatus() ProbeStatus {
 		serverStatus = "Desconectado (offline)"
 	}
 
+	cfg := GetCurrentConfig()
+	isSynced := cfg.IsCentralSynced()
+	statusText := a.statusText
+	if !a.isRunning && isSynced && (statusText == "" || strings.HasPrefix(statusText, "Agendado")) {
+		statusText = "Sincronizado com o servidor central"
+	}
+
 	return ProbeStatus{
-		IsRunning:     a.isRunning,
-		StatusText:    a.statusText,
-		LastRun:       a.lastRun,
-		NextRun:       a.nextRun,
-		LastMetric:    a.lastMetric,
-		ServerStatus:  serverStatus,
-		TotalSynced:   syncedCount,
-		TotalPending:  pendingCount,
-		CurrentPC:     a.currentPC,
-		CurrentSwitch: a.currentSwitch,
+		IsRunning:       a.isRunning,
+		StatusText:      statusText,
+		LastRun:         a.lastRun,
+		NextRun:         a.nextRun,
+		LastMetric:      a.lastMetric,
+		ServerStatus:    serverStatus,
+		TotalSynced:     syncedCount,
+		TotalPending:    pendingCount,
+		CurrentPC:       a.currentPC,
+		CurrentSwitch:   a.currentSwitch,
+		SyncWithCentral: isSynced,
 	}
 }
 
@@ -311,6 +369,15 @@ func (a *App) GetConfig() Config {
 func (a *App) SaveConfig(cfg Config) error {
 	err := SaveConfig(cfg)
 	if err == nil {
+		a.mu.Lock()
+		if a.cancelWorker != nil {
+			a.cancelWorker()
+		}
+		workerCtx, cancel := context.WithCancel(context.Background())
+		a.cancelWorker = cancel
+		go a.backgroundScheduler(workerCtx)
+		a.mu.Unlock()
+
 		go func() {
 			syncCtx, syncCancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer syncCancel()

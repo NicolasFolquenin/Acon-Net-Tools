@@ -31,7 +31,7 @@
         <!-- Status Badge -->
         <div id="status-badge" class="status-badge scheduled">
           <span class="status-pulse"></span>
-          <span id="status-text">Agendado (1h)</span>
+          <span id="status-text">Sincronizado com o servidor central</span>
         </div>
 
         <!-- Botão Rodar Teste Agora -->
@@ -301,7 +301,7 @@
     <!-- Footer Bar -->
     <footer class="app-footer">
       <div class="footer-item">
-        <span class="dot-live"></span> Agente Operando em Background (Goroutine Ticker 1h)
+        <span class="dot-live"></span> <span id="footer-agent-desc">Sincronizado com o servidor central (:00 e :30)</span>
       </div>
       <div class="footer-item">
         <span>Próxima execução: <strong id="next-run-text">Calculando...</strong></span>
@@ -337,9 +337,12 @@
           <input type="password" id="cfg-api-token" class="form-control" required />
         </div>
         <div class="form-row">
-          <div class="form-group col">
+          <div class="form-group col" id="group-cfg-interval">
             <label for="cfg-interval">Intervalo (Minutos)</label>
-            <input type="number" id="cfg-interval" class="form-control" min="1" max="1440" value="60" />
+            <input type="number" id="cfg-interval" class="form-control" min="1" max="1440" value="30" />
+            <small id="cfg-interval-hint" class="form-hint" style="color: var(--accent-cyan); font-size: 0.75rem; margin-top: 4px; display: block;">
+              ● Sincronizado com o servidor central (:00 e :30)
+            </small>
           </div>
           <div class="form-group col">
             <label for="cfg-ping-target">Alvo do Ping (Gateway/IP)</label>
