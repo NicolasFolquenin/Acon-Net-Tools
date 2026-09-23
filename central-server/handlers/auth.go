@@ -285,7 +285,7 @@ func (a *AuthHandler) computeHmac(message string) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// HandleUsers processa GET (listar), POST (criar) e DELETE (remover) usuários
+// HandleUsers processa GET (listar), POST (criar), PUT (alterar papel) e DELETE (remover) usuários
 func (a *AuthHandler) HandleUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -294,6 +294,8 @@ func (a *AuthHandler) HandleUsers(w http.ResponseWriter, r *http.Request) {
 		a.listUsers(w, r)
 	case http.MethodPost:
 		a.createUser(w, r)
+	case http.MethodPut, http.MethodPatch:
+		a.updateUserRole(w, r)
 	case http.MethodDelete:
 		a.deleteUser(w, r)
 	default:
@@ -310,6 +312,7 @@ func (a *AuthHandler) listUsers(w http.ResponseWriter, r *http.Request) {
 		userList = append(userList, models.UserResponse{
 			Username:  a.cfg.AdminUser,
 			Role:      "admin",
+			AuthType:  "system",
 			CreatedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 			IsSystem:  true,
 		})
@@ -318,20 +321,29 @@ func (a *AuthHandler) listUsers(w http.ResponseWriter, r *http.Request) {
 		userList = append(userList, models.UserResponse{
 			Username:  a.cfg.ViewerUser,
 			Role:      "operator",
+			AuthType:  "system",
 			CreatedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 			IsSystem:  true,
 		})
 	}
 
-	// 2. Adiciona usuários criados no MongoDB
+	// 2. Adiciona usuários criados no MongoDB (Locais e Keycloak)
 	if a.dbClient != nil {
 		dbUsers, err := a.dbClient.ListUsers(r.Context())
 		if err == nil {
 			for _, u := range dbUsers {
+				authType := u.AuthType
+				if authType == "" {
+					authType = "local"
+				}
 				userList = append(userList, models.UserResponse{
 					Username:  u.Username,
 					Role:      u.Role,
+					AuthType:  authType,
+					Email:     u.Email,
+					FullName:  u.FullName,
 					CreatedAt: u.CreatedAt,
+					LastLogin: u.LastLogin,
 					IsSystem:  false,
 				})
 			}
@@ -354,6 +366,10 @@ func (a *AuthHandler) createUser(w http.ResponseWriter, r *http.Request) {
 
 	req.Username = strings.TrimSpace(strings.ToLower(req.Username))
 	req.Password = strings.TrimSpace(req.Password)
+	authType := strings.ToLower(strings.TrimSpace(req.AuthType))
+	if authType != "keycloak" {
+		authType = "local"
+	}
 
 	if len(req.Username) < 3 || len(req.Username) > 32 {
 		w.WriteHeader(http.StatusBadRequest)
@@ -368,10 +384,22 @@ func (a *AuthHandler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.Password) < 4 {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "A senha deve ter pelo menos 4 caracteres"})
-		return
+	// Senha é obrigatória apenas para contas locais
+	var passwordHash string
+	if authType == "local" {
+		if len(req.Password) < 4 {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "A senha deve ter pelo menos 4 caracteres"})
+			return
+		}
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "falha ao processar senha"})
+			return
+		}
+		passwordHash = string(hash)
 	}
 
 	// Verifica se conflita com contas do sistema
@@ -395,13 +423,6 @@ func (a *AuthHandler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "falha ao processar senha"})
-		return
-	}
-
 	role := "operator"
 	if req.IsAdmin {
 		role = "admin"
@@ -415,8 +436,9 @@ func (a *AuthHandler) createUser(w http.ResponseWriter, r *http.Request) {
 
 	newUser := &models.User{
 		Username:     req.Username,
-		PasswordHash: string(hash),
+		PasswordHash: passwordHash,
 		Role:         role,
+		AuthType:     authType,
 		CreatedAt:    time.Now().UTC(),
 		CreatedBy:    createdBy,
 	}
@@ -434,9 +456,61 @@ func (a *AuthHandler) createUser(w http.ResponseWriter, r *http.Request) {
 		"user": models.UserResponse{
 			Username:  newUser.Username,
 			Role:      newUser.Role,
+			AuthType:  newUser.AuthType,
 			CreatedAt: newUser.CreatedAt,
 			IsSystem:  false,
 		},
+	})
+}
+
+func (a *AuthHandler) updateUserRole(w http.ResponseWriter, r *http.Request) {
+	if a.dbClient == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "banco de dados nao conectado"})
+		return
+	}
+
+	var req models.UpdateUserRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "corpo da requisicao invalido"})
+		return
+	}
+
+	req.Username = strings.TrimSpace(strings.ToLower(req.Username))
+	req.Role = strings.TrimSpace(strings.ToLower(req.Role))
+
+	if req.Role != "admin" && req.Role != "operator" && req.Role != "viewer" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Papel invalido. Escolha 'admin' ou 'operator'."})
+		return
+	}
+	if req.Role == "viewer" {
+		req.Role = "operator"
+	}
+
+	if req.Username == strings.ToLower(a.cfg.AdminUser) || req.Username == strings.ToLower(a.cfg.ViewerUser) {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Usuarios padrao do sistema nao podem ter seu perfil alterado"})
+		return
+	}
+
+	curUser, _ := r.Context().Value(userContextKey).(*UserSessionPayload)
+	if curUser != nil && strings.ToLower(curUser.Username) == req.Username && req.Role != "admin" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Voce nao pode revogar sua propria permissao de administrador"})
+		return
+	}
+
+	if err := a.dbClient.UpdateUserRole(r.Context(), req.Username, req.Role); err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "success",
+		"message": fmt.Sprintf("Permissao do usuario '%s' atualizada para '%s'", req.Username, req.Role),
 	})
 }
 

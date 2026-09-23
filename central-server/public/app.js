@@ -58,6 +58,19 @@ const createUserErrorText = document.getElementById('create-user-error-text');
 const usersTableBody = document.getElementById('users-table-body');
 const usersCountTag = document.getElementById('users-count-tag');
 
+// Elementos OIDC / Keycloak
+const oidcSSOWrapper = document.getElementById('oidc-sso-wrapper');
+const oidcButtonText = document.getElementById('oidc-button-text');
+
+// Elementos de Tipo de Conta no Modal de Usuários
+const tabTypeLocal = document.getElementById('tab-type-local');
+const tabTypeKeycloak = document.getElementById('tab-type-keycloak');
+const newUserAuthTypeInput = document.getElementById('new-user-auth-type');
+const fieldGroupPassword = document.getElementById('field-group-password');
+const fieldKeycloakInfo = document.getElementById('field-keycloak-info');
+const labelNewUserUsername = document.getElementById('label-new-user-username');
+const btnCreateUserText = document.getElementById('btn-create-user-text');
+
 // Toast Container
 const toastContainer = document.getElementById('toast-container');
 
@@ -145,6 +158,17 @@ document.addEventListener('DOMContentLoaded', async () => {
    ========================================================================== */
 
 async function checkAuthAndInitialize() {
+  // 1. Verifica se o servidor possui integração com Keycloak/OIDC ativa
+  checkOIDCConfig();
+
+  // 2. Notifica caso haja erro retornado pelo redirecionamento do SSO
+  const urlParams = new URLSearchParams(window.location.search);
+  const authError = urlParams.get('auth_error');
+  if (authError) {
+    showToast(`Falha no login institucional: ${authError}`, 'toast-error');
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
   try {
     const res = await fetch('/api/v1/auth/me');
     if (res.ok) {
@@ -162,6 +186,24 @@ async function checkAuthAndInitialize() {
 
   // Se não estiver logado, exibe a tela de login
   showLoginModal();
+}
+
+async function checkOIDCConfig() {
+  if (!oidcSSOWrapper) return;
+  try {
+    const res = await fetch('/api/v1/auth/oidc/config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.enabled) {
+        oidcSSOWrapper.style.display = 'flex';
+        if (oidcButtonText && data.button_text) {
+          oidcButtonText.textContent = data.button_text;
+        }
+        return;
+      }
+    }
+  } catch {}
+  oidcSSOWrapper.style.display = 'none';
 }
 
 function setAuthenticatedUser(user) {
@@ -332,6 +374,11 @@ function setupEventListeners() {
     createUserForm.addEventListener('submit', handleCreateUserSubmit);
   }
 
+  if (tabTypeLocal && tabTypeKeycloak) {
+    tabTypeLocal.addEventListener('click', () => setAccountType('local'));
+    tabTypeKeycloak.addEventListener('click', () => setAccountType('keycloak'));
+  }
+
   // Fechar modais ao pressionar tecla ESC
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -387,10 +434,36 @@ function initPasswordToggle(inputId, toggleBtnId) {
   });
 }
 
+function setAccountType(type) {
+  if (!tabTypeLocal || !tabTypeKeycloak) return;
+  if (type === 'keycloak') {
+    tabTypeKeycloak.classList.add('active');
+    tabTypeLocal.classList.remove('active');
+    if (newUserAuthTypeInput) newUserAuthTypeInput.value = 'keycloak';
+    if (fieldGroupPassword) fieldGroupPassword.style.display = 'none';
+    if (fieldKeycloakInfo) fieldKeycloakInfo.style.display = 'flex';
+    if (newUserPasswordInput) newUserPasswordInput.required = false;
+    if (labelNewUserUsername) labelNewUserUsername.textContent = 'Usuário Institucional (Keycloak)';
+    if (newUsernameInput) newUsernameInput.placeholder = 'Ex: nicolas.fonseca';
+    if (btnCreateUserText) btnCreateUserText.textContent = 'Vincular Usuário Keycloak';
+  } else {
+    tabTypeLocal.classList.add('active');
+    tabTypeKeycloak.classList.remove('active');
+    if (newUserAuthTypeInput) newUserAuthTypeInput.value = 'local';
+    if (fieldGroupPassword) fieldGroupPassword.style.display = 'flex';
+    if (fieldKeycloakInfo) fieldKeycloakInfo.style.display = 'none';
+    if (newUserPasswordInput) newUserPasswordInput.required = true;
+    if (labelNewUserUsername) labelNewUserUsername.textContent = 'Nome de Usuário';
+    if (newUsernameInput) newUsernameInput.placeholder = 'Ex: joao.silva';
+    if (btnCreateUserText) btnCreateUserText.textContent = 'Cadastrar Usuário';
+  }
+}
+
 async function openUsersModal() {
   if (!usersModal) return;
   usersModal.style.display = 'flex';
   if (createUserForm) createUserForm.reset();
+  setAccountType('local');
   if (createUserErrorAlert) createUserErrorAlert.style.display = 'none';
   await loadUsersList();
 }
@@ -401,7 +474,7 @@ function closeUsersModal() {
 
 async function loadUsersList() {
   if (!usersTableBody) return;
-  usersTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando usuários...</td></tr>`;
+  usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando usuários...</td></tr>`;
 
   try {
     const res = await fetch('/api/v1/users');
@@ -416,20 +489,41 @@ async function loadUsersList() {
     }
 
     if (users.length === 0) {
-      usersTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4" style="color: var(--text-muted);">Nenhum usuário cadastrado.</td></tr>`;
+      usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);">Nenhum usuário cadastrado.</td></tr>`;
       return;
     }
 
     usersTableBody.innerHTML = users.map(u => {
       const isCur = currentUser && currentUser.username.toLowerCase() === u.username.toLowerCase();
+
+      // Badge de Origem
+      let originBadge = '<span class="badge-origin-local">💻 Local</span>';
+      if (u.is_system) {
+        originBadge = '<span class="badge-origin-system">⚙️ Sistema</span>';
+      } else if (u.auth_type === 'keycloak') {
+        originBadge = '<span class="badge-origin-keycloak">🏛️ Keycloak</span>';
+      }
+
+      // Badge de Perfil + Botão de Alteração Rápida
       const roleBadge = u.role === 'admin'
-        ? `<span class="role-badge-admin">👑 Administrador</span>`
+        ? `<span class="role-badge-admin">👑 Admin</span>`
         : `<span class="role-badge-operator">👤 Operador</span>`;
 
+      let roleActionBtn = '';
+      if (!u.is_system && !isCur) {
+        if (u.role === 'admin') {
+          roleActionBtn = `<button class="btn-role-toggle to-operator" onclick="handleToggleRole('${escapeHtml(u.username)}', 'operator')" title="Rebaixar para Operador">Tornar Operador</button>`;
+        } else {
+          roleActionBtn = `<button class="btn-role-toggle to-admin" onclick="handleToggleRole('${escapeHtml(u.username)}', 'admin')" title="Promover a Administrador">Tornar Admin</button>`;
+        }
+      }
+
+      // Formatação de data
       let dateFormatted = '--';
-      if (u.created_at) {
+      const dateToFormat = u.last_login || u.created_at;
+      if (dateToFormat) {
         try {
-          const d = new Date(u.created_at);
+          const d = new Date(dateToFormat);
           if (!isNaN(d.getTime())) {
             dateFormatted = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
           }
@@ -438,9 +532,9 @@ async function loadUsersList() {
 
       let actionHtml = '';
       if (u.is_system) {
-        actionHtml = `<span class="system-tag">Conta do Sistema (.env)</span>`;
+        actionHtml = `<span class="system-tag">Conta do Sistema</span>`;
       } else if (isCur) {
-        actionHtml = `<span class="system-tag">Sua Conta (Conectado)</span>`;
+        actionHtml = `<span class="system-tag">Sua Conta</span>`;
       } else {
         actionHtml = `<button class="btn-delete-user" onclick="handleDeleteUser('${escapeHtml(u.username)}')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -448,27 +542,39 @@ async function loadUsersList() {
         </button>`;
       }
 
+      const displayName = u.full_name
+        ? `<strong>${escapeHtml(u.username)}</strong><div style="font-size:0.72rem;color:var(--text-muted);">${escapeHtml(u.full_name)}</div>`
+        : `<strong>${escapeHtml(u.username)}</strong>`;
+
       return `<tr>
-        <td><strong style="color: var(--text-main);">${escapeHtml(u.username)}</strong></td>
-        <td>${roleBadge}</td>
+        <td>${displayName}</td>
+        <td>${originBadge}</td>
+        <td>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+            ${roleBadge}
+            ${roleActionBtn}
+          </div>
+        </td>
         <td style="color: var(--text-muted); font-size: 0.78rem;">${dateFormatted}</td>
         <td style="text-align: right;">${actionHtml}</td>
       </tr>`;
     }).join('');
   } catch (err) {
-    usersTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4" style="color: var(--accent-rose);">${escapeHtml(err.message || 'Erro ao carregar usuários')}</td></tr>`;
+    usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--accent-rose);">${escapeHtml(err.message || 'Erro ao carregar usuários')}</td></tr>`;
   }
 }
 
 async function handleCreateUserSubmit(e) {
   e.preventDefault();
-  if (!newUsernameInput || !newUserPasswordInput) return;
+  if (!newUsernameInput) return;
 
   const username = newUsernameInput.value.trim();
-  const password = newUserPasswordInput.value.trim();
+  const password = newUserPasswordInput ? newUserPasswordInput.value.trim() : '';
+  const authType = newUserAuthTypeInput ? newUserAuthTypeInput.value : 'local';
   const isAdmin = newUserIsAdminSwitch ? newUserIsAdminSwitch.checked : false;
 
-  if (!username || !password) return;
+  if (!username) return;
+  if (authType === 'local' && !password) return;
 
   if (createUserErrorAlert) createUserErrorAlert.style.display = 'none';
   if (btnSubmitCreateUser) btnSubmitCreateUser.disabled = true;
@@ -480,6 +586,7 @@ async function handleCreateUserSubmit(e) {
       body: JSON.stringify({
         username,
         password,
+        auth_type: authType,
         is_admin: isAdmin
       })
     });
@@ -489,8 +596,10 @@ async function handleCreateUserSubmit(e) {
       throw new Error(data.error || 'Erro ao criar usuário');
     }
 
-    showToast(`Usuário '${data.user?.username || username}' criado com sucesso!`, 'toast-success');
+    const typeMsg = authType === 'keycloak' ? 'institucional Keycloak' : 'local';
+    showToast(`Usuário ${typeMsg} '${data.user?.username || username}' cadastrado com sucesso!`, 'toast-success');
     createUserForm.reset();
+    setAccountType('local');
     if (newUserIsAdminSwitch) newUserIsAdminSwitch.checked = false;
     await loadUsersList();
   } catch (err) {
@@ -500,6 +609,31 @@ async function handleCreateUserSubmit(e) {
     if (btnSubmitCreateUser) btnSubmitCreateUser.disabled = false;
   }
 }
+
+async function handleToggleRole(username, newRole) {
+  if (!username || !newRole) return;
+  const actionLabel = newRole === 'admin' ? 'promover a Administrador' : 'rebaixar para Operador';
+  if (!confirm(`Deseja realmente ${actionLabel} o usuário '${username}'?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/v1/users', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, role: newRole })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Falha ao alterar perfil');
+    }
+    showToast(data.message || `Perfil de '${username}' atualizado para ${newRole}`, 'toast-success');
+    await loadUsersList();
+  } catch (err) {
+    showToast(err.message || 'Erro ao alterar permissão', 'toast-error');
+  }
+}
+window.handleToggleRole = handleToggleRole;
 
 async function handleDeleteUser(username) {
   if (!username) return;
