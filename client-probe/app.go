@@ -60,9 +60,13 @@ func (a *App) startup(ctx context.Context) {
 		if a.lastMetric.SystemInfo != nil {
 			a.currentPC = a.lastMetric.SystemInfo
 		}
-		if a.lastMetric.SwitchInfo != nil {
-			a.currentSwitch = a.lastMetric.SwitchInfo
-		}
+	}
+	// Restaura o switch válido mais recente do histórico local para exibição instantânea
+	if validSw := a.storage.GetLastValidSwitchInfo(); validSw != nil {
+		a.currentSwitch = validSw
+		log.Printf("[APP] Switch restaurado do cache local: %s (Porta %s)", validSw.SwitchName, validSw.SwitchPort)
+	} else if len(history) > 0 && a.lastMetric.SwitchInfo != nil {
+		a.currentSwitch = a.lastMetric.SwitchInfo
 	}
 
 	// 4. Coleta dados de hardware do PC imediatamente na inicialização
@@ -73,14 +77,22 @@ func (a *App) startup(ctx context.Context) {
 		a.mu.Unlock()
 		a.emitStatus()
 
-		// Busca inicial de LLDP em background (captura resiliente)
-		lldpCtx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		// Busca inicial de LLDP em background (captura resiliente de 35s)
+		lldpCtx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 		defer cancel()
 		sw := DiscoverSwitchLLDP(lldpCtx)
-		a.mu.Lock()
-		a.currentSwitch = &sw
-		a.mu.Unlock()
-		a.emitStatus()
+		if sw.IsValid() {
+			a.mu.Lock()
+			a.currentSwitch = &sw
+			a.mu.Unlock()
+			log.Printf("[APP] Switch identificado via LLDP: %s (Porta %s)", sw.SwitchName, sw.SwitchPort)
+			a.emitStatus()
+		} else if a.currentSwitch == nil || !a.currentSwitch.IsValid() {
+			a.mu.Lock()
+			a.currentSwitch = &sw
+			a.mu.Unlock()
+			a.emitStatus()
+		}
 	}()
 
 	interval := time.Duration(cfg.IntervalMinutes) * time.Minute
@@ -172,23 +184,22 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 	cfg := GetCurrentConfig()
 
 	// 1. Executa medição de rede (Ping, Download, Upload)
-	measureCtx, cancelMeasure := context.WithTimeout(context.Background(), 45*time.Second)
+	measureCtx, cancelMeasure := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelMeasure()
 
-	payload, err := a.probe.MeasureAll(measureCtx, cfg)
+	payload, err := a.probe.MeasureAll(measureCtx, cfg, a.currentSwitch)
 	if err != nil {
 		log.Printf("[APP] Erro na medicao: %v", err)
 		return nil, err
 	}
 
-	// Se a sonda já possuía o switch detectado e a medição rápida não capturou, preserva o switch conhecido
-	if (payload.SwitchInfo == nil || payload.SwitchInfo.SwitchName == "" || payload.SwitchInfo.SwitchName == "Aguardando frame LLDP") &&
-		a.currentSwitch != nil && a.currentSwitch.SwitchName != "" && a.currentSwitch.SwitchName != "Aguardando frame LLDP" {
-		payload.SwitchInfo = a.currentSwitch
-	} else if payload.SwitchInfo != nil && payload.SwitchInfo.SwitchName != "" && payload.SwitchInfo.SwitchName != "Aguardando frame LLDP" {
+	// Preserva o switch conhecido se a nova medição não capturou um válido
+	if payload.SwitchInfo != nil && payload.SwitchInfo.IsValid() {
 		a.mu.Lock()
 		a.currentSwitch = payload.SwitchInfo
 		a.mu.Unlock()
+	} else if a.currentSwitch != nil && a.currentSwitch.IsValid() {
+		payload.SwitchInfo = a.currentSwitch
 	}
 
 	// 2. Envia para o servidor central (POST com Bearer token)

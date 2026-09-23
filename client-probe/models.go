@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // SystemInfo armazena dados de hardware e rede local da máquina que executa o teste
 type SystemInfo struct {
@@ -23,6 +26,25 @@ type SwitchInfo struct {
 	SwitchModel  string    `json:"switch_model,omitempty"`
 	Protocol     string    `json:"protocol,omitempty"`
 	DiscoveredAt time.Time `json:"discovered_at,omitempty"`
+}
+
+// IsValid verifica se o switch possui identificação real e válida descoberta por LLDP/CDP
+func (s *SwitchInfo) IsValid() bool {
+	if s == nil {
+		return false
+	}
+	name := strings.TrimSpace(s.SwitchName)
+	if name == "" || name == "--" || name == "{}" {
+		return false
+	}
+	lower := strings.ToLower(name)
+	if strings.HasPrefix(lower, "aguardando") {
+		return false
+	}
+	if strings.HasPrefix(lower, "não detectado") || strings.HasPrefix(lower, "nao detectado") {
+		return false
+	}
+	return true
 }
 
 // MetricPayload representa o contrato oficial enviado via POST HTTPS ao servidor central.

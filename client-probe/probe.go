@@ -39,7 +39,7 @@ func NewNetworkProbe() *NetworkProbe {
 }
 
 // MeasureAll executa o conjunto completo de testes (Ping, Download, Upload).
-func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config) (*MetricPayload, error) {
+func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config, knownSwitch *SwitchInfo) (*MetricPayload, error) {
 	log.Printf("[PROBE] Iniciando ciclo de medições para nó %s (%s)...", cfg.NodeID, cfg.Location)
 
 	// 1. Mede latência para o gateway/alvo
@@ -57,10 +57,17 @@ func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config) (*MetricPaylo
 	// 4. Coleta Informações da Máquina Local (Hardware, CPU, RAM, IP, MAC)
 	sysInfo := CollectSystemInfo()
 
-	// 5. Coleta Informações do Switch via LLDP (Timeout rápido de 8s para não atrasar medição)
-	lldpCtx, cancelLldp := context.WithTimeout(ctx, 8*time.Second)
-	switchInfo := DiscoverSwitchLLDP(lldpCtx)
-	cancelLldp()
+	// 5. Coleta Informações do Switch via LLDP (Reaproveita switch já conhecido se válido)
+	var switchInfo SwitchInfo
+	if knownSwitch != nil && knownSwitch.IsValid() {
+		switchInfo = *knownSwitch
+		log.Printf("[PROBE] Switch conhecido preservado: %s (Porta %s)", switchInfo.SwitchName, switchInfo.SwitchPort)
+	} else {
+		log.Printf("[PROBE] Buscando informações de switch via LLDP...")
+		lldpCtx, cancelLldp := context.WithTimeout(ctx, 30*time.Second)
+		switchInfo = DiscoverSwitchLLDP(lldpCtx)
+		cancelLldp()
+	}
 
 	payload := &MetricPayload{
 		NodeID:       cfg.NodeID,

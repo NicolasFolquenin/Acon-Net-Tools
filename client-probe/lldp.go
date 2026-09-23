@@ -26,7 +26,7 @@ func DiscoverSwitchLLDP(ctx context.Context) SwitchInfo {
 	if (Get-Module -ListAvailable -Name PSDiscoveryProtocol) {
 		try {
 			Import-Module PSDiscoveryProtocol -ErrorAction SilentlyContinue
-			$capture = Invoke-DiscoveryProtocolCapture -Duration 15 -Force -ErrorAction SilentlyContinue
+			$capture = Invoke-DiscoveryProtocolCapture -Duration 20 -Force -ErrorAction SilentlyContinue
 			if ($capture) {
 				$data = $capture | Get-DiscoveryProtocolData -ErrorAction SilentlyContinue
 				if ($data -is [array]) { $data = $data[0] }
