@@ -96,18 +96,32 @@ type Config struct {
 	APIToken        string `json:"api_token"`
 	IntervalMinutes int    `json:"interval_minutes"`
 	PingTarget      string `json:"ping_target"`
+	SyncWithCentral bool   `json:"sync_with_central"`
+}
+
+// IsCentralSynced retorna se a sonda está configurada para operar sincronizada com o Servidor Central
+func (c *Config) IsCentralSynced() bool {
+	if c == nil {
+		return false
+	}
+	cleanURL := strings.TrimSpace(c.ServerURL)
+	if cleanURL == "" || cleanURL == "none" || cleanURL == "disabled" {
+		return false
+	}
+	return c.SyncWithCentral
 }
 
 // ProbeStatus informa o estado atual da sonda para a interface visual.
 type ProbeStatus struct {
-	IsRunning     bool               `json:"is_running"`
-	StatusText    string             `json:"status_text"`
-	LastRun       *time.Time         `json:"last_run,omitempty"`
-	NextRun       *time.Time         `json:"next_run,omitempty"`
-	LastMetric    *LocalMetricRecord `json:"last_metric,omitempty"`
-	ServerStatus  string             `json:"server_status"`
-	TotalSynced   int                `json:"total_synced"`
-	TotalPending  int                `json:"total_pending"`
-	CurrentPC     *SystemInfo        `json:"current_pc,omitempty"`
-	CurrentSwitch *SwitchInfo        `json:"current_switch,omitempty"`
+	IsRunning       bool               `json:"is_running"`
+	StatusText      string             `json:"status_text"`
+	LastRun         *time.Time         `json:"last_run,omitempty"`
+	NextRun         *time.Time         `json:"next_run,omitempty"`
+	LastMetric      *LocalMetricRecord `json:"last_metric,omitempty"`
+	ServerStatus    string             `json:"server_status"`
+	TotalSynced     int                `json:"total_synced"`
+	TotalPending    int                `json:"total_pending"`
+	CurrentPC       *SystemInfo        `json:"current_pc,omitempty"`
+	CurrentSwitch   *SwitchInfo        `json:"current_switch,omitempty"`
+	SyncWithCentral bool               `json:"sync_with_central"`
 }

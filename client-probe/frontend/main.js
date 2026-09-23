@@ -167,7 +167,16 @@ function updateStatusBadge(status) {
     statusText.textContent = status.status_text || 'Executando teste...';
   } else {
     statusBadge.className = 'status-badge scheduled';
-    statusText.textContent = status.status_text || 'Agendado (1h)';
+    statusText.textContent = status.status_text || (status.sync_with_central ? 'Sincronizado com o servidor central' : 'Agendado');
+  }
+
+  const footerDesc = document.getElementById('footer-agent-desc');
+  if (footerDesc) {
+    if (status.sync_with_central) {
+      footerDesc.textContent = 'Sincronizado com o servidor central (:00 e :30)';
+    } else {
+      footerDesc.textContent = 'Agente Operando em Background (Agendado)';
+    }
   }
 
   if (status.next_run) {
@@ -510,8 +519,14 @@ async function loadAppConfig() {
   document.getElementById('cfg-location').value = cfg.location || '';
   document.getElementById('cfg-server-url').value = cfg.server_url || '';
   document.getElementById('cfg-api-token').value = cfg.api_token || '';
-  document.getElementById('cfg-interval').value = cfg.interval_minutes || 60;
+  document.getElementById('cfg-interval').value = cfg.interval_minutes || 30;
   document.getElementById('cfg-ping-target').value = cfg.ping_target || '192.168.1.1';
+
+  const isSync = (cfg.sync_with_central !== false) && (cfg.server_url && cfg.server_url.trim() !== '');
+  const hintEl = document.getElementById('cfg-interval-hint');
+  if (hintEl) {
+    hintEl.style.display = isSync ? 'block' : 'none';
+  }
 }
 
 function openSettingsModal() {
@@ -524,13 +539,15 @@ function closeSettingsModal() {
 
 async function onSaveSettings(e) {
   e.preventDefault();
+  const serverUrl = document.getElementById('cfg-server-url').value.trim();
   const cfg = {
     node_id: document.getElementById('cfg-node-id').value.trim(),
     location: document.getElementById('cfg-location').value.trim(),
-    server_url: document.getElementById('cfg-server-url').value.trim(),
+    server_url: serverUrl,
     api_token: document.getElementById('cfg-api-token').value.trim(),
-    interval_minutes: parseInt(document.getElementById('cfg-interval').value, 10) || 60,
-    ping_target: document.getElementById('cfg-ping-target').value.trim()
+    interval_minutes: parseInt(document.getElementById('cfg-interval').value, 10) || 30,
+    ping_target: document.getElementById('cfg-ping-target').value.trim(),
+    sync_with_central: serverUrl !== ''
   };
 
   try {

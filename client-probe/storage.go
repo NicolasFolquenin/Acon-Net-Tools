@@ -341,7 +341,7 @@ func (s *StorageService) SendToServer(ctx context.Context, payload *MetricPayloa
 		}
 
 		log.Printf("[STORAGE][AVISO] Servidor central recusou envio: %s", errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	log.Printf("[STORAGE][SUCESSO] Metricas sincronizadas com servidor central (HTTP %d)", resp.StatusCode)

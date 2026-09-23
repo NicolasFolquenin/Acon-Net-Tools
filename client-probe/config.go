@@ -73,11 +73,14 @@ func LoadConfig(customPath string) (*Config, error) {
 	cfg := &Config{
 		IntervalMinutes: 60,
 		PingTarget:      "1.1.1.1",
+		SyncWithCentral: true,
 	}
 
 	// 1. Tenta carregar do config.json se ele existir
+	var rawData map[string]interface{}
 	if data, err := os.ReadFile(targetPath); err == nil {
 		_ = json.Unmarshal(data, cfg)
+		_ = json.Unmarshal(data, &rawData)
 	}
 
 	// 2. Sobrescreve com variáveis do .env / Ambiente (têm prioridade)
@@ -100,6 +103,19 @@ func LoadConfig(customPath string) (*Config, error) {
 		if intVal, err := strconv.Atoi(v); err == nil && intVal > 0 {
 			cfg.IntervalMinutes = intVal
 		}
+	}
+	if v := os.Getenv("PROBE_SYNC_WITH_CENTRAL"); v != "" {
+		cfg.SyncWithCentral = (v == "true" || v == "1" || v == "yes")
+	} else if cfg.ServerURL != "" && cfg.ServerURL != "none" && rawData != nil {
+		if val, exists := rawData["sync_with_central"]; exists {
+			if b, ok := val.(bool); ok {
+				cfg.SyncWithCentral = b
+			}
+		} else {
+			cfg.SyncWithCentral = true
+		}
+	} else if cfg.ServerURL != "" && cfg.ServerURL != "none" {
+		cfg.SyncWithCentral = true
 	}
 
 	// Fallbacks finais caso nem config.json nem .env tenham preenchido
@@ -133,8 +149,8 @@ func LoadConfig(customPath string) (*Config, error) {
 	}
 
 	appConfig = cfg
-	log.Printf("[CONFIG] Configurações ativas: NodeID=%s, Location=%s, Server=%s, Interval=%dm, Ping=%s",
-		cfg.NodeID, cfg.Location, cfg.ServerURL, cfg.IntervalMinutes, cfg.PingTarget)
+	log.Printf("[CONFIG] Configurações ativas: NodeID=%s, Location=%s, Server=%s, Interval=%dm, SyncCentral=%v, Ping=%s",
+		cfg.NodeID, cfg.Location, cfg.ServerURL, cfg.IntervalMinutes, cfg.SyncWithCentral, cfg.PingTarget)
 
 	return appConfig, nil
 }
@@ -184,6 +200,7 @@ func SaveConfig(cfg Config) error {
 		"PROBE_SERVER_URL=" + cfg.ServerURL,
 		"PROBE_API_TOKEN=" + cfg.APIToken,
 		"PROBE_INTERVAL_MINUTES=" + strconv.Itoa(cfg.IntervalMinutes),
+		"PROBE_SYNC_WITH_CENTRAL=" + strconv.FormatBool(cfg.SyncWithCentral),
 		"PROBE_PING_TARGET=" + cfg.PingTarget,
 		"",
 	}, "\n")
