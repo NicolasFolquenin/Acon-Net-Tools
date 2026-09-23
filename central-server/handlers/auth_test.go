@@ -204,3 +204,30 @@ func TestCreateUserValidation(t *testing.T) {
 	}
 }
 
+func TestOIDCConfig(t *testing.T) {
+	cfg := setupTestAuthConfig()
+	cfg.OIDCEnabled = true
+	cfg.OIDCIssuerURL = "https://sso.acon.dev.uepg.br/realms/uepg"
+	cfg.OIDCClientID = "net-tools"
+
+	auth := NewAuthHandler(cfg)
+	oidc := NewOIDCHandler(cfg, auth, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oidc/config", nil)
+	w := httptest.NewRecorder()
+
+	oidc.ConfigHandler(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("esperado 200 para oidc config, recebido %d", resp.StatusCode)
+	}
+
+	var resData map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&resData)
+	if resData["enabled"] != true || resData["client_id"] != "net-tools" {
+		t.Fatalf("dados inesperados no config OIDC: %+v", resData)
+	}
+}
+
+

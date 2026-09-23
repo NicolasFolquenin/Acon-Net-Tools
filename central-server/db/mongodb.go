@@ -288,6 +288,66 @@ func (m *MongoDBClient) DeleteUser(ctx context.Context, username string) error {
 	return nil
 }
 
+// UpdateUserRole altera a permissão/papel de um usuário no sistema (admin ou operator)
+func (m *MongoDBClient) UpdateUserRole(ctx context.Context, username string, newRole string) error {
+	if m.UsersCollection == nil {
+		return fmt.Errorf("colecao de usuarios nao inicializada")
+	}
+
+	filter := bson.M{"username": username}
+	update := bson.M{"$set": bson.M{"role": newRole}}
+
+	res, err := m.UsersCollection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("erro ao atualizar perfil do usuario '%s': %w", username, err)
+	}
+	if res.MatchedCount == 0 {
+		return fmt.Errorf("usuario '%s' nao encontrado", username)
+	}
+
+	log.Printf("[MONGODB] Perfil do usuario '%s' atualizado para '%s'", username, newRole)
+	return nil
+}
+
+// UpsertKeycloakUser sincroniza um usuário que autenticou via Keycloak/OIDC:
+// Se já existe, atualiza LastLogin e preserva a Role já definida pelo Admin;
+// Se não existe, insere o novo usuário com a Role padrão fornecida.
+func (m *MongoDBClient) UpsertKeycloakUser(ctx context.Context, user *models.User) (*models.User, error) {
+	if m.UsersCollection == nil {
+		return nil, fmt.Errorf("colecao de usuarios nao inicializada")
+	}
+
+	existing, err := m.GetUserByUsername(ctx, user.Username)
+	if err == nil && existing != nil {
+		// Atualiza dados de login e preserva Role configurada no MongoDB!
+		updateSet := bson.M{
+			"last_login": user.LastLogin,
+			"auth_type":  "keycloak",
+		}
+		if user.Email != "" {
+			updateSet["email"] = user.Email
+		}
+		if user.FullName != "" {
+			updateSet["full_name"] = user.FullName
+		}
+
+		_, _ = m.UsersCollection.UpdateOne(ctx, bson.M{"username": user.Username}, bson.M{"$set": updateSet})
+		existing.LastLogin = user.LastLogin
+		return existing, nil
+	}
+
+	// Não existe, cria novo usuário Keycloak
+	user.AuthType = "keycloak"
+	user.CreatedAt = time.Now().UTC()
+	_, err = m.UsersCollection.InsertOne(ctx, user)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao registrar usuario keycloak: %w", err)
+	}
+
+	log.Printf("[MONGODB] Novo usuario Keycloak registrado: %s (perfil: %s)", user.Username, user.Role)
+	return user, nil
+}
+
 // Disconnect encerra a conexão com o MongoDB
 func (m *MongoDBClient) Disconnect(ctx context.Context) error {
 	if m.Client != nil {
