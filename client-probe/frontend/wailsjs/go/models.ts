@@ -7,6 +7,7 @@ export namespace main {
 	    api_token: string;
 	    interval_minutes: number;
 	    ping_target: string;
+	    sync_with_central: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -20,6 +21,7 @@ export namespace main {
 	        this.api_token = source["api_token"];
 	        this.interval_minutes = source["interval_minutes"];
 	        this.ping_target = source["ping_target"];
+	        this.sync_with_central = source["sync_with_central"];
 	    }
 	}
 	export class SwitchInfo {
@@ -155,6 +157,7 @@ export namespace main {
 	    total_pending: number;
 	    current_pc?: SystemInfo;
 	    current_switch?: SwitchInfo;
+	    sync_with_central: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ProbeStatus(source);
@@ -172,6 +175,7 @@ export namespace main {
 	        this.total_pending = source["total_pending"];
 	        this.current_pc = this.convertValues(source["current_pc"], SystemInfo);
 	        this.current_switch = this.convertValues(source["current_switch"], SwitchInfo);
+	        this.sync_with_central = source["sync_with_central"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
