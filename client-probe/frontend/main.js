@@ -209,9 +209,12 @@ function updateStatusBadge(status) {
     const swPort = document.getElementById('switch-port');
     const swVlan = document.getElementById('switch-vlan');
 
-    if (swName) swName.textContent = sw.switch_name || 'Aguardando frame LLDP...';
+    if (swName) {
+      swName.textContent = sw.switch_name || 'Aguardando frame LLDP...';
+      if (sw.switch_model) swName.title = `Modelo: ${sw.switch_model}`;
+    }
     if (swPort) swPort.textContent = sw.switch_port || '--';
-    if (swVlan) swVlan.textContent = sw.vlan ? `VLAN ${sw.vlan}` : (sw.switch_model || '--');
+    if (swVlan) swVlan.textContent = sw.vlan ? `VLAN ${sw.vlan}` : '--';
   }
 }
 

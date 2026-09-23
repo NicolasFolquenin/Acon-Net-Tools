@@ -81,13 +81,13 @@ func (a *App) startup(ctx context.Context) {
 		lldpCtx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 		defer cancel()
 		sw := DiscoverSwitchLLDP(lldpCtx)
-		if sw.IsValid() {
+		if sw.IsRealSwitch() {
 			a.mu.Lock()
 			a.currentSwitch = &sw
 			a.mu.Unlock()
-			log.Printf("[APP] Switch identificado via LLDP: %s (Porta %s)", sw.SwitchName, sw.SwitchPort)
+			log.Printf("[APP] Switch corporativo identificado via LLDP: %s (Porta %s)", sw.SwitchName, sw.SwitchPort)
 			a.emitStatus()
-		} else if a.currentSwitch == nil || !a.currentSwitch.IsValid() {
+		} else if sw.IsValid() && (a.currentSwitch == nil || !a.currentSwitch.IsRealSwitch()) {
 			a.mu.Lock()
 			a.currentSwitch = &sw
 			a.mu.Unlock()
@@ -193,8 +193,14 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 		return nil, err
 	}
 
-	// Preserva o switch conhecido se a nova medição não capturou um válido
-	if payload.SwitchInfo != nil && payload.SwitchInfo.IsValid() {
+	// Preserva o switch corporativo conhecido se a medição capturou apenas telefone ou vazio
+	if payload.SwitchInfo != nil && payload.SwitchInfo.IsRealSwitch() {
+		a.mu.Lock()
+		a.currentSwitch = payload.SwitchInfo
+		a.mu.Unlock()
+	} else if a.currentSwitch != nil && a.currentSwitch.IsRealSwitch() {
+		payload.SwitchInfo = a.currentSwitch
+	} else if payload.SwitchInfo != nil && payload.SwitchInfo.IsValid() {
 		a.mu.Lock()
 		a.currentSwitch = payload.SwitchInfo
 		a.mu.Unlock()

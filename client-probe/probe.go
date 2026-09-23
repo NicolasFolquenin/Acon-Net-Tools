@@ -57,16 +57,19 @@ func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config, knownSwitch *
 	// 4. Coleta Informações da Máquina Local (Hardware, CPU, RAM, IP, MAC)
 	sysInfo := CollectSystemInfo()
 
-	// 5. Coleta Informações do Switch via LLDP (Reaproveita switch já conhecido se válido)
+	// 5. Coleta Informações do Switch via LLDP (Reaproveita switch corporativo se já conhecido)
 	var switchInfo SwitchInfo
-	if knownSwitch != nil && knownSwitch.IsValid() {
+	if knownSwitch != nil && knownSwitch.IsRealSwitch() {
 		switchInfo = *knownSwitch
-		log.Printf("[PROBE] Switch conhecido preservado: %s (Porta %s)", switchInfo.SwitchName, switchInfo.SwitchPort)
+		log.Printf("[PROBE] Switch corporativo preservado: %s (Porta %s)", switchInfo.SwitchName, switchInfo.SwitchPort)
 	} else {
 		log.Printf("[PROBE] Buscando informações de switch via LLDP...")
 		lldpCtx, cancelLldp := context.WithTimeout(ctx, 30*time.Second)
 		switchInfo = DiscoverSwitchLLDP(lldpCtx)
 		cancelLldp()
+		if !switchInfo.IsRealSwitch() && knownSwitch != nil && knownSwitch.IsValid() {
+			switchInfo = *knownSwitch
+		}
 	}
 
 	payload := &MetricPayload{
