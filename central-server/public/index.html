@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UEPG Net Tools - Monitoramento de Rede</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=2.2.0" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -122,9 +122,30 @@
               </div>
               <div class="panel-header-right">
                 <div class="segmented-control" id="bandwidth-metric-toggle" role="group" aria-label="Métrica de Throughput">
-                  <button type="button" class="segment-btn active" data-metric="download">Download</button>
-                  <button type="button" class="segment-btn" data-metric="upload">Upload</button>
-                  <button type="button" class="segment-btn hidden-metric" data-metric="both" id="btn-metric-both">Ambos</button>
+                  <button type="button" class="segment-btn active" data-metric="download" onclick="handleMetricBtnClick('download')" title="Filtrar por taxa de Download">
+                    <svg class="segment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Download</span>
+                  </button>
+                  <button type="button" class="segment-btn" data-metric="upload" onclick="handleMetricBtnClick('upload')" title="Filtrar por taxa de Upload">
+                    <svg class="segment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="17 8 12 3 7 8"></polyline>
+                      <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span>Upload</span>
+                  </button>
+                  <button type="button" class="segment-btn hidden-metric" data-metric="both" id="btn-metric-both" onclick="handleMetricBtnClick('both')" title="Comparar Download e Upload">
+                    <svg class="segment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                      <line x1="18" y1="20" x2="18" y2="10"></line>
+                      <line x1="12" y1="20" x2="12" y2="4"></line>
+                      <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    <span>Ambos</span>
+                  </button>
                 </div>
                 <div id="bandwidth-legend-container" class="chart-legend-custom">
                   <span class="legend-badge cyan-dot">Download</span>
@@ -480,6 +501,6 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.2.0"></script>
 </body>
 </html>

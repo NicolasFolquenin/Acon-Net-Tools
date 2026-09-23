@@ -23,6 +23,8 @@ services:
       - AUTH_VIEWER_USER=${AUTH_VIEWER_USER:-operador}
       - AUTH_VIEWER_PASSWORD=${AUTH_VIEWER_PASSWORD:-operador123}
       - SESSION_SECRET=${SESSION_SECRET:-super-secret-session-key-change-in-prod-2026}
+    volumes:
+      - ./public:/app/public:ro
     depends_on:
       mongo:
         condition: service_healthy

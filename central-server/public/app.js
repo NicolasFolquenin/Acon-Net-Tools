@@ -64,22 +64,35 @@ let currentBandwidthMetric = 'download';
 let cachedMetricsSeries = [];
 let cachedNodesList = [];
 
+window.handleMetricBtnClick = function(metric) {
+  if (metric === currentBandwidthMetric) return;
+  currentBandwidthMetric = metric;
+
+  const toggleContainer = document.getElementById('bandwidth-metric-toggle');
+  if (toggleContainer) {
+    const buttons = toggleContainer.querySelectorAll('.segment-btn');
+    buttons.forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-metric') === metric);
+    });
+  }
+
+  if (cachedMetricsSeries && cachedMetricsSeries.length > 0) {
+    renderComparativeCharts(cachedMetricsSeries, cachedNodesList);
+  } else {
+    loadDashboardData();
+  }
+};
+
 function setupSegmentedControl() {
   const toggleContainer = document.getElementById('bandwidth-metric-toggle');
   if (!toggleContainer) return;
 
   const buttons = toggleContainer.querySelectorAll('.segment-btn');
   buttons.forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
       const metric = btn.getAttribute('data-metric');
-      if (metric === currentBandwidthMetric) return;
-
-      currentBandwidthMetric = metric;
-      buttons.forEach(b => b.classList.toggle('active', b === btn));
-
-      if (cachedMetricsSeries.length > 0) {
-        renderComparativeCharts(cachedMetricsSeries, cachedNodesList);
-      }
+      window.handleMetricBtnClick(metric);
     });
   });
 }
