@@ -377,12 +377,17 @@ body {
   position: relative;
   overflow: hidden;
   box-shadow: var(--shadow-card);
-  transition: transform 0.18s ease, border-color 0.18s ease;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .card:hover {
   transform: translateY(-2px);
-  border-color: var(--cyan-primary);
+  border-color: var(--border-strong);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .card:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
 .card-stat .card-header {
@@ -406,6 +411,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--border-subtle);
+  background: rgba(148, 163, 184, 0.08);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .card-icon svg {
@@ -414,29 +422,40 @@ body {
 }
 
 .card-icon.cyan {
-  background: rgba(6, 182, 212, 0.15);
+  background: rgba(6, 182, 212, 0.12);
+  border-color: rgba(6, 182, 212, 0.2);
   color: var(--cyan-light);
 }
 
 .card-icon.purple {
-  background: rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.2);
   color: var(--purple-light);
 }
 
 .card-icon.emerald {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.2);
   color: var(--emerald-light);
 }
 
 .card-icon.blue {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.2);
   color: #60a5fa;
 }
+
+[data-theme="light"] .card-icon.cyan { color: var(--cyan-primary); }
+[data-theme="light"] .card-icon.purple { color: var(--purple-primary); }
+[data-theme="light"] .card-icon.emerald { color: var(--emerald-primary); }
+[data-theme="light"] .card-icon.blue { color: var(--blue-primary); }
 
 .stat-value {
   font-size: 2rem;
   font-weight: 800;
   font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   color: var(--text-primary);
   line-height: 1.1;
   display: flex;
@@ -459,20 +478,6 @@ body {
   color: var(--text-muted);
   margin-top: 8px;
 }
-
-/* Card Glow bars */
-.card-footer-glow {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-}
-
-.cyan-glow { background: linear-gradient(90deg, transparent, var(--cyan-primary), transparent); }
-.purple-glow { background: linear-gradient(90deg, transparent, var(--purple-primary), transparent); }
-.emerald-glow { background: linear-gradient(90deg, transparent, var(--emerald-primary), transparent); }
-.blue-glow { background: linear-gradient(90deg, transparent, var(--blue-primary), transparent); }
 
 /* ==========================================================================
    Charts Section
