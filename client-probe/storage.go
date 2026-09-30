@@ -75,6 +75,9 @@ func (s *StorageService) initSchema() error {
 	// Migrações dinâmicas para bases existentes
 	_, _ = s.db.Exec(`ALTER TABLE metrics ADD COLUMN system_info_json TEXT;`)
 	_, _ = s.db.Exec(`ALTER TABLE metrics ADD COLUMN switch_info_json TEXT;`)
+	_, _ = s.db.Exec(`ALTER TABLE metrics ADD COLUMN group_name TEXT;`)
+	_, _ = s.db.Exec(`ALTER TABLE metrics ADD COLUMN vlan INTEGER;`)
+	_, _ = s.db.Exec(`ALTER TABLE metrics ADD COLUMN modular_json TEXT;`)
 
 	log.Printf("[STORAGE] Banco SQLite (%s) inicializado com sucesso", dbFilename)
 	return nil
@@ -90,7 +93,7 @@ func (s *StorageService) SaveMetric(m *MetricPayload, synced bool, errMsg string
 		syncedInt = 1
 	}
 
-	var sysJson, switchJson string
+	var sysJson, switchJson, modularJson string
 	if m.SystemInfo != nil {
 		if b, err := json.Marshal(m.SystemInfo); err == nil {
 			sysJson = string(b)
@@ -101,14 +104,21 @@ func (s *StorageService) SaveMetric(m *MetricPayload, synced bool, errMsg string
 			switchJson = string(b)
 		}
 	}
+	if m.ModularResults != nil {
+		if b, err := json.Marshal(m.ModularResults); err == nil {
+			modularJson = string(b)
+		}
+	}
 
 	query := `
-	INSERT INTO metrics (node_id, location, timestamp, download_mbps, upload_mbps, ping_gateway, synced, error_message, system_info_json, switch_info_json)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO metrics (node_id, location, group_name, vlan, timestamp, download_mbps, upload_mbps, ping_gateway, synced, error_message, system_info_json, switch_info_json, modular_json)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	res, err := s.db.Exec(query,
 		m.NodeID,
 		m.Location,
+		m.GroupName,
+		m.VLAN,
 		m.Timestamp.Format(time.RFC3339),
 		m.DownloadMbps,
 		m.UploadMbps,
@@ -117,6 +127,7 @@ func (s *StorageService) SaveMetric(m *MetricPayload, synced bool, errMsg string
 		errMsg,
 		sysJson,
 		switchJson,
+		modularJson,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao salvar metrica no sqlite: %w", err)
@@ -124,17 +135,20 @@ func (s *StorageService) SaveMetric(m *MetricPayload, synced bool, errMsg string
 
 	id, _ := res.LastInsertId()
 	return &LocalMetricRecord{
-		ID:           id,
-		NodeID:       m.NodeID,
-		Location:     m.Location,
-		Timestamp:    m.Timestamp,
-		DownloadMbps: m.DownloadMbps,
-		UploadMbps:   m.UploadMbps,
-		PingGateway:  m.PingGateway,
-		Synced:       synced,
-		ErrorMessage: errMsg,
-		SystemInfo:   m.SystemInfo,
-		SwitchInfo:   m.SwitchInfo,
+		ID:             id,
+		NodeID:         m.NodeID,
+		Location:       m.Location,
+		GroupName:      m.GroupName,
+		VLAN:           m.VLAN,
+		Timestamp:      m.Timestamp,
+		DownloadMbps:   m.DownloadMbps,
+		UploadMbps:     m.UploadMbps,
+		PingGateway:    m.PingGateway,
+		Synced:         synced,
+		ErrorMessage:   errMsg,
+		SystemInfo:     m.SystemInfo,
+		SwitchInfo:     m.SwitchInfo,
+		ModularResults: m.ModularResults,
 	}, nil
 }
 
@@ -148,8 +162,8 @@ func (s *StorageService) GetRecentMetrics(limit int) ([]LocalMetricRecord, error
 	}
 
 	query := `
-	SELECT id, node_id, location, timestamp, download_mbps, upload_mbps, ping_gateway, synced, 
-	       COALESCE(error_message, ''), COALESCE(system_info_json, ''), COALESCE(switch_info_json, '')
+	SELECT id, node_id, location, COALESCE(group_name, ''), COALESCE(vlan, 0), timestamp, download_mbps, upload_mbps, ping_gateway, synced, 
+	       COALESCE(error_message, ''), COALESCE(system_info_json, ''), COALESCE(switch_info_json, ''), COALESCE(modular_json, '')
 	FROM metrics
 	ORDER BY timestamp DESC
 	LIMIT ?
@@ -165,8 +179,8 @@ func (s *StorageService) GetRecentMetrics(limit int) ([]LocalMetricRecord, error
 		var r LocalMetricRecord
 		var timeStr string
 		var syncedInt int
-		var sysJson, switchJson string
-		if err := rows.Scan(&r.ID, &r.NodeID, &r.Location, &timeStr, &r.DownloadMbps, &r.UploadMbps, &r.PingGateway, &syncedInt, &r.ErrorMessage, &sysJson, &switchJson); err != nil {
+		var sysJson, switchJson, modularJson string
+		if err := rows.Scan(&r.ID, &r.NodeID, &r.Location, &r.GroupName, &r.VLAN, &timeStr, &r.DownloadMbps, &r.UploadMbps, &r.PingGateway, &syncedInt, &r.ErrorMessage, &sysJson, &switchJson, &modularJson); err != nil {
 			log.Printf("[STORAGE] Erro scan: %v", err)
 			continue
 		}
@@ -184,6 +198,12 @@ func (s *StorageService) GetRecentMetrics(limit int) ([]LocalMetricRecord, error
 			var sw SwitchInfo
 			if errU := json.Unmarshal([]byte(switchJson), &sw); errU == nil {
 				r.SwitchInfo = &sw
+			}
+		}
+		if modularJson != "" {
+			var mr ModularResults
+			if errU := json.Unmarshal([]byte(modularJson), &mr); errU == nil {
+				r.ModularResults = &mr
 			}
 		}
 
@@ -249,8 +269,8 @@ func (s *StorageService) GetCounts() (synced int, pending int) {
 func (s *StorageService) SyncPendingMetrics(ctx context.Context, serverURL, apiToken string) int {
 	s.mu.Lock()
 	rows, err := s.db.Query(`
-		SELECT id, node_id, location, timestamp, download_mbps, upload_mbps, ping_gateway, 
-		       COALESCE(system_info_json, ''), COALESCE(switch_info_json, '')
+		SELECT id, node_id, location, COALESCE(group_name, ''), COALESCE(vlan, 0), timestamp, download_mbps, upload_mbps, ping_gateway, 
+		       COALESCE(system_info_json, ''), COALESCE(switch_info_json, ''), COALESCE(modular_json, '')
 		FROM metrics WHERE synced = 0 ORDER BY id ASC LIMIT 20
 	`)
 	if err != nil {
@@ -266,8 +286,8 @@ func (s *StorageService) SyncPendingMetrics(ctx context.Context, serverURL, apiT
 	var list []pendingItem
 	for rows.Next() {
 		var item pendingItem
-		var timeStr, sysJson, swJson string
-		if err := rows.Scan(&item.id, &item.p.NodeID, &item.p.Location, &timeStr, &item.p.DownloadMbps, &item.p.UploadMbps, &item.p.PingGateway, &sysJson, &swJson); err != nil {
+		var timeStr, sysJson, swJson, modularJson string
+		if err := rows.Scan(&item.id, &item.p.NodeID, &item.p.Location, &item.p.GroupName, &item.p.VLAN, &timeStr, &item.p.DownloadMbps, &item.p.UploadMbps, &item.p.PingGateway, &sysJson, &swJson, &modularJson); err != nil {
 			continue
 		}
 		item.p.Timestamp, _ = time.Parse(time.RFC3339, timeStr)
@@ -281,6 +301,12 @@ func (s *StorageService) SyncPendingMetrics(ctx context.Context, serverURL, apiT
 			var sw SwitchInfo
 			if errU := json.Unmarshal([]byte(swJson), &sw); errU == nil {
 				item.p.SwitchInfo = &sw
+			}
+		}
+		if modularJson != "" {
+			var mr ModularResults
+			if errU := json.Unmarshal([]byte(modularJson), &mr); errU == nil {
+				item.p.ModularResults = &mr
 			}
 		}
 		list = append(list, item)

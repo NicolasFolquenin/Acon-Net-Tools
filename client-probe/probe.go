@@ -38,30 +38,15 @@ func NewNetworkProbe() *NetworkProbe {
 	}
 }
 
-// MeasureAll executa o conjunto completo de testes (Ping, Download, Upload).
+// MeasureAll executa os módulos de teste definidos pelo Grupo associado à VLAN detectada no LLDP.
 func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config, knownSwitch *SwitchInfo) (*MetricPayload, error) {
-	log.Printf("[PROBE] Iniciando ciclo de medições para nó %s (%s)...", cfg.NodeID, cfg.Location)
+	log.Printf("[PROBE] Iniciando ciclo modular de medições para nó %s (%s)...", cfg.NodeID, cfg.Location)
 
-	// 1. Mede latência para o gateway/alvo
-	pingMs := p.measurePing(cfg.PingTarget)
-	log.Printf("[PROBE] Ping para %s: %.2f ms", cfg.PingTarget, pingMs)
-
-	// 2. Mede Download
-	downloadMbps := p.measureDownload(ctx, cfg.ServerURL)
-	log.Printf("[PROBE] Download estimado: %.2f Mbps", downloadMbps)
-
-	// 3. Mede Upload
-	uploadMbps := p.measureUpload(ctx, cfg.ServerURL)
-	log.Printf("[PROBE] Upload estimado: %.2f Mbps", uploadMbps)
-
-	// 4. Coleta Informações da Máquina Local (Hardware, CPU, RAM, IP, MAC)
-	sysInfo := CollectSystemInfo()
-
-	// 5. Coleta Informações do Switch via LLDP (Reaproveita switch corporativo se já conhecido)
+	// 1. Identifica / Descobre Switch e VLAN via LLDP
 	var switchInfo SwitchInfo
 	if knownSwitch != nil && knownSwitch.IsRealSwitch() {
 		switchInfo = *knownSwitch
-		log.Printf("[PROBE] Switch corporativo preservado: %s (Porta %s)", switchInfo.SwitchName, switchInfo.SwitchPort)
+		log.Printf("[PROBE] Switch corporativo preservado: %s (Porta %s, VLAN %d)", switchInfo.SwitchName, switchInfo.SwitchPort, switchInfo.VLAN)
 	} else {
 		log.Printf("[PROBE] Buscando informações de switch via LLDP...")
 		lldpCtx, cancelLldp := context.WithTimeout(ctx, 30*time.Second)
@@ -72,15 +57,78 @@ func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config, knownSwitch *
 		}
 	}
 
+	// 2. Consulta diretrizes de módulos e grupo para a VLAN no Central Server
+	groupConfig, errGroup := FetchProbeGroupConfig(ctx, cfg, switchInfo.VLAN)
+	if errGroup != nil {
+		log.Printf("[PROBE][AVISO] Falha ao recuperar configuração do grupo: %v. Usando defaults.", errGroup)
+	}
+
+	mods := groupConfig.Modules
+
+	// 3. Executa módulos habilitados conforme JSON recebido
+	var pingMs float64
+	if mods.Ping.Enabled {
+		pingMs = RunPingModule(ctx, p, mods.Ping)
+	} else {
+		log.Println("[PROBE] Módulo Ping desativado para este grupo.")
+	}
+
+	var downloadMbps float64
+	if mods.Download.Enabled {
+		downloadMbps = RunDownloadModule(ctx, p, cfg.ServerURL, mods.Download)
+	} else {
+		log.Println("[PROBE] Módulo Download desativado para este grupo.")
+	}
+
+	var uploadMbps float64
+	if mods.Upload.Enabled {
+		uploadMbps = RunUploadModule(ctx, p, cfg.ServerURL, mods.Upload)
+	} else {
+		log.Println("[PROBE] Módulo Upload desativado para este grupo.")
+	}
+
+	var packetLossRes *PacketLossResult
+	if mods.PacketLoss.Enabled {
+		packetLossRes = RunPacketLossModule(ctx, p, mods.PacketLoss)
+	}
+
+	var dnsRes *DNSResult
+	if mods.DNS.Enabled {
+		dnsRes = RunDNSModule(ctx, mods.DNS)
+	}
+
+	var httpRes *HTTPCheckResult
+	if mods.HTTPCheck.Enabled {
+		httpRes = RunHTTPCheckModule(ctx, mods.HTTPCheck)
+	}
+
+	var traceRes *TracerouteResult
+	if mods.Traceroute.Enabled {
+		traceRes = RunTracerouteModule(ctx, mods.Traceroute)
+	}
+
+	// 4. Coleta Informações da Máquina Local (Hardware, CPU, RAM, IP, MAC)
+	sysInfo := CollectSystemInfo()
+
+	modularResults := &ModularResults{
+		DNS:        dnsRes,
+		PacketLoss: packetLossRes,
+		HTTPCheck:  httpRes,
+		Traceroute: traceRes,
+	}
+
 	payload := &MetricPayload{
-		NodeID:       cfg.NodeID,
-		Location:     cfg.Location,
-		Timestamp:    time.Now().UTC().Truncate(time.Second),
-		DownloadMbps: math.Round(downloadMbps*100) / 100,
-		UploadMbps:   math.Round(uploadMbps*100) / 100,
-		PingGateway:  math.Round(pingMs*100) / 100,
-		SystemInfo:   &sysInfo,
-		SwitchInfo:   &switchInfo,
+		NodeID:         cfg.NodeID,
+		Location:       cfg.Location,
+		GroupName:      groupConfig.GroupName,
+		VLAN:           switchInfo.VLAN,
+		Timestamp:      time.Now().UTC().Truncate(time.Second),
+		DownloadMbps:   math.Round(downloadMbps*100) / 100,
+		UploadMbps:     math.Round(uploadMbps*100) / 100,
+		PingGateway:    math.Round(pingMs*100) / 100,
+		SystemInfo:     &sysInfo,
+		SwitchInfo:     &switchInfo,
+		ModularResults: modularResults,
 	}
 
 	return payload, nil
