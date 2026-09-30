@@ -58,6 +58,47 @@ const createUserErrorText = document.getElementById('create-user-error-text');
 const usersTableBody = document.getElementById('users-table-body');
 const usersCountTag = document.getElementById('users-count-tag');
 
+// Elementos de Gerenciamento de Grupos & VLANs (Admin)
+const btnOpenGroups = document.getElementById('btn-open-groups');
+const groupsModal = document.getElementById('groups-modal');
+const modalBtnCloseGroups = document.getElementById('modal-btn-close-groups');
+const modalBtnCloseGroupsBottom = document.getElementById('modal-btn-close-groups-bottom');
+const groupForm = document.getElementById('group-form');
+const groupFormTitle = document.getElementById('group-form-title');
+const btnCancelEditGroup = document.getElementById('btn-cancel-edit-group');
+const groupIdInput = document.getElementById('group-id');
+const groupNameInput = document.getElementById('group-name');
+const groupVlansInput = document.getElementById('group-vlans');
+const groupIntervalInput = document.getElementById('group-interval');
+const groupDescriptionInput = document.getElementById('group-description');
+const groupIsDefaultInput = document.getElementById('group-is-default');
+const groupErrorAlert = document.getElementById('group-error-alert');
+const groupErrorText = document.getElementById('group-error-text');
+const groupsTableBody = document.getElementById('groups-table-body');
+const groupsCountTag = document.getElementById('groups-count-tag');
+const btnSubmitGroupText = document.getElementById('btn-submit-group-text');
+
+// Elementos dos Módulos de Testes
+const modPingEnabled = document.getElementById('mod-ping-enabled');
+const modPingTarget = document.getElementById('mod-ping-target');
+const modPingCount = document.getElementById('mod-ping-count');
+const modPacketlossEnabled = document.getElementById('mod-packetloss-enabled');
+const modPacketlossTarget = document.getElementById('mod-packetloss-target');
+const modPacketlossCount = document.getElementById('mod-packetloss-count');
+const modDownloadEnabled = document.getElementById('mod-download-enabled');
+const modDownloadBytes = document.getElementById('mod-download-bytes');
+const modUploadEnabled = document.getElementById('mod-upload-enabled');
+const modUploadBytes = document.getElementById('mod-upload-bytes');
+const modDnsEnabled = document.getElementById('mod-dns-enabled');
+const modDnsDomains = document.getElementById('mod-dns-domains');
+const modHttpEnabled = document.getElementById('mod-http-enabled');
+const modHttpUrl = document.getElementById('mod-http-url');
+const modHttpStatus = document.getElementById('mod-http-status');
+const modTraceEnabled = document.getElementById('mod-trace-enabled');
+const modTraceTarget = document.getElementById('mod-trace-target');
+const modTraceHops = document.getElementById('mod-trace-hops');
+const modLldpEnabled = document.getElementById('mod-lldp-enabled');
+
 // Elementos OIDC / Keycloak
 const oidcSSOWrapper = document.getElementById('oidc-sso-wrapper');
 const oidcButtonText = document.getElementById('oidc-button-text');
@@ -214,13 +255,15 @@ function setAuthenticatedUser(user) {
   navRoleBadge.textContent = user.role === 'admin' ? 'Administrador' : 'Operador';
   navRoleBadge.className = `role-badge ${user.role}`;
 
-  // Se for admin, o botão de deletar PC e o botão de gerenciar usuários estarão visíveis
+  // Se for admin, os botões de administração estarão visíveis
   if (user.role === 'admin') {
     modalBtnDeletePc.style.display = 'inline-flex';
     if (btnOpenUsers) btnOpenUsers.style.display = 'inline-flex';
+    if (btnOpenGroups) btnOpenGroups.style.display = 'inline-flex';
   } else {
     modalBtnDeletePc.style.display = 'none';
     if (btnOpenUsers) btnOpenUsers.style.display = 'none';
+    if (btnOpenGroups) btnOpenGroups.style.display = 'none';
   }
 }
 
@@ -235,6 +278,8 @@ function showLoginModal() {
   loginPasswordInput.value = '';
   if (btnOpenUsers) btnOpenUsers.style.display = 'none';
   if (usersModal) usersModal.style.display = 'none';
+  if (btnOpenGroups) btnOpenGroups.style.display = 'none';
+  if (groupsModal) groupsModal.style.display = 'none';
   if (refreshInterval) clearInterval(refreshInterval);
 }
 
@@ -374,6 +419,28 @@ function setupEventListeners() {
     createUserForm.addEventListener('submit', handleCreateUserSubmit);
   }
 
+  // Gerenciamento de Grupos & VLANs (Admin)
+  if (btnOpenGroups) {
+    btnOpenGroups.addEventListener('click', openGroupsModal);
+  }
+  if (modalBtnCloseGroups) {
+    modalBtnCloseGroups.addEventListener('click', closeGroupsModal);
+  }
+  if (modalBtnCloseGroupsBottom) {
+    modalBtnCloseGroupsBottom.addEventListener('click', closeGroupsModal);
+  }
+  if (groupsModal) {
+    groupsModal.addEventListener('click', (e) => {
+      if (e.target === groupsModal) closeGroupsModal();
+    });
+  }
+  if (groupForm) {
+    groupForm.addEventListener('submit', handleSaveGroupSubmit);
+  }
+  if (btnCancelEditGroup) {
+    btnCancelEditGroup.addEventListener('click', resetGroupForm);
+  }
+
   if (tabTypeLocal && tabTypeKeycloak) {
     tabTypeLocal.addEventListener('click', () => setAccountType('local'));
     tabTypeKeycloak.addEventListener('click', () => setAccountType('keycloak'));
@@ -386,6 +453,8 @@ function setupEventListeners() {
         closeDeleteModal();
       } else if (usersModal && usersModal.style.display !== 'none') {
         closeUsersModal();
+      } else if (groupsModal && groupsModal.style.display !== 'none') {
+        closeGroupsModal();
       } else if (pcModal && pcModal.style.display !== 'none') {
         closePCModal();
       }
@@ -658,6 +727,292 @@ async function handleDeleteUser(username) {
 }
 window.handleDeleteUser = handleDeleteUser;
 
+/* ==========================================================================
+   Gerenciamento de Grupos de Testes & VLANs (Admin)
+   ========================================================================== */
+
+let currentGroups = [];
+
+async function openGroupsModal() {
+  if (!groupsModal) return;
+  groupsModal.style.display = 'flex';
+  resetGroupForm();
+  await loadGroupsList();
+}
+
+function closeGroupsModal() {
+  if (groupsModal) groupsModal.style.display = 'none';
+}
+
+function resetGroupForm() {
+  if (groupForm) groupForm.reset();
+  if (groupIdInput) groupIdInput.value = '';
+  if (groupFormTitle) groupFormTitle.textContent = 'Cadastrar Novo Grupo de Testes';
+  if (btnSubmitGroupText) btnSubmitGroupText.textContent = 'Salvar Grupo';
+  if (btnCancelEditGroup) btnCancelEditGroup.style.display = 'none';
+  if (groupErrorAlert) groupErrorAlert.style.display = 'none';
+  if (groupIntervalInput) groupIntervalInput.value = '60';
+
+  // Reseta defaults dos módulos
+  if (modPingEnabled) modPingEnabled.checked = true;
+  if (modPingTarget) modPingTarget.value = '1.1.1.1';
+  if (modPingCount) modPingCount.value = '4';
+
+  if (modPacketlossEnabled) modPacketlossEnabled.checked = true;
+  if (modPacketlossTarget) modPacketlossTarget.value = '1.1.1.1';
+  if (modPacketlossCount) modPacketlossCount.value = '10';
+
+  if (modDownloadEnabled) modDownloadEnabled.checked = true;
+  if (modDownloadBytes) modDownloadBytes.value = '10485760';
+
+  if (modUploadEnabled) modUploadEnabled.checked = true;
+  if (modUploadBytes) modUploadBytes.value = '5242880';
+
+  if (modDnsEnabled) modDnsEnabled.checked = true;
+  if (modDnsDomains) modDnsDomains.value = 'google.com, cloudflare.com';
+
+  if (modHttpEnabled) modHttpEnabled.checked = true;
+  if (modHttpUrl) modHttpUrl.value = 'https://www.google.com';
+  if (modHttpStatus) modHttpStatus.value = '200';
+
+  if (modTraceEnabled) modTraceEnabled.checked = false;
+  if (modTraceTarget) modTraceTarget.value = '1.1.1.1';
+  if (modTraceHops) modTraceHops.value = '15';
+
+  if (modLldpEnabled) modLldpEnabled.checked = true;
+}
+
+async function loadGroupsList() {
+  if (!groupsTableBody) return;
+  groupsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando grupos...</td></tr>`;
+
+  try {
+    const res = await fetch('/api/v1/groups');
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Falha ao buscar grupos');
+    }
+
+    const groups = await res.json() || [];
+    currentGroups = groups;
+
+    if (groupsCountTag) {
+      groupsCountTag.textContent = `${groups.length} grupo${groups.length !== 1 ? 's' : ''}`;
+    }
+
+    if (groups.length === 0) {
+      groupsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);">Nenhum grupo cadastrado.</td></tr>`;
+      return;
+    }
+
+    groupsTableBody.innerHTML = groups.map(g => {
+      const vlanTags = (g.vlans && g.vlans.length > 0)
+        ? g.vlans.map(v => `<span class="vlan-pill">VLAN ${v}</span>`).join('')
+        : '<span style="color: var(--text-muted); font-size: 0.78rem;">Todas / Nenhuma</span>';
+
+      const m = g.modules || {};
+      const activeMods = [];
+      if (m.ping && m.ping.enabled) activeMods.push('<span class="module-pill active">🎯 Ping</span>');
+      if (m.packet_loss && m.packet_loss.enabled) activeMods.push('<span class="module-pill active">📊 Perda</span>');
+      if (m.download && m.download.enabled) activeMods.push('<span class="module-pill active">⬇️ Down</span>');
+      if (m.upload && m.upload.enabled) activeMods.push('<span class="module-pill active">⬆️ Up</span>');
+      if (m.dns && m.dns.enabled) activeMods.push('<span class="module-pill active">🌐 DNS</span>');
+      if (m.http_check && m.http_check.enabled) activeMods.push('<span class="module-pill active">⚡ HTTP</span>');
+      if (m.traceroute && m.traceroute.enabled) activeMods.push('<span class="module-pill active">🛣️ Trace</span>');
+      if (m.lldp && m.lldp.enabled) activeMods.push('<span class="module-pill active">🔌 LLDP</span>');
+
+      return `
+        <tr>
+          <td>
+            <strong>${escapeHtml(g.name)}</strong>
+            ${g.is_default ? '<span class="default-group-badge">★ Padrão</span>' : ''}
+            ${g.description ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${escapeHtml(g.description)}</div>` : ''}
+          </td>
+          <td>${vlanTags}</td>
+          <td>${activeMods.join('')}</td>
+          <td><span style="font-family: monospace; font-size: 0.8rem;">${g.interval_minutes || 60}m</span></td>
+          <td style="text-align: right; white-space: nowrap;">
+            <button type="button" class="btn-group-action" onclick="editGroup('${escapeHtml(g.id)}')">
+              ✏️ Editar
+            </button>
+            ${!g.is_default ? `
+            <button type="button" class="btn-group-action btn-delete" onclick="handleDeleteGroup('${escapeHtml(g.id)}', '${escapeHtml(g.name)}')">
+              🗑️ Excluir
+            </button>` : ''}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    groupsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: #f87171;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function editGroup(groupId) {
+  const g = currentGroups.find(item => item.id === groupId);
+  if (!g) return;
+
+  if (groupIdInput) groupIdInput.value = g.id;
+  if (groupNameInput) groupNameInput.value = g.name || '';
+  if (groupDescriptionInput) groupDescriptionInput.value = g.description || '';
+  if (groupVlansInput) groupVlansInput.value = (g.vlans || []).join(', ');
+  if (groupIntervalInput) groupIntervalInput.value = g.interval_minutes || 60;
+  if (groupIsDefaultInput) groupIsDefaultInput.checked = !!g.is_default;
+
+  const m = g.modules || {};
+  if (modPingEnabled) modPingEnabled.checked = !!(m.ping && m.ping.enabled);
+  if (modPingTarget) modPingTarget.value = (m.ping && m.ping.target) || '1.1.1.1';
+  if (modPingCount) modPingCount.value = (m.ping && m.ping.count) || 4;
+
+  if (modPacketlossEnabled) modPacketlossEnabled.checked = !!(m.packet_loss && m.packet_loss.enabled);
+  if (modPacketlossTarget) modPacketlossTarget.value = (m.packet_loss && m.packet_loss.target) || '1.1.1.1';
+  if (modPacketlossCount) modPacketlossCount.value = (m.packet_loss && m.packet_loss.count) || 10;
+
+  if (modDownloadEnabled) modDownloadEnabled.checked = !!(m.download && m.download.enabled);
+  if (modDownloadBytes) modDownloadBytes.value = (m.download && m.download.max_bytes) || 10485760;
+
+  if (modUploadEnabled) modUploadEnabled.checked = !!(m.upload && m.upload.enabled);
+  if (modUploadBytes) modUploadBytes.value = (m.upload && m.upload.max_bytes) || 5242880;
+
+  if (modDnsEnabled) modDnsEnabled.checked = !!(m.dns && m.dns.enabled);
+  if (modDnsDomains) modDnsDomains.value = (m.dns && m.dns.domains) ? m.dns.domains.join(', ') : 'google.com, cloudflare.com';
+
+  if (modHttpEnabled) modHttpEnabled.checked = !!(m.http_check && m.http_check.enabled);
+  if (modHttpUrl) modHttpUrl.value = (m.http_check && m.http_check.url) || 'https://www.google.com';
+  if (modHttpStatus) modHttpStatus.value = (m.http_check && m.http_check.expected_status) || 200;
+
+  if (modTraceEnabled) modTraceEnabled.checked = !!(m.traceroute && m.traceroute.enabled);
+  if (modTraceTarget) modTraceTarget.value = (m.traceroute && m.traceroute.target) || '1.1.1.1';
+  if (modTraceHops) modTraceHops.value = (m.traceroute && m.traceroute.max_hops) || 15;
+
+  if (modLldpEnabled) modLldpEnabled.checked = !(m.lldp && m.lldp.enabled === false);
+
+  if (groupFormTitle) groupFormTitle.textContent = `Editar Grupo: ${g.name}`;
+  if (btnSubmitGroupText) btnSubmitGroupText.textContent = 'Salvar Alterações';
+  if (btnCancelEditGroup) btnCancelEditGroup.style.display = 'inline-block';
+  if (groupErrorAlert) groupErrorAlert.style.display = 'none';
+
+  groupForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+window.editGroup = editGroup;
+
+async function handleSaveGroupSubmit(e) {
+  e.preventDefault();
+  if (groupErrorAlert) groupErrorAlert.style.display = 'none';
+
+  const name = groupNameInput.value.trim();
+  if (!name) {
+    if (groupErrorAlert) {
+      groupErrorAlert.style.display = 'flex';
+      groupErrorText.textContent = 'Informe o nome do grupo.';
+    }
+    return;
+  }
+
+  // Parse VLANs
+  const rawVlans = groupVlansInput.value.split(',')
+    .map(v => parseInt(v.trim(), 10))
+    .filter(v => !isNaN(v) && v > 0);
+
+  // Parse DNS Domains
+  const dnsDomains = modDnsDomains.value.split(',')
+    .map(d => d.trim())
+    .filter(d => d.length > 0);
+
+  const payload = {
+    name: name,
+    description: groupDescriptionInput.value.trim(),
+    vlans: rawVlans,
+    interval_minutes: parseInt(groupIntervalInput.value, 10) || 60,
+    is_default: groupIsDefaultInput.checked,
+    modules: {
+      ping: {
+        enabled: modPingEnabled.checked,
+        target: modPingTarget.value.trim() || '1.1.1.1',
+        count: parseInt(modPingCount.value, 10) || 4,
+        timeout_ms: 1000
+      },
+      packet_loss: {
+        enabled: modPacketlossEnabled.checked,
+        target: modPacketlossTarget.value.trim() || '1.1.1.1',
+        count: parseInt(modPacketlossCount.value, 10) || 10,
+        timeout_ms: 1000
+      },
+      download: {
+        enabled: modDownloadEnabled.checked,
+        max_bytes: parseInt(modDownloadBytes.value, 10) || 10485760
+      },
+      upload: {
+        enabled: modUploadEnabled.checked,
+        max_bytes: parseInt(modUploadBytes.value, 10) || 5242880
+      },
+      dns: {
+        enabled: modDnsEnabled.checked,
+        domains: dnsDomains.length > 0 ? dnsDomains : ['google.com']
+      },
+      http_check: {
+        enabled: modHttpEnabled.checked,
+        url: modHttpUrl.value.trim() || 'https://www.google.com',
+        expected_status: parseInt(modHttpStatus.value, 10) || 200
+      },
+      traceroute: {
+        enabled: modTraceEnabled.checked,
+        target: modTraceTarget.value.trim() || '1.1.1.1',
+        max_hops: parseInt(modTraceHops.value, 10) || 15
+      },
+      lldp: {
+        enabled: modLldpEnabled.checked
+      }
+    }
+  };
+
+  const editingId = groupIdInput.value.trim();
+  const url = editingId ? `/api/v1/groups/${encodeURIComponent(editingId)}` : '/api/v1/groups';
+  const method = editingId ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Falha ao salvar grupo');
+    }
+
+    showToast(editingId ? 'Grupo atualizado com sucesso!' : 'Grupo cadastrado com sucesso!', 'toast-success');
+    resetGroupForm();
+    await loadGroupsList();
+  } catch (err) {
+    if (groupErrorAlert) {
+      groupErrorAlert.style.display = 'flex';
+      groupErrorText.textContent = err.message || 'Erro ao salvar grupo';
+    }
+  }
+}
+
+async function handleDeleteGroup(groupId, groupName) {
+  if (!confirm(`Tem certeza que deseja excluir o grupo "${groupName}"?`)) return;
+
+  try {
+    const res = await fetch(`/api/v1/groups/${encodeURIComponent(groupId)}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Falha ao excluir grupo');
+    }
+
+    showToast(`Grupo "${groupName}" excluído com sucesso!`, 'toast-info');
+    await loadGroupsList();
+  } catch (err) {
+    showToast(err.message || 'Erro ao excluir grupo', 'toast-error');
+  }
+}
+window.handleDeleteGroup = handleDeleteGroup;
+
 function startAutoRefresh() {
   if (refreshInterval) clearInterval(refreshInterval);
   refreshInterval = setInterval(() => {
@@ -765,6 +1120,10 @@ function renderSummaryCards(summaries) {
               </svg>
               <span>${escapeHtml(s.location)}</span>
             </div>
+            ${s.group_name ? `
+            <div style="margin-top: 4px;">
+              <span class="vlan-pill" title="Grupo e VLAN associada">🏷️ ${escapeHtml(s.group_name)} ${s.vlan ? '(VLAN ' + s.vlan + ')' : ''}</span>
+            </div>` : ''}
           </div>
           <div class="dc-card-top-actions">
             <span class="dc-health-badge ${healthClass}">● ${healthText}</span>
@@ -796,6 +1155,14 @@ function renderSummaryCards(summaries) {
             <div class="metric-unit">ms</div>
           </div>
         </div>
+
+        ${s.modular_results ? `
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+          ${s.modular_results.packet_loss ? `<span class="module-pill" title="Perda de Pacotes">📉 Perda: ${s.modular_results.packet_loss.loss_percent.toFixed(0)}% (Jitter: ${s.modular_results.packet_loss.jitter_ms.toFixed(1)}ms)</span>` : ''}
+          ${s.modular_results.dns ? `<span class="module-pill" title="Tempo Resolução DNS">🌐 DNS: ${s.modular_results.dns.avg_ms.toFixed(1)}ms</span>` : ''}
+          ${s.modular_results.http_check ? `<span class="module-pill" title="Healthcheck HTTP">⚡ HTTP: ${s.modular_results.http_check.status_code} (${s.modular_results.http_check.duration_ms.toFixed(0)}ms)</span>` : ''}
+        </div>
+        ` : ''}
 
         ${s.system_info || s.switch_info ? `
         <div class="dc-hardware-box">

@@ -4,5 +4,6 @@
   "server_url": "http://localhost:8090",
   "api_token": "super-secret-probe-token-2026",
   "interval_minutes": 60,
-  "ping_target": "1.1.1.1"
+  "ping_target": "1.1.1.1",
+  "sync_with_central": true
 }
