@@ -164,10 +164,19 @@ function updateStatusBadge(status) {
 
   if (status.is_running) {
     statusBadge.className = 'status-badge running';
-    statusText.textContent = status.status_text || 'Executando teste...';
+    statusText.textContent = status.status_text || (status.active_task ? `Executando: ${status.active_task}...` : 'Executando teste...');
   } else {
     statusBadge.className = 'status-badge scheduled';
     statusText.textContent = status.status_text || (status.sync_with_central ? 'Sincronizado com o servidor central' : 'Agendado');
+  }
+
+  // Atualiza badge de Perfil de Medição
+  const profileBadge = document.getElementById('profile-badge');
+  if (profileBadge && status.current_profile) {
+    const prof = status.current_profile;
+    const activeCount = prof.tests ? prof.tests.filter(t => t.enabled).length : 0;
+    profileBadge.textContent = `Perfil ${prof.version} (${activeCount} testes)`;
+    profileBadge.title = prof.description || `Perfil ativo com ${activeCount} tarefas`;
   }
 
   const footerDesc = document.getElementById('footer-agent-desc');
@@ -497,9 +506,19 @@ function renderTable(records) {
       ? '<span class="sync-badge ok">✓ Sincronizado</span>'
       : '<span class="sync-badge fail" title="' + (r.error_message || 'Falha de conexão') + '">✕ Pendente</span>';
 
+    let extraBadges = '';
+    if (r.metrics) {
+      if (r.metrics.dns_uepg && r.metrics.dns_uepg.value > 0) {
+        extraBadges += `<span class="mono-badge" style="font-size: 0.68rem; margin-left: 4px;" title="Resolução DNS UEPG">DNS ${r.metrics.dns_uepg.value.toFixed(1)}ms</span>`;
+      }
+      if (r.metrics.ping_nti_core && r.metrics.ping_nti_core.value > 0) {
+        extraBadges += `<span class="mono-badge" style="font-size: 0.68rem; margin-left: 4px; color: #c084fc; border-color: rgba(192, 132, 252, 0.3);" title="Ping Core NTI">NTI ${r.metrics.ping_nti_core.value.toFixed(1)}ms</span>`;
+      }
+    }
+
     return `
       <tr>
-        <td>${dateFormatted}</td>
+        <td>${dateFormatted} ${extraBadges}</td>
         <td><strong style="color: var(--cyan-light)">${r.download_mbps.toFixed(1)}</strong> Mbps</td>
         <td><strong style="color: var(--purple-light)">${r.upload_mbps.toFixed(1)}</strong> Mbps</td>
         <td><strong style="color: var(--emerald-light)">${r.ping_gateway.toFixed(1)}</strong> ms</td>

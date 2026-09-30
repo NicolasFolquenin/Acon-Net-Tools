@@ -27,3 +27,8 @@ node_modules/
 
 # Arquivos com segredos (variáveis reais de ambiente)
 .env
+
+# Perfis dinâmicos de runtime e caches
+profile_*.json
+measurement_profile.json
+**/config/machines/*.json

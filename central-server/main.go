@@ -43,6 +43,8 @@ func main() {
 	metricsHandler := handlers.NewMetricsHandler(mongoClient, cfg)
 	authHandler := handlers.NewAuthHandler(cfg, mongoClient)
 	oidcHandler := handlers.NewOIDCHandler(cfg, authHandler, mongoClient)
+	profileHandler := handlers.NewProfileHandler(cfg)
+	machineProfileHandler := handlers.NewMachineProfileHandler(cfg, mongoClient)
 
 	mux := http.NewServeMux()
 
@@ -72,6 +74,28 @@ func main() {
 
 	// Endpoints de Gerenciamento de Usuários (Apenas Administrador)
 	mux.HandleFunc("/api/v1/users", authHandler.RequireAdmin(authHandler.HandleUsers))
+
+	// Endpoints de Perfil Dinâmico de Medição das Sondas
+	// 1. GET /api/v1/probes/profile/{hostname} -> perfil individual por máquina
+	// 2. GET /api/v1/probes/profile -> perfil legado global
+	// 3. PUT /api/v1/probes/profile -> atualização do perfil global pelo admin
+	mux.HandleFunc("/api/v1/probes/profile/", machineProfileHandler.HandleGetProfileByHostname)
+	mux.HandleFunc("/api/v1/probes/profile", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			authHandler.RequireAdmin(profileHandler.UpdateProfile)(w, r)
+			return
+		}
+		profileHandler.GetProfile(w, r)
+	})
+
+	// Auto-registro de novas sondas (quando 404 no perfil)
+	mux.HandleFunc("/api/v1/probes/register", handlers.RequireBearerToken(cfg.APIToken, machineProfileHandler.HandleRegisterProbe))
+
+	// Endpoints Administrativos para Máquinas e Grupos
+	mux.HandleFunc("/api/v1/admin/machines", authHandler.RequireAdmin(machineProfileHandler.HandleAdminMachines))
+	mux.HandleFunc("/api/v1/admin/machines/", authHandler.RequireAdmin(machineProfileHandler.HandleAdminMachines))
+	mux.HandleFunc("/api/v1/admin/groups", authHandler.RequireAdmin(machineProfileHandler.HandleAdminGroups))
+	mux.HandleFunc("/api/v1/admin/groups/", authHandler.RequireAdmin(machineProfileHandler.HandleAdminGroups))
 
 	// Endpoints da API oficial
 	// POST /api/v1/metrics protegido por Bearer Token

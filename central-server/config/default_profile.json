@@ -1,0 +1,67 @@
+{
+  "version": "2026.1",
+  "updated_at": "2026-09-28T10:00:00Z",
+  "interval_minutes": 30,
+  "sync_schedule": "fixed_half_hour",
+  "description": "Perfil padrão de medição para monitoramento do Anel de Conectividade e diagnóstico UEPG",
+  "tests": [
+    {
+      "id": "ping_gateway",
+      "type": "ping",
+      "name": "Latência Gateway Local",
+      "enabled": true,
+      "target": "auto_gateway",
+      "count": 3,
+      "timeout_ms": 1000
+    },
+    {
+      "id": "ping_nti_core",
+      "type": "ping",
+      "name": "Latência Core NTI (Anel)",
+      "enabled": true,
+      "target": "177.101.22.40",
+      "count": 3,
+      "timeout_ms": 1000
+    },
+    {
+      "id": "dns_uepg",
+      "type": "dns_lookup",
+      "name": "Resolução DNS Institucional",
+      "enabled": true,
+      "domain": "uepg.br",
+      "timeout_ms": 2000
+    },
+    {
+      "id": "throughput_download",
+      "type": "http_throughput_download",
+      "name": "Throughput Download",
+      "enabled": true,
+      "endpoint": "/api/v1/speedtest/download",
+      "size_mb": 5,
+      "timeout_seconds": 15
+    },
+    {
+      "id": "throughput_upload",
+      "type": "http_throughput_upload",
+      "name": "Throughput Upload",
+      "enabled": true,
+      "endpoint": "/api/v1/speedtest/upload",
+      "size_mb": 2,
+      "timeout_seconds": 15
+    },
+    {
+      "id": "network_switch_discovery",
+      "type": "discovery_protocol",
+      "name": "Identificação Switch / Porta",
+      "enabled": true,
+      "protocol": "LLDP_CDP",
+      "listen_timeout_seconds": 45
+    },
+    {
+      "id": "system_hardware_info",
+      "type": "system_info",
+      "name": "Telemetria de Host e Interface",
+      "enabled": true
+    }
+  ]
+}

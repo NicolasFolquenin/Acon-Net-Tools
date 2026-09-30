@@ -1,30 +1,20 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"crypto/rand"
-	"fmt"
-	"io"
 	"log"
 	"math"
-	mathrand "math/rand"
-	"net"
 	"net/http"
-	"os/exec"
-	"regexp"
-	"runtime"
-	"strconv"
-	"strings"
 	"time"
 )
 
-// NetworkProbe é o serviço responsável por medir latência e throughput.
+// NetworkProbe é o serviço responsável por orquestrar a execução das tarefas de telemetria
 type NetworkProbe struct {
 	httpClient *http.Client
+	executors  map[TaskType]TaskExecutor
 }
 
-// NewNetworkProbe cria uma nova instância de NetworkProbe.
+// NewNetworkProbe cria uma nova instância de NetworkProbe com o registro padrão de executores
 func NewNetworkProbe() *NetworkProbe {
 	return &NetworkProbe{
 		httpClient: &http.Client{
@@ -35,180 +25,116 @@ func NewNetworkProbe() *NetworkProbe {
 				DisableCompression:  true,
 			},
 		},
+		executors: NewExecutorRegistry(),
 	}
 }
 
-// MeasureAll executa o conjunto completo de testes (Ping, Download, Upload).
-func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config, knownSwitch *SwitchInfo) (*MetricPayload, error) {
-	log.Printf("[PROBE] Iniciando ciclo de medições para nó %s (%s)...", cfg.NodeID, cfg.Location)
+// RegisterExecutor permite registrar ou substituir um executor para um tipo de tarefa.
+// Isso possibilita adicionar novos tipos de medição sem modificar o código do orquestrador.
+func (p *NetworkProbe) RegisterExecutor(taskType TaskType, executor TaskExecutor) {
+	if p.executors == nil {
+		p.executors = make(map[TaskType]TaskExecutor)
+	}
+	p.executors[taskType] = executor
+}
 
-	// 1. Mede latência para o gateway/alvo
-	pingMs := p.measurePing(cfg.PingTarget)
-	log.Printf("[PROBE] Ping para %s: %.2f ms", cfg.PingTarget, pingMs)
+// RunProfile executa dinamicamente todas as tarefas ativas descritas no perfil de medição
+func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile, cfg Config, knownSwitch *SwitchInfo, onProgress func(taskName string)) (*MetricPayload, error) {
+	if prof == nil {
+		prof = NewProfileManager().GetBuiltinFallback()
+	}
 
-	// 2. Mede Download
-	downloadMbps := p.measureDownload(ctx, cfg.ServerURL)
-	log.Printf("[PROBE] Download estimado: %.2f Mbps", downloadMbps)
+	log.Printf("[PROBE] Iniciando ciclo de testes dinâmicos com perfil '%s' (%d tarefas cadastradas)...", prof.Version, len(prof.Tests))
 
-	// 3. Mede Upload
-	uploadMbps := p.measureUpload(ctx, cfg.ServerURL)
-	log.Printf("[PROBE] Upload estimado: %.2f Mbps", uploadMbps)
+	execCtx := &ExecutionContext{
+		ServerURL:   cfg.ServerURL,
+		KnownSwitch: knownSwitch,
+		HTTPClient:  p.httpClient,
+	}
 
-	// 4. Coleta Informações da Máquina Local (Hardware, CPU, RAM, IP, MAC)
+	// Pré-carrega informações do host para alimentar alvos que necessitam dele (ex: auto_gateway)
 	sysInfo := CollectSystemInfo()
+	execCtx.SysInfo = &sysInfo
 
-	// 5. Coleta Informações do Switch via LLDP (Reaproveita switch corporativo se já conhecido)
-	var switchInfo SwitchInfo
-	if knownSwitch != nil && knownSwitch.IsRealSwitch() {
-		switchInfo = *knownSwitch
-		log.Printf("[PROBE] Switch corporativo preservado: %s (Porta %s)", switchInfo.SwitchName, switchInfo.SwitchPort)
-	} else {
-		log.Printf("[PROBE] Buscando informações de switch via LLDP...")
-		lldpCtx, cancelLldp := context.WithTimeout(ctx, 30*time.Second)
-		switchInfo = DiscoverSwitchLLDP(lldpCtx)
-		cancelLldp()
-		if !switchInfo.IsRealSwitch() && knownSwitch != nil && knownSwitch.IsValid() {
-			switchInfo = *knownSwitch
+	metricsMap := make(map[string]interface{})
+	var currentSwitch *SwitchInfo
+	if knownSwitch != nil {
+		currentSwitch = knownSwitch
+	}
+
+	var pingGateway float64
+	var downloadMbps float64
+	var uploadMbps float64
+
+	for _, task := range prof.Tests {
+		if !task.Enabled {
+			continue
 		}
+
+		if onProgress != nil {
+			onProgress(task.Name)
+		}
+		log.Printf("[PROBE] Executando tarefa [%s]: %s (tipo: %s)", task.ID, task.Name, task.Type)
+
+		timeout := 30 * time.Second
+		if task.TimeoutSeconds > 0 {
+			timeout = time.Duration(task.TimeoutSeconds) * time.Second
+		}
+		taskCtx, cancel := context.WithTimeout(ctx, timeout)
+
+		executor, registered := p.executors[task.Type]
+		if !registered {
+			log.Printf("[PROBE][AVISO] Tipo de tarefa desconhecido ignorado: %s (nenhum executor registrado)", task.Type)
+			cancel()
+			continue
+		}
+
+		result := executor.Execute(taskCtx, task, execCtx)
+		metricsMap[task.ID] = result.Metric
+
+		// Propaga dados laterais de volta ao contexto compartilhado
+		if result.SwitchInfo != nil && (currentSwitch == nil || result.SwitchInfo.IsRealSwitch()) {
+			currentSwitch = result.SwitchInfo
+			execCtx.KnownSwitch = result.SwitchInfo
+		}
+		if result.SystemInfo != nil {
+			execCtx.SysInfo = result.SystemInfo
+		}
+
+		// Preenche campos legados de compatibilidade com o dashboard existente
+		switch task.Type {
+		case TaskTypePing:
+			if task.ID == "ping_gateway" || pingGateway == 0 {
+				pingGateway = result.Metric.Value
+			}
+		case TaskTypeThroughputDownload:
+			downloadMbps = result.Metric.Value
+		case TaskTypeThroughputUpload:
+			uploadMbps = result.Metric.Value
+		}
+
+		cancel()
 	}
 
 	payload := &MetricPayload{
-		NodeID:       cfg.NodeID,
-		Location:     cfg.Location,
-		Timestamp:    time.Now().UTC().Truncate(time.Second),
-		DownloadMbps: math.Round(downloadMbps*100) / 100,
-		UploadMbps:   math.Round(uploadMbps*100) / 100,
-		PingGateway:  math.Round(pingMs*100) / 100,
-		SystemInfo:   &sysInfo,
-		SwitchInfo:   &switchInfo,
+		NodeID:         cfg.NodeID,
+		Location:       cfg.Location,
+		Timestamp:      time.Now().UTC().Truncate(time.Second),
+		ProfileVersion: prof.Version,
+		DownloadMbps:   math.Round(downloadMbps*100) / 100,
+		UploadMbps:     math.Round(uploadMbps*100) / 100,
+		PingGateway:    math.Round(pingGateway*100) / 100,
+		Metrics:        metricsMap,
+		SystemInfo:     execCtx.SysInfo,
+		SwitchInfo:     currentSwitch,
 	}
 
 	return payload, nil
 }
 
-// measurePing tenta ping via comando do SO e fallback para TCP dial.
-func (p *NetworkProbe) measurePing(target string) float64 {
-	if target == "" {
-		target = "1.1.1.1"
-	}
-
-	// 1. Tenta comando nativo (Windows ping -n 3 ou Linux ping -c 3)
-	if ping, err := p.pingViaExec(target); err == nil && ping > 0 {
-		return ping
-	}
-
-	// 2. Fallback via TCP handshake para porta 80 ou 53
-	if ping, err := p.pingViaTCP(target); err == nil && ping > 0 {
-		return ping
-	}
-
-	// 3. Fallback simulado realista para ambientes sem rota direta (ex: 1.2ms ~ 4.5ms)
-	r := mathrand.New(mathrand.NewSource(time.Now().UnixNano()))
-	simulated := 1.0 + r.Float64()*3.2
-	return math.Round(simulated*10) / 10
+// MeasureAll mantém compatibilidade com chamadas legadas
+func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config, knownSwitch *SwitchInfo) (*MetricPayload, error) {
+	defaultProf := NewProfileManager().GetBuiltinFallback()
+	return p.RunProfile(ctx, defaultProf, cfg, knownSwitch, nil)
 }
 
-func (p *NetworkProbe) pingViaExec(target string) (float64, error) {
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("ping", "-n", "2", "-w", "1000", target)
-	} else {
-		cmd = exec.Command("ping", "-c", "2", "-W", "1", target)
-	}
-	hideWindow(cmd)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return 0, err
-	}
-
-	outputStr := string(out)
-	// Regex para Windows: Média = Xms ou Average = Xms
-	reWin := regexp.MustCompile(`(?i)(?:Média|Average|Media)\s*=\s*(\d+)ms`)
-	if match := reWin.FindStringSubmatch(outputStr); len(match) > 1 {
-		if val, err := strconv.ParseFloat(match[1], 64); err == nil {
-			return val, nil
-		}
-	}
-
-	// Regex para Linux: min/avg/max = .../X/...
-	reLinux := regexp.MustCompile(`(?:min/avg/max|rtt min/avg/max)[^=]*=\s*[\d.]+/([\d.]+)/`)
-	if match := reLinux.FindStringSubmatch(outputStr); len(match) > 1 {
-		if val, err := strconv.ParseFloat(match[1], 64); err == nil {
-			return val, nil
-		}
-	}
-
-	return 0, fmt.Errorf("ping parse error")
-}
-
-func (p *NetworkProbe) pingViaTCP(target string) (float64, error) {
-	ports := []string{"80", "53", "443"}
-	for _, port := range ports {
-		hostPort := net.JoinHostPort(target, port)
-		start := time.Now()
-		conn, err := net.DialTimeout("tcp", hostPort, 1200*time.Millisecond)
-		if err == nil {
-			duration := time.Since(start).Seconds() * 1000.0
-			_ = conn.Close()
-			return duration, nil
-		}
-	}
-	return 0, fmt.Errorf("tcp ping failed")
-}
-
-// measureDownload tenta baixar um payload real do servidor central.
-// Se o servidor estiver indisponível, gera uma medição simulada precisa de alta performance.
-func (p *NetworkProbe) measureDownload(ctx context.Context, serverURL string) float64 {
-	url := strings.TrimRight(serverURL, "/") + "/api/v1/speedtest/download?size_mb=5"
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err == nil {
-		start := time.Now()
-		resp, err := p.httpClient.Do(req)
-		if err == nil && resp.StatusCode == http.StatusOK {
-			defer resp.Body.Close()
-			n, err := io.Copy(io.Discard, resp.Body)
-			elapsed := time.Since(start).Seconds()
-			if err == nil && elapsed > 0.05 && n > 0 {
-				mbps := (float64(n) * 8.0) / (elapsed * 1000000.0)
-				return mbps
-			}
-		}
-	}
-
-	// Simulação estatística realista de link corporativo (750 - 950 Mbps com oscilações normais)
-	r := mathrand.New(mathrand.NewSource(time.Now().UnixNano()))
-	base := 820.0 + (r.Float64()*120.0 - 40.0)
-	return math.Round(base*100) / 100
-}
-
-// measureUpload tenta enviar dados para o servidor central.
-// Se o servidor estiver indisponível, gera uma medição simulada precisa.
-func (p *NetworkProbe) measureUpload(ctx context.Context, serverURL string) float64 {
-	url := strings.TrimRight(serverURL, "/") + "/api/v1/speedtest/upload"
-
-	// 2 MB de payload para teste de upload
-	payloadSize := 2 * 1024 * 1024
-	buf := make([]byte, payloadSize)
-	_, _ = rand.Read(buf)
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(buf))
-	if err == nil {
-		req.Header.Set("Content-Type", "application/octet-stream")
-		start := time.Now()
-		resp, err := p.httpClient.Do(req)
-		if err == nil && (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated) {
-			defer resp.Body.Close()
-			elapsed := time.Since(start).Seconds()
-			if elapsed > 0.05 {
-				mbps := (float64(payloadSize) * 8.0) / (elapsed * 1000000.0)
-				return mbps
-			}
-		}
-	}
-
-	// Simulação estatística realista de upload (680 - 820 Mbps)
-	r := mathrand.New(mathrand.NewSource(time.Now().UnixNano() + 42))
-	base := 710.0 + (r.Float64()*100.0 - 30.0)
-	return math.Round(base*100) / 100
-}

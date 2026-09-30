@@ -251,6 +251,8 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 			LastDownload:    agg.latest.DownloadMbps,
 			LastUpload:      agg.latest.UploadMbps,
 			LastPing:        agg.latest.PingGateway,
+			ProfileVersion:  agg.latest.ProfileVersion,
+			Metrics:         agg.latest.Metrics,
 			IsHealthy:       isHealthy,
 			TotalReadings24: agg.count,
 			SystemInfo:      sys,

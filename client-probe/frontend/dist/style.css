@@ -209,6 +209,17 @@ body {
   border: 1px solid var(--border-subtle);
 }
 
+.profile-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.12);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  letter-spacing: 0.01em;
+}
+
 .header-actions {
   display: flex;
   align-items: center;

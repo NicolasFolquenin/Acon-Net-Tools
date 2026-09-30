@@ -18,9 +18,11 @@ import (
 type MongoDBClient struct {
 	Client          *mongo.Client
 	Database        *mongo.Database
-	Collection      *mongo.Collection
-	UsersCollection *mongo.Collection
-	cfg             *config.AppConfig
+	Collection         *mongo.Collection
+	UsersCollection    *mongo.Collection
+	GroupsCollection   *mongo.Collection
+	MachinesCollection *mongo.Collection
+	cfg                *config.AppConfig
 }
 
 // InitMongoDB conecta ao cluster MongoDB e assegura a coleção Time Series
@@ -45,13 +47,17 @@ func InitMongoDB(ctx context.Context, cfg *config.AppConfig) (*MongoDBClient, er
 	database := client.Database(cfg.DatabaseName)
 	collection := database.Collection(cfg.CollectionName)
 	usersCollection := database.Collection("users")
+	groupsCollection := database.Collection("machine_groups")
+	machinesCollection := database.Collection("machines")
 
 	m := &MongoDBClient{
-		Client:          client,
-		Database:        database,
-		Collection:      collection,
-		UsersCollection: usersCollection,
-		cfg:             cfg,
+		Client:             client,
+		Database:           database,
+		Collection:         collection,
+		UsersCollection:    usersCollection,
+		GroupsCollection:   groupsCollection,
+		MachinesCollection: machinesCollection,
+		cfg:                cfg,
 	}
 
 	// Assegura criação da coleção Time Series
@@ -64,6 +70,11 @@ func InitMongoDB(ctx context.Context, cfg *config.AppConfig) (*MongoDBClient, er
 		Keys:    bson.D{{Key: "username", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	})
+
+	// Assegura grupos padrão no sistema
+	if err := m.SeedInitialGroups(ctx); err != nil {
+		log.Printf("[MONGODB][AVISO] Falha ao verificar/semear grupos padrão: %v", err)
+	}
 
 	return m, nil
 }
@@ -121,11 +132,13 @@ func (m *MongoDBClient) InsertMetric(ctx context.Context, payload *models.Metric
 			NodeID:   payload.NodeID,
 			Location: payload.Location,
 		},
-		DownloadMbps: payload.DownloadMbps,
-		UploadMbps:   payload.UploadMbps,
-		PingGateway:  payload.PingGateway,
-		SystemInfo:   payload.SystemInfo,
-		SwitchInfo:   payload.SwitchInfo,
+		DownloadMbps:   payload.DownloadMbps,
+		UploadMbps:     payload.UploadMbps,
+		PingGateway:    payload.PingGateway,
+		ProfileVersion: payload.ProfileVersion,
+		Metrics:        payload.Metrics,
+		SystemInfo:     payload.SystemInfo,
+		SwitchInfo:     payload.SwitchInfo,
 	}
 
 	_, err := m.Collection.InsertOne(ctx, doc)
@@ -168,14 +181,16 @@ func (m *MongoDBClient) GetMetricsLast24Hours(ctx context.Context, nodeIDFilter 
 		}
 
 		results = append(results, models.FlattenedMetricItem{
-			NodeID:       doc.Metadata.NodeID,
-			Location:     doc.Metadata.Location,
-			Timestamp:    doc.Timestamp,
-			DownloadMbps: doc.DownloadMbps,
-			UploadMbps:   doc.UploadMbps,
-			PingGateway:  doc.PingGateway,
-			SystemInfo:   doc.SystemInfo,
-			SwitchInfo:   doc.SwitchInfo,
+			NodeID:         doc.Metadata.NodeID,
+			Location:       doc.Metadata.Location,
+			Timestamp:      doc.Timestamp,
+			DownloadMbps:   doc.DownloadMbps,
+			UploadMbps:     doc.UploadMbps,
+			PingGateway:    doc.PingGateway,
+			ProfileVersion: doc.ProfileVersion,
+			Metrics:        doc.Metrics,
+			SystemInfo:     doc.SystemInfo,
+			SwitchInfo:     doc.SwitchInfo,
 		})
 	}
 
@@ -355,4 +370,156 @@ func (m *MongoDBClient) Disconnect(ctx context.Context) error {
 	}
 	return nil
 }
+
+// SeedInitialGroups assegura que os grupos padrão (default, reitoria, acon) existam no MongoDB
+func (m *MongoDBClient) SeedInitialGroups(ctx context.Context) error {
+	if m.GroupsCollection == nil {
+		return nil
+	}
+
+	initialGroups := models.GetInitialGroups()
+	for _, grp := range initialGroups {
+		count, err := m.GroupsCollection.CountDocuments(ctx, bson.M{"_id": grp.ID})
+		if err != nil {
+			continue
+		}
+		if count == 0 {
+			_, err = m.GroupsCollection.InsertOne(ctx, grp)
+			if err != nil {
+				log.Printf("[MONGODB][AVISO] Falha ao semear grupo '%s': %v", grp.ID, err)
+			} else {
+				log.Printf("[MONGODB] Grupo inicial '%s' (%s) semeado com sucesso.", grp.ID, grp.Name)
+			}
+		}
+	}
+	return nil
+}
+
+// GetGroup busca um grupo de máquinas pelo ID
+func (m *MongoDBClient) GetGroup(ctx context.Context, id string) (*models.MachineGroup, error) {
+	if m.GroupsCollection == nil {
+		return nil, fmt.Errorf("colecao de grupos nao inicializada")
+	}
+
+	var grp models.MachineGroup
+	err := m.GroupsCollection.FindOne(ctx, bson.M{"_id": id}).Decode(&grp)
+	if err != nil {
+		return nil, err
+	}
+	return &grp, nil
+}
+
+// ListGroups retorna todos os grupos de máquinas cadastrados
+func (m *MongoDBClient) ListGroups(ctx context.Context) ([]models.MachineGroup, error) {
+	if m.GroupsCollection == nil {
+		return nil, fmt.Errorf("colecao de grupos nao inicializada")
+	}
+
+	cursor, err := m.GroupsCollection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var groups []models.MachineGroup
+	if err := cursor.All(ctx, &groups); err != nil {
+		return nil, err
+	}
+	return groups, nil
+}
+
+// SaveGroup cria ou atualiza um grupo de máquinas
+func (m *MongoDBClient) SaveGroup(ctx context.Context, grp *models.MachineGroup) error {
+	if m.GroupsCollection == nil {
+		return fmt.Errorf("colecao de grupos nao inicializada")
+	}
+
+	grp.UpdatedAt = time.Now().UTC()
+	opts := options.Update().SetUpsert(true)
+	_, err := m.GroupsCollection.UpdateOne(ctx, bson.M{"_id": grp.ID}, bson.M{"$set": grp}, opts)
+	return err
+}
+
+// GetMachine busca o registro de uma máquina pelo hostname
+func (m *MongoDBClient) GetMachine(ctx context.Context, hostname string) (*models.MachineRegistration, error) {
+	if m.MachinesCollection == nil {
+		return nil, fmt.Errorf("colecao de maquinas nao inicializada")
+	}
+
+	var mach models.MachineRegistration
+	err := m.MachinesCollection.FindOne(ctx, bson.M{"_id": hostname}).Decode(&mach)
+	if err != nil {
+		return nil, err
+	}
+	return &mach, nil
+}
+
+// ListMachines retorna todas as máquinas registradas
+func (m *MongoDBClient) ListMachines(ctx context.Context) ([]models.MachineRegistration, error) {
+	if m.MachinesCollection == nil {
+		return nil, fmt.Errorf("colecao de maquinas nao inicializada")
+	}
+
+	cursor, err := m.MachinesCollection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var machines []models.MachineRegistration
+	if err := cursor.All(ctx, &machines); err != nil {
+		return nil, err
+	}
+	return machines, nil
+}
+
+// SaveMachine cria ou atualiza o registro de uma máquina
+func (m *MongoDBClient) SaveMachine(ctx context.Context, mach *models.MachineRegistration) error {
+	if m.MachinesCollection == nil {
+		return fmt.Errorf("colecao de maquinas nao inicializada")
+	}
+
+	mach.UpdatedAt = time.Now().UTC()
+	mach.LastSeen = time.Now().UTC()
+	if mach.CreatedAt.IsZero() {
+		mach.CreatedAt = mach.UpdatedAt
+	}
+
+	opts := options.Update().SetUpsert(true)
+	_, err := m.MachinesCollection.UpdateOne(ctx, bson.M{"_id": mach.Hostname}, bson.M{"$set": mach}, opts)
+	return err
+}
+
+// UpdateMachine atualiza o grupo, testes customizados ou status de uma máquina
+func (m *MongoDBClient) UpdateMachine(ctx context.Context, hostname string, req *models.UpdateMachineRequest) error {
+	if m.MachinesCollection == nil {
+		return fmt.Errorf("colecao de maquinas nao inicializada")
+	}
+
+	update := bson.M{
+		"updated_at": time.Now().UTC(),
+	}
+	if req.GroupID != "" {
+		update["group_id"] = req.GroupID
+	}
+	update["is_custom"] = req.IsCustom
+	if req.IsCustom {
+		update["custom_tests"] = req.CustomTests
+	} else {
+		update["custom_tests"] = nil
+	}
+	if req.Status != "" {
+		update["status"] = req.Status
+	}
+
+	res, err := m.MachinesCollection.UpdateOne(ctx, bson.M{"_id": hostname}, bson.M{"$set": update})
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return fmt.Errorf("maquina '%s' nao encontrada", hostname)
+	}
+	return nil
+}
+
 
