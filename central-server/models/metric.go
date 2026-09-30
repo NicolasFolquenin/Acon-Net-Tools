@@ -56,21 +56,25 @@ func (s *SwitchInfo) IsValid() bool {
 	return true
 }
 
-// IsRealSwitch indica se a informação é de fato um switch de rede e não um telefone IP/VoIP
+// IsRealSwitch é um alias semântico de IsValid, mantido para legibilidade no domínio de rede.
+// No contexto de diagnóstico, "real switch" comunica a intenção mais claramente do que "valid"
+// ao distinguir switches corporativos (Cisco, HP, etc.) de telefones VoIP ou dados ausentes.
 func (s *SwitchInfo) IsRealSwitch() bool {
 	return s.IsValid()
 }
 
 // MetricPayloadInput representa o contrato exato recebido via POST /api/v1/metrics
 type MetricPayloadInput struct {
-	NodeID       string      `json:"node_id"`
-	Location     string      `json:"location"`
-	Timestamp    time.Time   `json:"timestamp"`
-	DownloadMbps float64     `json:"download_mbps"`
-	UploadMbps   float64     `json:"upload_mbps"`
-	PingGateway  float64     `json:"ping_gateway"`
-	SystemInfo   *SystemInfo `json:"system_info,omitempty"`
-	SwitchInfo   *SwitchInfo `json:"switch_info,omitempty"`
+	NodeID         string                 `json:"node_id"`
+	Location       string                 `json:"location"`
+	Timestamp      time.Time              `json:"timestamp"`
+	DownloadMbps   float64                `json:"download_mbps"`
+	UploadMbps     float64                `json:"upload_mbps"`
+	PingGateway    float64                `json:"ping_gateway"`
+	ProfileVersion string                 `json:"profile_version,omitempty"`
+	Metrics        map[string]interface{} `json:"metrics,omitempty"`
+	SystemInfo     *SystemInfo            `json:"system_info,omitempty"`
+	SwitchInfo     *SwitchInfo            `json:"switch_info,omitempty"`
 }
 
 // NodeMetadata representa os metadados do nó indexados no Time Series MongoDB
@@ -81,39 +85,45 @@ type NodeMetadata struct {
 
 // TimeSeriesMetricDocument é a estrutura persistida na Time Series collection do MongoDB
 type TimeSeriesMetricDocument struct {
-	Timestamp    time.Time    `bson:"timestamp" json:"timestamp"`
-	Metadata     NodeMetadata `bson:"metadata" json:"metadata"`
-	DownloadMbps float64      `bson:"download_mbps" json:"download_mbps"`
-	UploadMbps   float64      `bson:"upload_mbps" json:"upload_mbps"`
-	PingGateway  float64      `bson:"ping_gateway" json:"ping_gateway"`
-	SystemInfo   *SystemInfo  `bson:"system_info,omitempty" json:"system_info,omitempty"`
-	SwitchInfo   *SwitchInfo  `bson:"switch_info,omitempty" json:"switch_info,omitempty"`
+	Timestamp      time.Time              `bson:"timestamp" json:"timestamp"`
+	Metadata       NodeMetadata           `bson:"metadata" json:"metadata"`
+	DownloadMbps   float64                `bson:"download_mbps" json:"download_mbps"`
+	UploadMbps     float64                `bson:"upload_mbps" json:"upload_mbps"`
+	PingGateway    float64                `bson:"ping_gateway" json:"ping_gateway"`
+	ProfileVersion string                 `bson:"profile_version,omitempty" json:"profile_version,omitempty"`
+	Metrics        map[string]interface{} `bson:"metrics,omitempty" json:"metrics,omitempty"`
+	SystemInfo     *SystemInfo            `bson:"system_info,omitempty" json:"system_info,omitempty"`
+	SwitchInfo     *SwitchInfo            `bson:"switch_info,omitempty" json:"switch_info,omitempty"`
 }
 
 // FlattenedMetricItem representa o item retornado para o dashboard web
 type FlattenedMetricItem struct {
-	NodeID       string      `json:"node_id"`
-	Location     string      `json:"location"`
-	Timestamp    time.Time   `json:"timestamp"`
-	DownloadMbps float64     `json:"download_mbps"`
-	UploadMbps   float64     `json:"upload_mbps"`
-	PingGateway  float64     `json:"ping_gateway"`
-	SystemInfo   *SystemInfo `json:"system_info,omitempty"`
-	SwitchInfo   *SwitchInfo `json:"switch_info,omitempty"`
+	NodeID         string                 `json:"node_id"`
+	Location       string                 `json:"location"`
+	Timestamp      time.Time              `json:"timestamp"`
+	DownloadMbps   float64                `json:"download_mbps"`
+	UploadMbps     float64                `json:"upload_mbps"`
+	PingGateway    float64                `json:"ping_gateway"`
+	ProfileVersion string                 `json:"profile_version,omitempty"`
+	Metrics        map[string]interface{} `json:"metrics,omitempty"`
+	SystemInfo     *SystemInfo            `json:"system_info,omitempty"`
+	SwitchInfo     *SwitchInfo            `json:"switch_info,omitempty"`
 }
 
 // NodeSummaryCard resume a última leitura de cada nó para os cards do dashboard
 type NodeSummaryCard struct {
-	NodeID          string      `json:"node_id"`
-	Location        string      `json:"location"`
-	LastSeen        time.Time   `json:"last_seen"`
-	LastDownload    float64     `json:"last_download"`
-	LastUpload      float64     `json:"last_upload"`
-	LastPing        float64     `json:"last_ping"`
-	IsHealthy       bool        `json:"is_healthy"`
-	TotalReadings24 int         `json:"total_readings_24h"`
-	SystemInfo      *SystemInfo `json:"system_info,omitempty"`
-	SwitchInfo      *SwitchInfo `json:"switch_info,omitempty"`
+	NodeID          string                 `json:"node_id"`
+	Location        string                 `json:"location"`
+	LastSeen        time.Time              `json:"last_seen"`
+	LastDownload    float64                `json:"last_download"`
+	LastUpload      float64                `json:"last_upload"`
+	LastPing        float64                `json:"last_ping"`
+	ProfileVersion  string                 `json:"profile_version,omitempty"`
+	Metrics         map[string]interface{} `json:"metrics,omitempty"`
+	IsHealthy       bool                   `json:"is_healthy"`
+	TotalReadings24 int                    `json:"total_readings_24h"`
+	SystemInfo      *SystemInfo            `json:"system_info,omitempty"`
+	SwitchInfo      *SwitchInfo            `json:"switch_info,omitempty"`
 }
 
 // DashboardResponse resposta agregada do endpoint GET /api/v1/dashboard/metrics

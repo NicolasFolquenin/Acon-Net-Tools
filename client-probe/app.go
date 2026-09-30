@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -17,20 +18,23 @@ type App struct {
 	cancelWorker context.CancelFunc
 	storage      *StorageService
 	probe        *NetworkProbe
+	profileMgr   *ProfileManager
 	isRunning    bool
 	statusText   string
+	activeTask   string
 	lastRun      *time.Time
 	nextRun      *time.Time
-	lastMetric    *LocalMetricRecord
-	currentPC     *SystemInfo
+	lastMetric   *LocalMetricRecord
+	currentPC    *SystemInfo
 	currentSwitch *SwitchInfo
-	mu            sync.Mutex
+	mu           sync.Mutex
 }
 
 // NewApp cria uma nova instância de App
 func NewApp() *App {
 	return &App{
 		probe:      NewNetworkProbe(),
+		profileMgr: NewProfileManager(),
 		statusText: "Inicializando sonda...",
 	}
 }
@@ -139,6 +143,17 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}()
 
+	// Busca o perfil de medição mais recente do servidor central em segundo plano
+	go func() {
+		fetchCtx, cancelFetch := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelFetch()
+		hostInfo := a.getHostBootstrapInfo()
+		if prof, err := a.profileMgr.FetchRemoteProfileForHost(fetchCtx, cfg.ServerURL, cfg.APIToken, hostInfo); err == nil {
+			log.Printf("[APP] Perfil dinâmico carregado do servidor para %s: versão %s (%d testes)", hostInfo.Hostname, prof.Version, len(prof.Tests))
+			a.emitStatus()
+		}
+	}()
+
 	log.Println("[APP] Probe inicializada com sucesso e pronta para operacao.")
 }
 
@@ -234,6 +249,7 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 	defer func() {
 		a.mu.Lock()
 		a.isRunning = false
+		a.activeTask = ""
 		cfg := GetCurrentConfig()
 		if cfg.IsCentralSynced() {
 			a.statusText = "Sincronizado com o servidor central"
@@ -247,11 +263,25 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 
 	cfg := GetCurrentConfig()
 
-	// 1. Executa medição de rede (Ping, Download, Upload)
-	measureCtx, cancelMeasure := context.WithTimeout(context.Background(), 60*time.Second)
+	// 1. Tenta atualizar o perfil de testes antes de executar se o servidor estiver acessível
+	fetchCtx, cancelFetch := context.WithTimeout(context.Background(), 5*time.Second)
+	hostInfo := a.getHostBootstrapInfo()
+	_, _ = a.profileMgr.FetchRemoteProfileForHost(fetchCtx, cfg.ServerURL, cfg.APIToken, hostInfo)
+	cancelFetch()
+
+	activeProfile := a.profileMgr.GetActiveProfile()
+
+	// 2. Executa a bateria de medições dinâmicas definidas no perfil
+	measureCtx, cancelMeasure := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancelMeasure()
 
-	payload, err := a.probe.MeasureAll(measureCtx, cfg, a.currentSwitch)
+	payload, err := a.probe.RunProfile(measureCtx, activeProfile, cfg, a.currentSwitch, func(taskName string) {
+		a.mu.Lock()
+		a.activeTask = taskName
+		a.statusText = fmt.Sprintf("Executando: %s...", taskName)
+		a.mu.Unlock()
+		a.emitStatus()
+	})
 	if err != nil {
 		log.Printf("[APP] Erro na medicao: %v", err)
 		return nil, err
@@ -352,6 +382,7 @@ func (a *App) GetStatus() ProbeStatus {
 	return ProbeStatus{
 		IsRunning:       a.isRunning,
 		StatusText:      statusText,
+		ActiveTask:      a.activeTask,
 		LastRun:         a.lastRun,
 		NextRun:         a.nextRun,
 		LastMetric:      a.lastMetric,
@@ -360,8 +391,33 @@ func (a *App) GetStatus() ProbeStatus {
 		TotalPending:    pendingCount,
 		CurrentPC:       a.currentPC,
 		CurrentSwitch:   a.currentSwitch,
+		CurrentProfile:  a.profileMgr.GetActiveProfile(),
 		SyncWithCentral: isSynced,
 	}
+}
+
+// GetActiveProfile expõe o perfil de medição ativo para a interface Wails
+func (a *App) GetActiveProfile() *MeasurementProfile {
+	if a.profileMgr == nil {
+		return nil
+	}
+	return a.profileMgr.GetActiveProfile()
+}
+
+// RefreshProfile força a busca do perfil mais recente junto ao Servidor Central
+func (a *App) RefreshProfile() (*MeasurementProfile, error) {
+	if a.profileMgr == nil {
+		return nil, fmt.Errorf("profile manager não inicializado")
+	}
+	cfg := GetCurrentConfig()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	hostInfo := a.getHostBootstrapInfo()
+	prof, err := a.profileMgr.FetchRemoteProfileForHost(ctx, cfg.ServerURL, cfg.APIToken, hostInfo)
+	if err == nil {
+		a.emitStatus()
+	}
+	return prof, err
 }
 
 // GetConfig expõe a configuração para a UI
@@ -398,3 +454,29 @@ func (a *App) emitStatus() {
 		runtime.EventsEmit(a.ctx, "status_updated", a.GetStatus())
 	}
 }
+
+// getHostBootstrapInfo coleta os dados locais do host e switch para identificação e auto-registro
+func (a *App) getHostBootstrapInfo() HostBootstrapInfo {
+	sys := CollectSystemInfo()
+	hostname := sys.Hostname
+	if hostname == "" {
+		hostname, _ = os.Hostname()
+	}
+	info := HostBootstrapInfo{
+		Hostname:   hostname,
+		IPAddress:  sys.IPAddress,
+		MACAddress: sys.MACAddress,
+	}
+
+	a.mu.Lock()
+	sw := a.currentSwitch
+	a.mu.Unlock()
+
+	if sw != nil {
+		info.VLAN = sw.VLAN
+		info.SwitchName = sw.SwitchName
+		info.SwitchPort = sw.SwitchPort
+	}
+	return info
+}
+
