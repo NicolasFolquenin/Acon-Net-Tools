@@ -25,6 +25,7 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-super-secret-session-key-change-in-prod-2026}
     volumes:
       - ./public:/app/public:ro
+      - ./config:/app/config
     depends_on:
       mongo:
         condition: service_healthy
