@@ -118,13 +118,11 @@ func LoadConfig(customPath string) (*Config, error) {
 		cfg.SyncWithCentral = true
 	}
 
-	// Fallbacks finais caso nem config.json nem .env tenham preenchido
-	if cfg.NodeID == "" {
-		if hostname, _ := os.Hostname(); hostname != "" {
-			cfg.NodeID = hostname
-		} else {
-			cfg.NodeID = "meu-pc-windows"
-		}
+	// 3. Força ESTRITAMENTE o Hostname real do SO como NodeID (não pode mais ser alterado)
+	if hostname, errHost := os.Hostname(); errHost == nil && strings.TrimSpace(hostname) != "" {
+		cfg.NodeID = strings.TrimSpace(hostname)
+	} else if cfg.NodeID == "" {
+		cfg.NodeID = "pc-windows"
 	}
 	if cfg.Location == "" {
 		cfg.Location = "Escritorio-Local"
@@ -176,6 +174,11 @@ func GetCurrentConfig() Config {
 func SaveConfig(cfg Config) error {
 	configMu.Lock()
 	defer configMu.Unlock()
+
+	// Preserva estritamente o hostname real da máquina (NodeID não pode ser alterado)
+	if hostname, errHost := os.Hostname(); errHost == nil && strings.TrimSpace(hostname) != "" {
+		cfg.NodeID = strings.TrimSpace(hostname)
+	}
 
 	// 1. Atualiza config.json
 	data, err := json.MarshalIndent(cfg, "", "  ")

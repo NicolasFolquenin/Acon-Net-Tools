@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Documentação Técnica: LLDP e PSDiscoveryProtocol no Polling App</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 14mm 14mm 16mm 14mm;
+      @bottom-right {
+        content: counter(page) " / " counter(pages);
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        font-size: 8pt;
+        color: #64748b;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1e293b;
+      background-color: #ffffff;
+      line-height: 1.55;
+      font-size: 9.5pt;
+    }
+
+    /* Print & Break Controls */
+    .page-break {
+      page-break-before: always;
+      break-before: page;
+    }
+
+    .no-break {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    /* Cover / Header */
+    .header-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0369a1 100%);
+      color: #ffffff;
+      padding: 26px 28px;
+      border-radius: 10px;
+      margin-bottom: 22px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    }
+
+    .header-tag {
+      display: inline-block;
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 8pt;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .header-title {
+      font-size: 20pt;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 8px;
+      color: #f8fafc;
+    }
+
+    .header-subtitle {
+      font-size: 10.5pt;
+      color: #94a3b8;
+      font-weight: 400;
+      max-width: 680px;
+    }
+
+    .header-meta {
+      display: flex;
+      gap: 20px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 8pt;
+      color: #cbd5e1;
+    }
+
+    .header-meta span strong {
+      color: #38bdf8;
+    }
+
+    /* Typography */
+    h1, h2, h3, h4 {
+      color: #0f172a;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    h2 {
+      font-size: 13.5pt;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 5px;
+      margin-top: 18px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h2 .num {
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 9pt;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 800;
+    }
+
+    h3 {
+      font-size: 11pt;
+      margin-top: 12px;
+      margin-bottom: 6px;
+      color: #1e293b;
+    }
+
+    p {
+      margin-bottom: 8px;
+      text-align: justify;
+    }
+
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 10px;
+    }
+
+    li {
+      margin-bottom: 4px;
+    }
+
+    /* Cards & Boxes */
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+    }
+
+    .card-accent {
+      border-left: 4px solid #0284c7;
+    }
+
+    .callout {
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin: 10px 0;
+      font-size: 9pt;
+    }
+
+    .callout-info {
+      background: #f0f9ff;
+      border-left: 4px solid #0284c7;
+      color: #0369a1;
+    }
+
+    .callout-warning {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      color: #92400e;
+    }
+
+    .callout-success {
+      background: #f0fdf4;
+      border-left: 4px solid #16a34a;
+      color: #166534;
+    }
+
+    .callout-danger {
+      background: #fef2f2;
+      border-left: 4px solid #dc2626;
+      color: #991b1b;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      margin-bottom: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px 0;
+      font-size: 8.5pt;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 6px 9px;
+      text-align: left;
+    }
+
+    th {
+      background: #0f172a;
+      color: #f8fafc;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    /* Code Blocks */
+    pre {
+      background: #0f172a;
+      color: #f1f5f9;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
+      font-size: 8pt;
+      line-height: 1.4;
+      overflow-x: hidden;
+      margin: 8px 0 12px 0;
+      border: 1px solid #1e293b;
+    }
+
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
+      font-size: 8.5pt;
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .code-keyword { color: #f472b6; font-weight: 600; }
+    .code-func { color: #60a5fa; }
+    .code-str { color: #a7f3d0; }
+    .code-comment { color: #94a3b8; font-style: italic; }
+    .code-var { color: #fde047; }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      font-size: 7.5pt;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .badge-blue { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .badge-green { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-purple { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+    .badge-amber { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+
+    /* Architecture Diagram */
+    .diagram-container {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 12px 0;
+      color: #fff;
+    }
+
+    .diagram-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 10px 0;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin: 10px 0;
+    }
+
+    .stat-box {
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #e2e8f0;
+    }
+
+    .stat-val {
+      font-size: 15pt;
+      font-weight: 800;
+      color: #0284c7;
+    }
+
+    .stat-label {
+      font-size: 7.5pt;
+      color: #64748b;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .footer-doc {
+      margin-top: 25px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      color: #94a3b8;
+      font-size: 7.5pt;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BANNER / CAPA -->
+  <div class="header-banner">
+    <div class="header-tag">Whitepaper de Engenharia de Redes & Telemetria</div>
+    <div class="header-title">Descoberta L2 com LLDP & PSDiscoveryProtocol</div>
+    <div class="header-subtitle">
+      Arquitetura, funcionamento em baixo nível, algoritmo de captura e filtragem de switches corporativos no ecossistema Polling App (Client-Probe & Central Server).
+    </div>
+    <div class="header-meta">
+      <span><strong>Componente:</strong> Client-Probe (Go / Wails) & Server</span>
+      <span><strong>Protocolo Base:</strong> IEEE 802.1AB & Cisco CDP</span>
+      <span><strong>Mecanismo de Captura:</strong> PSDiscoveryProtocol / Npcap / PktMon</span>
+      <span><strong>Data:</strong> Setembro / 2026</span>
+    </div>
+  </div>
+
+  <!-- SEÇÃO 1: INTRODUÇÃO E CONCEITO -->
+  <div class="no-break">
+    <h2><span class="num">1</span> Visão Geral: O Que é LLDP e Qual Seu Propósito?</h2>
+    <p>
+      O <strong>LLDP (Link Layer Discovery Protocol)</strong>, padronizado pelo <strong>IEEE 802.1AB</strong>, é um protocolo de descoberta de vizinhança que atua na <strong>Camada de Enlace (Camada 2 do Modelo OSI)</strong>. Ele permite que dispositivos de rede (switches, roteadores, firewalls, telefones IP e servidores) anunciem periodicamente suas identidades, capacidades operacionais e detalhes da porta física aos seus vizinhos diretamente conectados.
+    </p>
+    <p>
+      Ao contrário de protocolos roteados ou de camada superior (como SNMP, ICMP ou HTTP), o LLDP não depende de endereçamento IP configurado nem de credenciais de login. Ele opera de forma estritamente <strong>unidirecional e passiva</strong>: o switch transmite anúncios em broadcast/multicast Layer 2 sem exigir handshake ou resposta da ponta receptora.
+    </p>
+  </div>
+
+  <div class="grid-2 no-break">
+    <div class="card card-accent">
+      <h3 style="color:#0284c7; margin-top:0;">Estrutura do Frame LLDP</h3>
+      <ul style="margin-left: 15px; margin-bottom: 0;">
+        <li><strong>EtherType:</strong> <code>0x88CC</code></li>
+        <li><strong>Endereços MAC Multicast Destino:</strong>
+          <br>• <code>01:80:C2:00:00:0E</code> (Nearest Bridge)
+          <br>• <code>01:80:C2:00:00:03</code> (Nearest Non-TPMR)
+          <br>• <code>01:80:C2:00:00:00</code> (Nearest Customer)
+        </li>
+        <li><strong>Intervalo Típico de Transmissão:</strong> 30 a 60 segundos.</li>
+        <li><strong>Encapsulamento:</strong> TLV (Type-Length-Value).</li>
+      </ul>
+    </div>
+    <div class="card card-accent">
+      <h3 style="color:#0284c7; margin-top:0;">O Equivalente Cisco: CDP</h3>
+      <ul style="margin-left: 15px; margin-bottom: 0;">
+        <li><strong>Protocolo:</strong> Cisco Discovery Protocol (CDP).</li>
+        <li><strong>EtherType / SNAP:</strong> <code>0x2000</code>.</li>
+        <li><strong>MAC Destino:</strong> <code>01:00:0C:CC:CC:CC</code>.</li>
+        <li><strong>Objetivo:</strong> Proprietário Cisco com finalidade idêntica ao LLDP (mapeamento de portas, VLANs de voz e switches).</li>
+        <li><strong>Tratamento na Probe:</strong> A sonda trata frames LLDP e CDP de forma unificada.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="no-break">
+    <h3>Estrutura TLV (Type-Length-Value) Obrigatória e Opcional</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 15%;">Tipo TLV</th>
+          <th style="width: 25%;">Nome</th>
+          <th style="width: 35%;">Informação Extraída pelo Polling App</th>
+          <th style="width: 25%;">Campo no Payload JSON</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>TLV 1</strong></td>
+          <td>Chassis ID</td>
+          <td>MAC ou Hostname do chassi do Switch</td>
+          <td><code>switch_name</code></td>
+        </tr>
+        <tr>
+          <td><strong>TLV 2</strong></td>
+          <td>Port ID</td>
+          <td>Identificador da interface física (ex: GE1/0/24, Gi0/1)</td>
+          <td><code>switch_port</code></td>
+        </tr>
+        <tr>
+          <td><strong>TLV 3</strong></td>
+          <td>Time To Live (TTL)</td>
+          <td>Tempo de expiração da informação (ex: 120s)</td>
+          <td>Utilizado internamente</td>
+        </tr>
+        <tr>
+          <td><strong>TLV 4</strong></td>
+          <td>Port Description</td>
+          <td>Descrição administrativa ou nome do link</td>
+          <td><code>switch_model</code> / Descrição</td>
+        </tr>
+        <tr>
+          <td><strong>TLV 5</strong></td>
+          <td>System Name</td>
+          <td>Hostname do Switch (ex: SW-CORE-FLOOR2)</td>
+          <td><code>switch_name</code></td>
+        </tr>
+        <tr>
+          <td><strong>TLV 6</strong></td>
+          <td>System Description</td>
+          <td>Modelo de hardware e versão do SO (ex: Huawei V200R021)</td>
+          <td><code>switch_model</code> (normalizado)</td>
+        </tr>
+        <tr>
+          <td><strong>TLV 127</strong></td>
+          <td>Org-Specific (802.1)</td>
+          <td>Port VLAN ID (PVID) da interface</td>
+          <td><code>vlan</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SEÇÃO 2: O QUE É O PSDISCOVERYPROTOCOL -->
+  <div class="no-break">
+    <h2><span class="num">2</span> O Que é o PSDiscoveryProtocol e Como Ele Funciona no Windows?</h2>
+    <p>
+      O sistema operacional Windows para estações de trabalho (Windows 10 e 11) <strong>não expõe nativamente</strong> APIs de usuário simples para ler frames LLDP/CDP de switches. O recurso nativo <code>MSFT_NetLldpAgent</code> só existe com DCB (Data Center Bridging) ativado no Windows Server e quase sempre está inativo ou inacessível em desktops padrão.
+    </p>
+    <p>
+      O <strong>PSDiscoveryProtocol</strong> é um módulo especializado de automação PowerShell (criado pela comunidade de engenharia de redes) projetado para resolver exatamente este gargalo. Ele atua capturando pacotes brutos diretamente da placa de rede ativa durante uma janela de tempo e decodificando os bytes binários das PDUs LLDP e CDP.
+    </p>
+  </div>
+
+  <div class="diagram-container no-break">
+    <div style="font-size: 8.5pt; font-weight: bold; color: #38bdf8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+      Diagrama de Fluxo Físico e Decodificação de Frames
+    </div>
+    <svg class="diagram-svg" viewBox="0 0 850 180" xmlns="http://www.w3.org/2000/svg">
+      <!-- Switch -->
+      <rect x="10" y="40" width="150" height="90" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+      <text x="85" y="70" fill="#38bdf8" font-size="11" font-weight="bold" text-anchor="middle">Switch Corporativo</text>
+      <text x="85" y="90" fill="#94a3b8" font-size="9" text-anchor="middle">Huawei / Cisco / Aruba</text>
+      <text x="85" y="110" fill="#64748b" font-size="8" text-anchor="middle">Transmite a cada 30s</text>
+
+      <!-- Frame in wire -->
+      <line x1="160" y1="85" x2="250" y2="85" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4"/>
+      <rect x="175" y="65" width="60" height="20" rx="4" fill="#0284c7"/>
+      <text x="205" y="79" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">LLDP 0x88CC</text>
+
+      <!-- VoIP Phone (Passthrough) -->
+      <rect x="250" y="40" width="130" height="90" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="315" y="68" fill="#fbbf24" font-size="10" font-weight="bold" text-anchor="middle">Telefone VoIP (SEP)</text>
+      <text x="315" y="85" fill="#94a3b8" font-size="8" text-anchor="middle">Switch 2 Portas</text>
+      <text x="315" y="105" fill="#ef4444" font-size="7.5" font-weight="bold" text-anchor="middle">[FILTRADO PELA PROBE]</text>
+
+      <!-- Wire to PC -->
+      <line x1="380" y1="85" x2="450" y2="85" stroke="#38bdf8" stroke-width="2"/>
+
+      <!-- Windows NIC / OS Kernel -->
+      <rect x="450" y="30" width="170" height="110" rx="8" fill="#1e293b" stroke="#60a5fa" stroke-width="2"/>
+      <text x="535" y="55" fill="#93c5fd" font-size="10" font-weight="bold" text-anchor="middle">Windows OS / NIC</text>
+      <text x="535" y="75" fill="#cbd5e1" font-size="8.5" text-anchor="middle">PktMon / Npcap Driver</text>
+      <text x="535" y="95" fill="#38bdf8" font-size="8" text-anchor="middle">PSDiscoveryProtocol</text>
+      <text x="535" y="115" fill="#a7f3d0" font-size="7.5" text-anchor="middle">Invoke-DiscoveryProtocolCapture</text>
+
+      <!-- Arrow to Go App -->
+      <line x1="620" y1="85" x2="680" y2="85" stroke="#10b981" stroke-width="3"/>
+      <polygon points="680,80 690,85 680,90" fill="#10b981"/>
+
+      <!-- Client-Probe (Go) -->
+      <rect x="690" y="35" width="150" height="100" rx="8" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+      <text x="765" y="62" fill="#6ee7b7" font-size="10.5" font-weight="bold" text-anchor="middle">Client-Probe (Go)</text>
+      <text x="765" y="80" fill="#ffffff" font-size="8" text-anchor="middle">Filtragem Heurística</text>
+      <text x="765" y="98" fill="#ffffff" font-size="8" text-anchor="middle">Normalização Huawei</text>
+      <text x="765" y="116" fill="#a7f3d0" font-size="7.5" text-anchor="middle">Cache Local SQLite</text>
+    </svg>
+  </div>
+
+  <div class="grid-3 no-break">
+    <div class="stat-box">
+      <div class="stat-val">35s</div>
+      <div class="stat-label">Janela de Escuta (Sniffing)</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val">0x88CC</div>
+      <div class="stat-label">EtherType LLDP IEEE</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val">0x2000</div>
+      <div class="stat-label">EtherType CDP Cisco</div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO 3: IMPLEMENTAÇÃO NO POLLING APP -->
+  <div class="page-break"></div>
+
+  <div class="no-break">
+    <h2><span class="num">3</span> A Implementação do LLDP no Código do Polling App</h2>
+    <p>
+      No Polling App, a lógica de descoberta de switch é centralizada no arquivo <code>client-probe/lldp.go</code> através da função <code>DiscoverSwitchLLDP(ctx context.Context) SwitchInfo</code>. O sistema foi desenvolvido com resiliência total para rodar em estações Windows corporativas heterogêneas sem intervenção manual do usuário.
+    </p>
+  </div>
+
+  <div class="no-break">
+    <h3>A. Autoinstalação e Resiliência do Módulo PowerShell</h3>
+    <p>
+      Se o agente estiver rodando em uma máquina nova onde o <code>PSDiscoveryProtocol</code> ainda não foi instalado, o próprio script em runtime realiza o provisionamento sem interromper a execução:
+    </p>
+    <pre><code><span class="code-comment"># 1. Garante que o módulo PSDiscoveryProtocol esteja disponível (instala automaticamente)</span>
+<span class="code-keyword">if</span> (-not (Get-Module -ListAvailable -Name PSDiscoveryProtocol)) {
+    <span class="code-keyword">try</span> {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+        Install-Module -Name PSDiscoveryProtocol -Scope CurrentUser -Force -SkipPublisherCheck -AllowClobber | Out-Null
+    } <span class="code-keyword">catch</span> {}
+}</code></pre>
+    <div class="callout callout-info">
+      <div class="callout-title">Resiliência Operacional</div>
+      O parâmetro <code>-Scope CurrentUser</code> dispensa elevação administrativa para baixar o módulo do repositório PSGallery. A definição de <code>ExecutionPolicy Bypass</code> no escopo <code>Process</code> assegura que políticas restritivas do PowerShell local não bloqueiem a execução do script.
+    </div>
+  </div>
+
+  <div class="no-break">
+    <h3>B. Captura Passiva de Tráfego L2</h3>
+    <p>
+      Com o módulo carregado, a sonda chama <code>Invoke-DiscoveryProtocolCapture</code> por 35 segundos. Como switches corporativos transmitem anúncios a cada 30 segundos, uma janela de 35s garante com altíssima probabilidade a captura de pelo menos um frame completo:
+    </p>
+    <pre><code>$capture = <span class="code-func">Invoke-DiscoveryProtocolCapture</span> -Duration 35 -Force
+$rawList = $capture | <span class="code-func">Get-DiscoveryProtocolData</span></code></pre>
+  </div>
+
+  <div class="no-break">
+    <h3>C. Algoritmo Crítico: Filtragem Anti-Falso Positivo de Telefones VoIP</h3>
+    <p>
+      Em redes corporativas, é comum que computadores estejam conectados na porta <em>PC Port</em> de um telefone VoIP (Cisco CP-78xx/88xx), que por sua vez se conecta à tomada de parede do switch. Como o telefone IP também anuncia CDP/LLDP na interface do PC com nomes de dispositivo como <code>SEP001122334455</code> (Skinny Client Control Protocol com MAC do telefone), uma leitura ingênua identificaria o telefone como se fosse o switch de borda.
+    </p>
+    <p>
+      O Polling App implementou uma <strong>filtragem estrita e inteligente</strong> para eliminar esse ruído:
+    </p>
+    <pre><code><span class="code-comment"># Filtra ESTRITAMENTE apenas SWITCHES de rede reais, descartando telefones VoIP</span>
+$realSwitches = @($rawList) | Where-Object {
+    $dev = <span class="code-keyword">if</span> ($_.Device) { [string]$_.Device } <span class="code-keyword">elseif</span> ($_.SysName) { [string]$_.SysName } <span class="code-keyword">else</span> { <span class="code-str">""</span> }
+    $model = <span class="code-keyword">if</span> ($_.Model) { [string]$_.Model } <span class="code-keyword">elseif</span> ($_.Type) { [string]$_.Type } <span class="code-keyword">else</span> { <span class="code-str">""</span> }
+    
+    <span class="code-comment"># Descarte expresso de identificadores SEP e modelos telefônicos</span>
+    $dev -notmatch <span class="code-str">'^SEP[0-9A-Fa-f]{12}'</span> -and $model -notmatch <span class="code-str">'Phone|Telefone|VoIP'</span>
+}</code></pre>
+  </div>
+
+  <div class="no-break">
+    <h3>D. Sistema de Pontuação Heurística (Heuristic Scoring)</h3>
+    <p>
+      Caso múltiplos dispositivos transmitam frames LLDP válidos, a sonda executa uma ordenação baseada em pontuação ponderada para eleger o switch mais provável:
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Critério de Avaliação</th>
+          <th>Expressão / Condição</th>
+          <th>Pontos</th>
+          <th>Motivo Técnico</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>VLAN Corporativa</strong></td>
+          <td><code>$vlan -gt 0</code></td>
+          <td><span class="badge badge-green">+50 pts</span></td>
+          <td>Switches gerenciáveis anunciam a VLAN da porta do usuário (802.1Q).</td>
+        </tr>
+        <tr>
+          <td><strong>Padrão de Porta Enterprise</strong></td>
+          <td><code>Port -match '^(GE|Gi|Fa|Te|Eth|Gigabit|Port-channel)'</code></td>
+          <td><span class="badge badge-blue">+30 pts</span></td>
+          <td>Nomenclatura típica de portas físicas em switches de acesso empresariais.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="no-break">
+    <h3>E. Normalização e Reconhecimento de Modelos Corporativos</h3>
+    <p>
+      Identificadores brutos de switches Huawei (ex: <code>S5735-L24T4S-A-V2</code>) são normalizados antes do envio ao servidor central, garantindo dashboards limpos e legíveis:
+    </p>
+    <pre><code><span class="code-keyword">if</span> ($swModel -match <span class="code-str">'S5735-[A-Za-z0-9\-]+'</span>) {
+    $swModel = <span class="code-str">"Huawei CloudEngine "</span> + $Matches[0]
+} <span class="code-keyword">elseif</span> ($swModel -match <span class="code-str">'Huawei|CloudEngine'</span> -and $swModel -notmatch <span class="code-str">'CloudEngine'</span>) {
+    $swModel = <span class="code-str">"Huawei "</span> + $swModel
+}</code></pre>
+  </div>
+
+  <!-- SEÇÃO 4: CICLO DE VIDA, CACHE E PERFORMANCE -->
+  <div class="page-break"></div>
+
+  <div class="no-break">
+    <h2><span class="num">4</span> Ciclo de Vida da Descoberta, Caching e Otimização</h2>
+    <p>
+      Executar uma captura de pacotes de 35 segundos em toda medição de rede seria inviável, pois atrasaria os testes de velocidade (Download/Upload/Ping) e consumiria recursos desnecessários de CPU. O Polling App adota uma estratégia de <strong>descoberta em segundo plano com persistência em cache</strong>.
+    </p>
+  </div>
+
+  <div class="no-break">
+    <h3>Fluxo de Descoberta no Startup da Aplicação (`app.go`)</h3>
+    <p>
+      Ao iniciar o Client-Probe (Go + Wails), uma goroutine em background é disparada imediatamente, executando até 3 ciclos de busca progressivos:
+    </p>
+    <ol>
+      <li><strong>Tentativa 1 (75 segundos):</strong> Timeout estendido para acomodar possíveis atrasos no timer do switch ou instalação inicial do módulo PowerShell.</li>
+      <li><strong>Tentativas 2 e 3 (50 segundos cada):</strong> Repetição caso a porta ainda estivesse negociando ou o switch estivesse em janela entre beacons.</li>
+      <li><strong>Parada Imediata:</strong> Assim que um switch real é detectado (<code>sw.IsRealSwitch() == true</code>), o loop é interrompido com sucesso e o status é emitido em tempo real para a interface gráfica (Wails).</li>
+    </ol>
+  </div>
+
+  <div class="no-break">
+    <h3>Estratégia de Cache e Persistência SQLite (`storage.go` & `probe.go`)</h3>
+    <div class="card card-accent">
+      <ul style="margin-left: 15px; margin-bottom: 0;">
+        <li><strong>Persistência em Disco:</strong> Toda medição que inclui informações de switch é armazenada na tabela local SQLite.</li>
+        <li><strong>Reaproveitamento nas Medições Periódicas:</strong> Na execução da rotina <code>MeasureAll(ctx, cfg, knownSwitch)</code>, se o switch já for conhecido e for um switch real (<code>knownSwitch.IsRealSwitch() == true</code>), a sonda <strong>não roda</strong> o PowerShell novamente, economizando 35 segundos e entregando o teste de velocidade instantaneamente.</li>
+        <li><strong>Fallback Histórico no Boot:</strong> Se o app for reiniciado sem rede ou antes do primeiro frame LLDP chegar, o método <code>storage.GetLastValidSwitchInfo()</code> recupera o último switch corporativo válido registrado no banco de dados local.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="no-break">
+    <h2><span class="num">5</span> Visualização e Consumo: Frontend e Servidor Central</h2>
+    <p>
+      As informações extraídas pelo LLDP são sincronizadas ponta a ponta e exibidas em dois níveis:
+    </p>
+  </div>
+
+  <div class="grid-2 no-break">
+    <div class="card">
+      <h3 style="color:#0284c7; margin-top:0;">Interface Local (Client-Probe)</h3>
+      <p style="font-size: 8.5pt;">
+        No card <strong>"Conexão de Switch (LLDP)"</strong> da interface Wails da máquina do usuário:
+      </p>
+      <ul style="font-size: 8.5pt; margin-left: 15px;">
+        <li><strong>Switch:</strong> Ex: <code>SW-DIST-A-ANDAR2</code></li>
+        <li><strong>Porta:</strong> Ex: <code>GigabitEthernet0/0/14</code></li>
+        <li><strong>VLAN:</strong> Ex: <code>VLAN 100</code></li>
+        <li><strong>Modelo:</strong> Ex: <code>Huawei CloudEngine S5735</code></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:#0284c7; margin-top:0;">Dashboard Central (Central-Server)</h3>
+      <p style="font-size: 8.5pt;">
+        Ingerido via endpoint <code>POST /api/metrics</code> e salvo no MongoDB:
+      </p>
+      <ul style="font-size: 8.5pt; margin-left: 15px;">
+        <li>Identificação imediata da porta física e switch de cada nó corporativo.</li>
+        <li>Detecção automática de computadores trocados de mesa ou porta.</li>
+        <li>Correlação entre quedas de performance e portas de switch com erro de CRC ou limitação de negociação (100Mbps vs 1Gbps).</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SEÇÃO 6: MATRIZ DE DIAGNÓSTICO E TROUBLESHOOTING -->
+  <div class="no-break">
+    <h2><span class="num">6</span> Guia de Diagnóstico e Resolução de Problemas (Troubleshooting)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25%;">Sintoma Observado</th>
+          <th style="width: 35%;">Causa Raiz Mais Provável</th>
+          <th style="width: 40%;">Ação Corretiva Recomendada</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-amber">"Aguardando frame LLDP..."</span> contínuo</td>
+          <td>O switch conectado não está com LLDP ativado ou a interface está em um switch não gerenciável (dumb switch).</td>
+          <td>
+            No switch de acesso, habilitar LLDP:
+            <br>• Huawei: <code>lldp enable</code>
+            <br>• Cisco: <code>lldp run</code> ou <code>cdp run</code>
+            <br>• Aruba: <code>lldp run</code>
+          </td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-amber">Dispositivo Conectado via Wi-Fi</span></td>
+          <td>Access Points Wi-Fi em geral não encaminham frames LLDP de switches cabeadas via rádio 802.11.</td>
+          <td>Comportamento esperado em redes sem fio. A probe entra em fallback seguro e mantém as medições de IP e velocidade normais.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-purple">Permissão PowerShell</span></td>
+          <td>Política de execução restrita por GPO de domínio impedindo execução de scripts.</td>
+          <td>O código utiliza <code>-ExecutionPolicy Bypass</code> no processo da probe. Caso bloqueado por AppLocker/WDAC, homologar o binário da probe.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-blue">Aparece Telefone IP em vez do Switch</span></td>
+          <td>Telefone IP corporativo com formato de nome fora do padrão SEP usual.</td>
+          <td>O regex no <code>lldp.go</code> já exclui <code>^SEP[0-9A-Fa-f]{12}</code> e modelos com <code>Phone|VoIP</code>. Se surgir novo modelo, adicionar o padrão ao filtro.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer-doc no-break">
+    <span>Polling App &copy; 2026 - Documento de Engenharia de Redes & Telemetria</span>
+    <span>Confidencial &bull; Uso Interno</span>
+  </div>
+
+</body>
+</html>
