@@ -22,13 +22,23 @@
         </div>
       </div>
 
+      <!-- Abas Principais de Navegação -->
+      <nav class="nav-tabs" id="main-nav-tabs">
+        <button id="tab-dashboard" class="nav-tab-btn active" onclick="switchView('dashboard')">
+          Dashboard
+        </button>
+        <button id="tab-groups" class="nav-tab-btn" onclick="switchView('groups')" style="display: none;">
+          Grupos & VLANs
+        </button>
+      </nav>
+
       <div class="nav-controls">
         <!-- Node Selector -->
         <div class="control-group">
           <label for="select-node" class="control-label">Filtrar Sonda:</label>
           <div class="select-wrapper">
             <select id="select-node" class="select-custom">
-              <option value="all">⚡ Todos os Nós (Consolidado)</option>
+              <option value="all">Todos os Nós (Consolidado)</option>
             </select>
           </div>
         </div>
@@ -69,7 +79,7 @@
         <!-- User Profile & Logout -->
         <div id="user-nav-box" class="user-nav-box">
           <div class="user-info-chip">
-            <div class="user-avatar" id="user-avatar">👤</div>
+            <div class="user-avatar" id="user-avatar">ADM</div>
             <div class="user-meta">
               <span id="nav-username" class="user-name">Carregando...</span>
               <span id="nav-role-badge" class="role-badge">--</span>
@@ -83,14 +93,6 @@
               <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
             </svg>
             <span>Usuários</span>
-          </button>
-          <button id="btn-open-groups" class="btn btn-glass btn-users-nav" title="Gerenciar Grupos & VLANs (Apenas Administrador)" style="display: none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-              <polyline points="2 17 12 22 22 17"></polyline>
-              <polyline points="2 12 12 17 22 12"></polyline>
-            </svg>
-            <span>Grupos & VLANs</span>
           </button>
           <button id="btn-logout" class="btn btn-logout" title="Encerrar Sessão">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -106,26 +108,76 @@
 
     <!-- Main Container -->
     <main class="dashboard-body" id="main-content">
-      <!-- Section: Data Center Summary Cards -->
-      <section class="section-block">
-        <div class="section-title-row">
-          <div>
-            <h3>Status dos Data Centers & Nós Monitorados</h3>
-            <p class="section-subtitle">Clique sobre o card de um computador para inspecionar configurações de hardware, rede e switch LLDP</p>
+      <!-- VIEW 1: DASHBOARD & TELEMETRIA -->
+      <div id="view-dashboard" class="page-view active">
+        <!-- Section: Data Center Summary List -->
+        <section class="section-block">
+          <div class="section-title-row">
+            <div>
+              <h3>Computadores & Sondas Monitoradas</h3>
+              <p class="section-subtitle">Selecione uma máquina da lista para inspecionar configurações detalhadas de hardware, rede e switch LLDP</p>
+            </div>
+            <div id="nodes-count-badge" class="count-badge">
+              <span id="active-nodes-count">0</span> Sondas Registradas
+            </div>
           </div>
-          <div id="nodes-count-badge" class="count-badge">
-            <span id="active-nodes-count">0</span> Sondas Registradas
-          </div>
-        </div>
 
-        <!-- Grid de Cartões dos Data Centers -->
-        <div id="nodes-summary-grid" class="summary-grid">
-          <div class="card-loading">
-            <div class="spinner"></div>
-            <span>Carregando dados dos computadores...</span>
+          <!-- Barra de Filtragem Rápida -->
+          <div id="nodes-filter-bar" class="filter-bar">
+            <div class="filter-search-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="nodes-search-input" class="filter-input" placeholder="Buscar por computador, local, VLAN, switch ou IP..." />
+            </div>
+
+            <div class="filter-controls-group">
+              <div class="select-wrapper select-sm">
+                <select id="nodes-status-filter" class="select-custom">
+                  <option value="all">Todos os Status</option>
+                  <option value="online">Ativos (1h)</option>
+                  <option value="stale">Sem sinal recente</option>
+                </select>
+              </div>
+
+              <div class="select-wrapper select-sm">
+                <select id="nodes-group-filter" class="select-custom">
+                  <option value="all">Todos os Grupos</option>
+                </select>
+              </div>
+
+              <div class="filter-count-pill" id="nodes-filter-count">
+                Exibindo 0 de 0 sondas
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+
+          <!-- Tabela/Lista Compacta dos Computadores -->
+          <div class="table-container nodes-table-container">
+            <table class="nodes-table" id="nodes-table">
+              <thead>
+                <tr>
+                  <th style="width: 140px;">Status</th>
+                  <th>Computador</th>
+                  <th>Local</th>
+                  <th>Grupo & VLAN</th>
+                  <th>Switch / Porta (LLDP)</th>
+                  <th style="text-align: right;">Download</th>
+                  <th style="text-align: right;">Upload</th>
+                  <th style="text-align: right;">Ping</th>
+                  <th>Último Sync</th>
+                  <th style="text-align: center; width: 110px;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="nodes-table-body">
+                <tr>
+                  <td colspan="10" class="text-center text-muted py-4">Carregando dados dos computadores...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
       <!-- Section: Comparative Charts -->
       <section class="section-block">
@@ -223,6 +275,273 @@
           </table>
         </div>
       </section>
+      </div> <!-- /#view-dashboard -->
+
+      <!-- VIEW 2: GRUPOS & VLANS (PÁGINA DEDICADA) -->
+      <div id="view-groups" class="page-view" style="display: none;">
+        <div class="section-title-row page-header-row">
+          <div>
+            <h3>Gerenciamento de Grupos e Segmentação de Testes</h3>
+            <p class="section-subtitle">Configure quais testes e módulos cada VLAN ou segmento de rede deve executar automaticamente</p>
+          </div>
+          <div>
+            <button type="button" class="btn btn-glass" onclick="switchView('dashboard')">
+              Voltar ao Dashboard
+            </button>
+          </div>
+        </div>
+
+        <div class="groups-page-layout">
+          <!-- Coluna 1: Formulário de Criar / Editar Grupo -->
+          <div class="group-create-card">
+            <div class="card-header-row">
+              <h4 class="card-subtitle" id="group-form-title">Cadastrar Novo Grupo de Testes</h4>
+              <button type="button" id="btn-cancel-edit-group" class="btn btn-glass btn-sm" style="display: none;">Cancelar Edição</button>
+            </div>
+
+            <form id="group-form" class="group-form">
+              <input type="hidden" id="group-id" value="" />
+
+              <div id="group-error-alert" class="login-error-alert" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span id="group-error-text">Erro ao salvar grupo</span>
+              </div>
+
+              <div class="form-row-grid">
+                <div class="form-group">
+                  <label for="group-name">Nome do Grupo *</label>
+                  <input type="text" id="group-name" class="form-input" placeholder="Ex: Administrativo, TI, Lab-01" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="group-vlans">VLANs Associadas (separadas por vírgula)</label>
+                  <input type="text" id="group-vlans" class="form-input" placeholder="Ex: 10, 20, 30" />
+                  <span class="field-hint">Sondas detectadas nessas VLANs receberão estes testes automaticamente</span>
+                </div>
+
+                <div class="form-group">
+                  <label for="group-interval">Intervalo de Teste (minutos)</label>
+                  <input type="number" id="group-interval" class="form-input" value="60" min="5" max="1440" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="group-description">Descrição</label>
+                  <input type="text" id="group-description" class="form-input" placeholder="Ex: Grupo para computadores da reitoria" />
+                </div>
+              </div>
+
+              <!-- Checkbox de Fallback Padrão -->
+              <div class="form-switch-row mb-3">
+                <div class="switch-info">
+                  <span class="switch-title">Grupo Padrão do Sistema (Fallback)</span>
+                  <span class="switch-desc">Aplicado automaticamente para sondas em VLANs não cadastradas ou sem LLDP</span>
+                </div>
+                <label class="toggle-switch" for="group-is-default">
+                  <input type="checkbox" id="group-is-default" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <!-- Grid de Módulos de Testes Configuráveis -->
+              <div class="modules-config-section">
+                <h5 class="modules-section-title">Módulos de Teste e Parâmetros</h5>
+
+                <div class="modules-cards-grid">
+                  <!-- 1. Ping Gateway/Destino -->
+                  <div class="module-item-card">
+                    <div class="module-card-header">
+                      <label class="module-toggle-label">
+                        <input type="checkbox" id="mod-ping-enabled" checked />
+                        <span class="module-name-text">Ping / Latência</span>
+                      </label>
+                    </div>
+                    <div class="module-card-fields">
+                      <div class="form-group form-group-sm">
+                        <label>Alvo / IP</label>
+                        <input type="text" id="mod-ping-target" class="form-input form-input-sm" value="1.1.1.1" />
+                      </div>
+                      <div class="form-group form-group-sm">
+                        <label>Pacotes</label>
+                        <input type="number" id="mod-ping-count" class="form-input form-input-sm" value="4" min="1" max="20" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 2. Perda de Pacotes e Jitter -->
+                  <div class="module-item-card">
+                    <div class="module-card-header">
+                      <label class="module-toggle-label">
+                        <input type="checkbox" id="mod-packetloss-enabled" checked />
+                        <span class="module-name-text">Perda de Pacotes & Jitter</span>
+                      </label>
+                    </div>
+                    <div class="module-card-fields">
+                      <div class="form-group form-group-sm">
+                        <label>Alvo / IP</label>
+                        <input type="text" id="mod-packetloss-target" class="form-input form-input-sm" value="1.1.1.1" />
+                      </div>
+                      <div class="form-group form-group-sm">
+                        <label>Qtd Amostras</label>
+                        <input type="number" id="mod-packetloss-count" class="form-input form-input-sm" value="10" min="5" max="50" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 3. Speedtest Download -->
+                  <div class="module-item-card">
+                    <div class="module-card-header">
+                      <label class="module-toggle-label">
+                        <input type="checkbox" id="mod-download-enabled" checked />
+                        <span class="module-name-text">Teste de Download</span>
+                      </label>
+                    </div>
+                    <div class="module-card-fields">
+                      <div class="form-group form-group-sm">
+                        <label>Tamanho do Payload</label>
+                        <select id="mod-download-bytes" class="form-input form-input-sm">
+                          <option value="5242880">5 MB (Rápido)</option>
+                          <option value="10485760" selected>10 MB (Padrão)</option>
+                          <option value="20971520">20 MB (Completo)</option>
+                          <option value="52428800">50 MB (Intensivo)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 4. Speedtest Upload -->
+                  <div class="module-item-card">
+                    <div class="module-card-header">
+                      <label class="module-toggle-label">
+                        <input type="checkbox" id="mod-upload-enabled" checked />
+                        <span class="module-name-text">Teste de Upload</span>
+                      </label>
+                    </div>
+                    <div class="module-card-fields">
+                      <div class="form-group form-group-sm">
+                        <label>Tamanho do Payload</label>
+                        <select id="mod-upload-bytes" class="form-input form-input-sm">
+                          <option value="2097152">2 MB (Leve)</option>
+                          <option value="5242880" selected>5 MB (Padrão)</option>
+                          <option value="10485760">10 MB (Completo)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 5. Resolução DNS -->
+                  <div class="module-item-card">
+                    <div class="module-card-header">
+                      <label class="module-toggle-label">
+                        <input type="checkbox" id="mod-dns-enabled" checked />
+                        <span class="module-name-text">Resolução DNS</span>
+                      </label>
+                    </div>
+                    <div class="module-card-fields">
+                      <div class="form-group form-group-sm">
+                        <label>Domínios (vírgula)</label>
+                        <input type="text" id="mod-dns-domains" class="form-input form-input-sm" value="google.com, cloudflare.com" placeholder="Ex: google.com, uepg.br" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 6. HTTP Healthcheck -->
+                  <div class="module-item-card">
+                    <div class="module-card-header">
+                      <label class="module-toggle-label">
+                        <input type="checkbox" id="mod-http-enabled" checked />
+                        <span class="module-name-text">HTTP Healthcheck</span>
+                      </label>
+                    </div>
+                    <div class="module-card-fields">
+                      <div class="form-group form-group-sm">
+                        <label>URL Alvo</label>
+                        <input type="text" id="mod-http-url" class="form-input form-input-sm" value="https://www.google.com" placeholder="https://..." />
+                      </div>
+                      <div class="form-group form-group-sm">
+                        <label>Status Esperado</label>
+                        <input type="number" id="mod-http-status" class="form-input form-input-sm" value="200" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 7. Traceroute -->
+                  <div class="module-item-card">
+                    <div class="module-card-header">
+                      <label class="module-toggle-label">
+                        <input type="checkbox" id="mod-trace-enabled" />
+                        <span class="module-name-text">Traceroute / Saltos</span>
+                      </label>
+                    </div>
+                    <div class="module-card-fields">
+                      <div class="form-group form-group-sm">
+                        <label>Destino</label>
+                        <input type="text" id="mod-trace-target" class="form-input form-input-sm" value="1.1.1.1" />
+                      </div>
+                      <div class="form-group form-group-sm">
+                        <label>Máx Saltos</label>
+                        <input type="number" id="mod-trace-hops" class="form-input form-input-sm" value="15" min="3" max="30" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 8. Descoberta LLDP -->
+                  <div class="module-item-card">
+                    <div class="module-card-header">
+                      <label class="module-toggle-label">
+                        <input type="checkbox" id="mod-lldp-enabled" checked />
+                        <span class="module-name-text">Descoberta Switch (LLDP)</span>
+                      </label>
+                    </div>
+                    <div class="module-card-fields">
+                      <span class="field-hint">Captura porta de switch, modelo e VLAN via protocolo de enlace.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions-right mt-3">
+                <button type="submit" id="btn-submit-group" class="btn btn-primary-submit">
+                  <span id="btn-submit-group-text">Salvar Grupo</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Coluna 2: Lista de Grupos Existentes -->
+          <div class="groups-list-card">
+            <div class="users-list-header">
+              <div>
+                <h4 class="card-subtitle">Grupos Configurados</h4>
+                <p class="users-table-hint">Módulos de teste aplicados automaticamente de acordo com a VLAN da porta</p>
+              </div>
+              <span id="groups-count-tag" class="count-tag">0 grupos</span>
+            </div>
+
+            <div class="table-responsive">
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th>Grupo</th>
+                    <th>VLANs</th>
+                    <th>Módulos Ativos</th>
+                    <th>Intervalo</th>
+                    <th style="text-align: right;">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="groups-table-body">
+                  <tr>
+                    <td colspan="5" class="text-center py-4">Carregando grupos...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
 
     <!-- Footer -->
@@ -687,290 +1006,6 @@
       <div class="modal-footer">
         <div class="modal-footer-right">
           <button id="modal-btn-close-users-bottom" class="btn btn-glass">Fechar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Groups & VLANs Management Modal (Admin Only) -->
-  <div id="groups-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-dialog modal-dialog-lg">
-      <div class="modal-header">
-        <div class="modal-title-group">
-          <div class="modal-icon-badge group-badge-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-              <polyline points="2 17 12 22 22 17"></polyline>
-              <polyline points="2 12 12 17 22 12"></polyline>
-            </svg>
-          </div>
-          <div>
-            <h3>Gerenciamento de Grupos & VLANs</h3>
-            <span class="modal-subtitle">Configure quais testes e módulos cada VLAN ou segmento de rede deve executar</span>
-          </div>
-        </div>
-        <button id="modal-btn-close-groups" class="btn-close-modal" title="Fechar">&times;</button>
-      </div>
-
-      <div class="modal-body groups-modal-body">
-        <!-- Formulário de Criar / Editar Grupo -->
-        <div class="group-create-card">
-          <div class="card-header-row">
-            <h4 class="card-subtitle" id="group-form-title">Cadastrar Novo Grupo de Testes</h4>
-            <button type="button" id="btn-cancel-edit-group" class="btn btn-glass btn-sm" style="display: none;">Cancelar Edição</button>
-          </div>
-
-          <form id="group-form" class="group-form">
-            <input type="hidden" id="group-id" value="" />
-
-            <div id="group-error-alert" class="login-error-alert" style="display: none;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
-              <span id="group-error-text">Erro ao salvar grupo</span>
-            </div>
-
-            <div class="form-row-grid">
-              <div class="form-group">
-                <label for="group-name">Nome do Grupo *</label>
-                <input type="text" id="group-name" class="form-input" placeholder="Ex: Administrativo, TI, Lab-01" required />
-              </div>
-
-              <div class="form-group">
-                <label for="group-vlans">VLANs Associadas (separadas por vírgula)</label>
-                <input type="text" id="group-vlans" class="form-input" placeholder="Ex: 10, 20, 30" />
-                <span class="field-hint">Sondas detectadas nessas VLANs receberão estes testes automaticamente</span>
-              </div>
-
-              <div class="form-group">
-                <label for="group-interval">Intervalo de Teste (minutos)</label>
-                <input type="number" id="group-interval" class="form-input" value="60" min="5" max="1440" required />
-              </div>
-
-              <div class="form-group">
-                <label for="group-description">Descrição</label>
-                <input type="text" id="group-description" class="form-input" placeholder="Ex: Grupo para computadores da reitoria" />
-              </div>
-            </div>
-
-            <!-- Checkbox de Fallback Padrão -->
-            <div class="form-switch-row mb-3">
-              <div class="switch-info">
-                <span class="switch-title">Grupo Padrão do Sistema (Fallback)</span>
-                <span class="switch-desc">Aplicado automaticamente para sondas em VLANs não cadastradas ou sem LLDP</span>
-              </div>
-              <label class="toggle-switch" for="group-is-default">
-                <input type="checkbox" id="group-is-default" />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-
-            <!-- Grid de Módulos de Testes Configuráveis -->
-            <div class="modules-config-section">
-              <h5 class="modules-section-title">Módulos de Teste e Parâmetros</h5>
-
-              <div class="modules-cards-grid">
-                <!-- 1. Ping Gateway/Destino -->
-                <div class="module-item-card">
-                  <div class="module-card-header">
-                    <label class="module-toggle-label">
-                      <input type="checkbox" id="mod-ping-enabled" checked />
-                      <span class="module-name-text">🎯 Ping / Latência</span>
-                    </label>
-                  </div>
-                  <div class="module-card-fields">
-                    <div class="form-group form-group-sm">
-                      <label>Alvo / IP</label>
-                      <input type="text" id="mod-ping-target" class="form-input form-input-sm" value="1.1.1.1" />
-                    </div>
-                    <div class="form-group form-group-sm">
-                      <label>Pacotes</label>
-                      <input type="number" id="mod-ping-count" class="form-input form-input-sm" value="4" min="1" max="20" />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 2. Perda de Pacotes e Jitter -->
-                <div class="module-item-card">
-                  <div class="module-card-header">
-                    <label class="module-toggle-label">
-                      <input type="checkbox" id="mod-packetloss-enabled" checked />
-                      <span class="module-name-text">📊 Perda de Pacotes & Jitter</span>
-                    </label>
-                  </div>
-                  <div class="module-card-fields">
-                    <div class="form-group form-group-sm">
-                      <label>Alvo / IP</label>
-                      <input type="text" id="mod-packetloss-target" class="form-input form-input-sm" value="1.1.1.1" />
-                    </div>
-                    <div class="form-group form-group-sm">
-                      <label>Qtd Amostras</label>
-                      <input type="number" id="mod-packetloss-count" class="form-input form-input-sm" value="10" min="5" max="50" />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 3. Speedtest Download -->
-                <div class="module-item-card">
-                  <div class="module-card-header">
-                    <label class="module-toggle-label">
-                      <input type="checkbox" id="mod-download-enabled" checked />
-                      <span class="module-name-text">⬇️ Teste de Download</span>
-                    </label>
-                  </div>
-                  <div class="module-card-fields">
-                    <div class="form-group form-group-sm">
-                      <label>Tamanho do Payload</label>
-                      <select id="mod-download-bytes" class="form-input form-input-sm">
-                        <option value="5242880">5 MB (Rápido)</option>
-                        <option value="10485760" selected>10 MB (Padrão)</option>
-                        <option value="20971520">20 MB (Completo)</option>
-                        <option value="52428800">50 MB (Intensivo)</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 4. Speedtest Upload -->
-                <div class="module-item-card">
-                  <div class="module-card-header">
-                    <label class="module-toggle-label">
-                      <input type="checkbox" id="mod-upload-enabled" checked />
-                      <span class="module-name-text">⬆️ Teste de Upload</span>
-                    </label>
-                  </div>
-                  <div class="module-card-fields">
-                    <div class="form-group form-group-sm">
-                      <label>Tamanho do Payload</label>
-                      <select id="mod-upload-bytes" class="form-input form-input-sm">
-                        <option value="2097152">2 MB (Leve)</option>
-                        <option value="5242880" selected>5 MB (Padrão)</option>
-                        <option value="10485760">10 MB (Completo)</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 5. Resolução DNS -->
-                <div class="module-item-card">
-                  <div class="module-card-header">
-                    <label class="module-toggle-label">
-                      <input type="checkbox" id="mod-dns-enabled" checked />
-                      <span class="module-name-text">🌐 Resolução DNS</span>
-                    </label>
-                  </div>
-                  <div class="module-card-fields">
-                    <div class="form-group form-group-sm">
-                      <label>Domínios (vírgula)</label>
-                      <input type="text" id="mod-dns-domains" class="form-input form-input-sm" value="google.com, cloudflare.com" placeholder="Ex: google.com, uepg.br" />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 6. HTTP Healthcheck -->
-                <div class="module-item-card">
-                  <div class="module-card-header">
-                    <label class="module-toggle-label">
-                      <input type="checkbox" id="mod-http-enabled" checked />
-                      <span class="module-name-text">⚡ HTTP Healthcheck</span>
-                    </label>
-                  </div>
-                  <div class="module-card-fields">
-                    <div class="form-group form-group-sm">
-                      <label>URL Alvo</label>
-                      <input type="text" id="mod-http-url" class="form-input form-input-sm" value="https://www.google.com" placeholder="https://..." />
-                    </div>
-                    <div class="form-group form-group-sm">
-                      <label>Status Esperado</label>
-                      <input type="number" id="mod-http-status" class="form-input form-input-sm" value="200" />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 7. Traceroute -->
-                <div class="module-item-card">
-                  <div class="module-card-header">
-                    <label class="module-toggle-label">
-                      <input type="checkbox" id="mod-trace-enabled" />
-                      <span class="module-name-text">🛣️ Traceroute / Saltos</span>
-                    </label>
-                  </div>
-                  <div class="module-card-fields">
-                    <div class="form-group form-group-sm">
-                      <label>Destino</label>
-                      <input type="text" id="mod-trace-target" class="form-input form-input-sm" value="1.1.1.1" />
-                    </div>
-                    <div class="form-group form-group-sm">
-                      <label>Máx Saltos</label>
-                      <input type="number" id="mod-trace-hops" class="form-input form-input-sm" value="15" min="3" max="30" />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 8. Descoberta LLDP -->
-                <div class="module-item-card">
-                  <div class="module-card-header">
-                    <label class="module-toggle-label">
-                      <input type="checkbox" id="mod-lldp-enabled" checked />
-                      <span class="module-name-text">🔌 Descoberta Switch (LLDP)</span>
-                    </label>
-                  </div>
-                  <div class="module-card-fields">
-                    <span class="field-hint">Captura porta de switch, modelo e VLAN via protocolo de enlace.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-actions-right mt-3">
-              <button type="submit" id="btn-submit-group" class="btn btn-primary-submit">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                  <polyline points="7 3 7 8 15 8"></polyline>
-                </svg>
-                <span id="btn-submit-group-text">Salvar Grupo</span>
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- Lista de Grupos Existentes -->
-        <div class="groups-list-card mt-4">
-          <div class="users-list-header">
-            <div>
-              <h4 class="card-subtitle">Grupos Configurados</h4>
-              <p class="users-table-hint">Módulos de teste aplicados automaticamente de acordo com a VLAN da porta</p>
-            </div>
-            <span id="groups-count-tag" class="count-tag">0 grupos</span>
-          </div>
-
-          <div class="table-responsive">
-            <table class="users-table">
-              <thead>
-                <tr>
-                  <th>Grupo</th>
-                  <th>VLANs</th>
-                  <th>Módulos Ativos</th>
-                  <th>Intervalo</th>
-                  <th style="text-align: right;">Ações</th>
-                </tr>
-              </thead>
-              <tbody id="groups-table-body">
-                <tr>
-                  <td colspan="5" class="text-center py-4">Carregando grupos...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <div class="modal-footer-right">
-          <button id="modal-btn-close-groups-bottom" class="btn btn-glass">Fechar</button>
         </div>
       </div>
     </div>

@@ -2246,3 +2246,451 @@ body {
   border-color: rgba(239, 68, 68, 0.4);
 }
 
+/* ==========================================================================
+   Navigation Tabs & Page Views (Dashboard vs Grupos & VLANs)
+   ========================================================================== */
+
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-input);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-glass);
+}
+
+.nav-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.nav-tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-tab-btn.active {
+  color: #ffffff;
+  background: var(--accent-cyan);
+  font-weight: 600;
+  box-shadow: 0 2px 8px var(--accent-cyan-glow);
+}
+
+[data-theme="light"] .nav-tab-btn.active {
+  color: #ffffff;
+  background: var(--accent-cyan);
+}
+
+.page-view {
+  display: none;
+}
+
+.page-view.active,
+.page-view[style*="display: block"] {
+  display: block;
+}
+
+/* ==========================================================================
+   Filter Bar (Dashboard Node Search & Filters)
+   ========================================================================== */
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+
+.filter-search-box {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+  max-width: 480px;
+}
+
+.filter-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.filter-input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  font-size: 0.82rem;
+  border: 1px solid var(--border-glass);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.filter-input:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px var(--accent-cyan-glow);
+}
+
+.filter-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  padding: 7px 12px;
+  font-size: 0.80rem;
+  border: 1px solid var(--border-glass);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.filter-select:focus {
+  border-color: var(--accent-cyan);
+}
+
+.filter-count-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-glass);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Nodes Table (List View)
+   ========================================================================== */
+
+.nodes-table-container {
+  width: 100%;
+  overflow-x: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+
+.nodes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.nodes-table thead tr {
+  background: var(--table-header-bg);
+  border-bottom: 1px solid var(--border-glass-strong);
+}
+
+.nodes-table th {
+  padding: 10px 14px;
+  font-size: 0.70rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.nodes-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border-glass);
+  vertical-align: middle;
+  color: var(--text-main);
+}
+
+.nodes-table tbody tr.node-row {
+  transition: background-color 0.15s ease;
+}
+
+.nodes-table tbody tr.node-row:hover {
+  background: var(--table-row-hover);
+}
+
+.nodes-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.nodes-empty-state {
+  text-align: center;
+  padding: 48px 20px !important;
+  color: var(--text-muted);
+}
+
+.nodes-empty-state p {
+  margin: 4px 0;
+}
+
+/* Status Indicator */
+.status-indicator-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.status-indicator-badge.online {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-indicator-badge.stale {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.status-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-indicator-badge.online .status-indicator-dot {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.6);
+}
+
+.status-indicator-badge.stale .status-indicator-dot {
+  background: #fbbf24;
+}
+
+/* Node Hostname Cell */
+.node-cell-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.node-name-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s ease, text-decoration 0.15s ease;
+}
+
+.node-name-btn:hover {
+  color: #38bdf8;
+  text-decoration: underline;
+}
+
+.node-sub-ip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Node Location Cell */
+.node-cell-location {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.80rem;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.location-pin-icon {
+  stroke: var(--accent-cyan);
+  flex-shrink: 0;
+}
+
+/* Switch & Port Cell */
+.switch-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.switch-name {
+  font-size: 0.80rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.switch-port {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.70rem;
+  color: var(--text-muted);
+}
+
+/* Metrics in Table */
+.metric-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.metric-num small {
+  font-weight: 400;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.metric-num.cyan {
+  color: #38bdf8;
+}
+
+.metric-num.purple {
+  color: #c084fc;
+}
+
+.metric-num.emerald {
+  color: #34d399;
+}
+
+/* Table Action Buttons */
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-table-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid var(--border-glass);
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.btn-table-action.btn-inspect {
+  background: rgba(56, 189, 248, 0.1);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.btn-table-action.btn-inspect:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+}
+
+.btn-table-action.btn-delete-node:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* ==========================================================================
+   Groups & VLANs Dedicated Page Layout
+   ========================================================================== */
+
+.groups-page-layout {
+  display: grid;
+  grid-template-columns: 460px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .groups-page-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.groups-page-form-col,
+.groups-page-table-col {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 22px;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+
+.groups-page-form-col h3,
+.groups-page-table-col h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Toast indicator dots (Zero emojis) */
+.toast-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.toast-dot-info {
+  background: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+}
+
+.toast-dot-success {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.6);
+}
+
+.toast-dot-error {
+  background: #f87171;
+  box-shadow: 0 0 6px rgba(248, 113, 113, 0.6);
+}
+

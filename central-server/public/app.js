@@ -10,10 +10,21 @@ let currentUser = null;
 let currentSummaries = [];
 let pendingDeleteNodeId = null;
 
+// Elementos de Navegação por Abas & Páginas/Views
+const tabDashboard = document.getElementById('tab-dashboard');
+const tabGroups = document.getElementById('tab-groups');
+const viewDashboard = document.getElementById('view-dashboard');
+const viewGroups = document.getElementById('view-groups');
+
 // Elementos DOM principais
 const selectNode = document.getElementById('select-node');
 const btnRefresh = document.getElementById('btn-refresh');
 const nodesSummaryGrid = document.getElementById('nodes-summary-grid');
+const nodesTableBody = document.getElementById('nodes-table-body');
+const nodesSearchInput = document.getElementById('nodes-search-input');
+const nodesStatusFilter = document.getElementById('nodes-status-filter');
+const nodesGroupFilter = document.getElementById('nodes-group-filter');
+const nodesFilterCount = document.getElementById('nodes-filter-count');
 const telemetryTableBody = document.getElementById('telemetry-table-body');
 const activeNodesCount = document.getElementById('active-nodes-count');
 const lastIngestTime = document.getElementById('last-ingest-time');
@@ -216,6 +227,11 @@ async function checkAuthAndInitialize() {
       const data = await res.json();
       if (data.authenticated && data.user) {
         setAuthenticatedUser(data.user);
+        if (window.location.hash === '#groups' && data.user.role === 'admin') {
+          switchView('groups');
+        } else {
+          switchView('dashboard');
+        }
         await loadDashboardData();
         startAutoRefresh();
         return;
@@ -255,15 +271,18 @@ function setAuthenticatedUser(user) {
   navRoleBadge.textContent = user.role === 'admin' ? 'Administrador' : 'Operador';
   navRoleBadge.className = `role-badge ${user.role}`;
 
-  // Se for admin, os botões de administração estarão visíveis
+  // Se for admin, os botões e abas de administração estarão visíveis
   if (user.role === 'admin') {
     modalBtnDeletePc.style.display = 'inline-flex';
     if (btnOpenUsers) btnOpenUsers.style.display = 'inline-flex';
-    if (btnOpenGroups) btnOpenGroups.style.display = 'inline-flex';
+    if (tabGroups) tabGroups.style.display = 'inline-flex';
   } else {
     modalBtnDeletePc.style.display = 'none';
     if (btnOpenUsers) btnOpenUsers.style.display = 'none';
-    if (btnOpenGroups) btnOpenGroups.style.display = 'none';
+    if (tabGroups) tabGroups.style.display = 'none';
+    if (window.location.hash === '#groups') {
+      switchView('dashboard');
+    }
   }
 }
 
@@ -279,9 +298,38 @@ function showLoginModal() {
   if (btnOpenUsers) btnOpenUsers.style.display = 'none';
   if (usersModal) usersModal.style.display = 'none';
   if (btnOpenGroups) btnOpenGroups.style.display = 'none';
+  if (tabGroups) tabGroups.style.display = 'none';
   if (groupsModal) groupsModal.style.display = 'none';
+  switchView('dashboard');
   if (refreshInterval) clearInterval(refreshInterval);
 }
+
+/* ==========================================================================
+   Controle de Views / Páginas (Dashboard vs Grupos & VLANs)
+   ========================================================================== */
+
+function switchView(viewName) {
+  if (viewName === 'groups') {
+    if (!currentUser || currentUser.role !== 'admin') {
+      showToast('Acesso restrito a administradores', 'toast-error');
+      switchView('dashboard');
+      return;
+    }
+    if (viewDashboard) viewDashboard.style.display = 'none';
+    if (viewGroups) viewGroups.style.display = 'block';
+    if (tabDashboard) tabDashboard.classList.remove('active');
+    if (tabGroups) tabGroups.classList.add('active');
+    window.location.hash = '#groups';
+    loadGroupsList();
+  } else {
+    if (viewGroups) viewGroups.style.display = 'none';
+    if (viewDashboard) viewDashboard.style.display = 'block';
+    if (tabGroups) tabGroups.classList.remove('active');
+    if (tabDashboard) tabDashboard.classList.add('active');
+    window.location.hash = '#dashboard';
+  }
+}
+window.switchView = switchView;
 
 async function handleLoginSubmit(e) {
   e.preventDefault();
@@ -420,8 +468,14 @@ function setupEventListeners() {
   }
 
   // Gerenciamento de Grupos & VLANs (Admin)
+  if (tabDashboard) {
+    tabDashboard.addEventListener('click', () => switchView('dashboard'));
+  }
+  if (tabGroups) {
+    tabGroups.addEventListener('click', () => switchView('groups'));
+  }
   if (btnOpenGroups) {
-    btnOpenGroups.addEventListener('click', openGroupsModal);
+    btnOpenGroups.addEventListener('click', () => switchView('groups'));
   }
   if (modalBtnCloseGroups) {
     modalBtnCloseGroups.addEventListener('click', closeGroupsModal);
@@ -440,6 +494,54 @@ function setupEventListeners() {
   if (btnCancelEditGroup) {
     btnCancelEditGroup.addEventListener('click', resetGroupForm);
   }
+
+  // Filtros em Tempo Real da Tabela de Nós
+  if (nodesSearchInput) {
+    nodesSearchInput.addEventListener('input', (e) => {
+      nodeFilterState.search = e.target.value.toLowerCase().trim();
+      applyNodeFilters();
+    });
+  }
+  if (nodesStatusFilter) {
+    nodesStatusFilter.addEventListener('change', (e) => {
+      nodeFilterState.status = e.target.value;
+      applyNodeFilters();
+    });
+  }
+  if (nodesGroupFilter) {
+    nodesGroupFilter.addEventListener('change', (e) => {
+      nodeFilterState.group = e.target.value;
+      applyNodeFilters();
+    });
+  }
+
+  // Cliques na Tabela de Nós (Inspecionar e Excluir)
+  if (nodesTableBody) {
+    nodesTableBody.addEventListener('click', (e) => {
+      const inspectBtn = e.target.closest('.btn-inspect, .node-name-btn');
+      if (inspectBtn) {
+        const nodeId = inspectBtn.getAttribute('data-node-id');
+        const summary = currentSummaries.find(item => item.node_id === nodeId);
+        if (summary) openPCDetailsModal(summary);
+        return;
+      }
+
+      const deleteBtn = e.target.closest('.btn-delete-node');
+      if (deleteBtn) {
+        const nodeId = deleteBtn.getAttribute('data-node-id');
+        if (nodeId) promptDeleteNode(nodeId);
+        return;
+      }
+    });
+  }
+
+  window.addEventListener('hashchange', () => {
+    if (window.location.hash === '#groups') {
+      switchView('groups');
+    } else {
+      switchView('dashboard');
+    }
+  });
 
   if (tabTypeLocal && tabTypeKeycloak) {
     tabTypeLocal.addEventListener('click', () => setAccountType('local'));
@@ -566,17 +668,17 @@ async function loadUsersList() {
       const isCur = currentUser && currentUser.username.toLowerCase() === u.username.toLowerCase();
 
       // Badge de Origem
-      let originBadge = '<span class="badge-origin-local">💻 Local</span>';
+      let originBadge = '<span class="badge-origin-local">Local</span>';
       if (u.is_system) {
-        originBadge = '<span class="badge-origin-system">⚙️ Sistema</span>';
+        originBadge = '<span class="badge-origin-system">Sistema</span>';
       } else if (u.auth_type === 'keycloak') {
-        originBadge = '<span class="badge-origin-keycloak">🏛️ Keycloak</span>';
+        originBadge = '<span class="badge-origin-keycloak">Keycloak</span>';
       }
 
       // Badge de Perfil + Botão de Alteração Rápida
       const roleBadge = u.role === 'admin'
-        ? `<span class="role-badge-admin">👑 Admin</span>`
-        : `<span class="role-badge-operator">👤 Operador</span>`;
+        ? `<span class="role-badge-admin">Admin</span>`
+        : `<span class="role-badge-operator">Operador</span>`;
 
       let roleActionBtn = '';
       if (!u.is_system && !isCur) {
@@ -734,14 +836,11 @@ window.handleDeleteUser = handleDeleteUser;
 let currentGroups = [];
 
 async function openGroupsModal() {
-  if (!groupsModal) return;
-  groupsModal.style.display = 'flex';
-  resetGroupForm();
-  await loadGroupsList();
+  switchView('groups');
 }
 
 function closeGroupsModal() {
-  if (groupsModal) groupsModal.style.display = 'none';
+  switchView('dashboard');
 }
 
 function resetGroupForm() {
@@ -812,20 +911,20 @@ async function loadGroupsList() {
 
       const m = g.modules || {};
       const activeMods = [];
-      if (m.ping && m.ping.enabled) activeMods.push('<span class="module-pill active">🎯 Ping</span>');
-      if (m.packet_loss && m.packet_loss.enabled) activeMods.push('<span class="module-pill active">📊 Perda</span>');
-      if (m.download && m.download.enabled) activeMods.push('<span class="module-pill active">⬇️ Down</span>');
-      if (m.upload && m.upload.enabled) activeMods.push('<span class="module-pill active">⬆️ Up</span>');
-      if (m.dns && m.dns.enabled) activeMods.push('<span class="module-pill active">🌐 DNS</span>');
-      if (m.http_check && m.http_check.enabled) activeMods.push('<span class="module-pill active">⚡ HTTP</span>');
-      if (m.traceroute && m.traceroute.enabled) activeMods.push('<span class="module-pill active">🛣️ Trace</span>');
-      if (m.lldp && m.lldp.enabled) activeMods.push('<span class="module-pill active">🔌 LLDP</span>');
+      if (m.ping && m.ping.enabled) activeMods.push('<span class="module-pill active">Ping</span>');
+      if (m.packet_loss && m.packet_loss.enabled) activeMods.push('<span class="module-pill active">Perda</span>');
+      if (m.download && m.download.enabled) activeMods.push('<span class="module-pill active">Down</span>');
+      if (m.upload && m.upload.enabled) activeMods.push('<span class="module-pill active">Up</span>');
+      if (m.dns && m.dns.enabled) activeMods.push('<span class="module-pill active">DNS</span>');
+      if (m.http_check && m.http_check.enabled) activeMods.push('<span class="module-pill active">HTTP</span>');
+      if (m.traceroute && m.traceroute.enabled) activeMods.push('<span class="module-pill active">Trace</span>');
+      if (m.lldp && m.lldp.enabled) activeMods.push('<span class="module-pill active">LLDP</span>');
 
       return `
         <tr>
           <td>
             <strong>${escapeHtml(g.name)}</strong>
-            ${g.is_default ? '<span class="default-group-badge">★ Padrão</span>' : ''}
+            ${g.is_default ? '<span class="default-group-badge">Padrão</span>' : ''}
             ${g.description ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${escapeHtml(g.description)}</div>` : ''}
           </td>
           <td>${vlanTags}</td>
@@ -833,11 +932,11 @@ async function loadGroupsList() {
           <td><span style="font-family: monospace; font-size: 0.8rem;">${g.interval_minutes || 60}m</span></td>
           <td style="text-align: right; white-space: nowrap;">
             <button type="button" class="btn-group-action" onclick="editGroup('${escapeHtml(g.id)}')">
-              ✏️ Editar
+              Editar
             </button>
             ${!g.is_default ? `
             <button type="button" class="btn-group-action btn-delete" onclick="handleDeleteGroup('${escapeHtml(g.id)}', '${escapeHtml(g.name)}')">
-              🗑️ Excluir
+              Excluir
             </button>` : ''}
           </td>
         </tr>
@@ -1060,23 +1159,27 @@ async function loadDashboardData() {
     }
   } catch (err) {
     console.error('Falha ao carregar métricas:', err);
-    nodesSummaryGrid.innerHTML = `
-      <div class="card-loading">
-        <p class="text-rose font-bold">Falha ao conectar com o servidor central.</p>
-        <p class="text-subtle">${err.message}</p>
-      </div>
-    `;
+    if (nodesTableBody) {
+      nodesTableBody.innerHTML = `
+        <tr>
+          <td colspan="10" class="nodes-empty-state">
+            <p class="text-rose font-bold">Falha ao conectar com o servidor central.</p>
+            <p class="text-subtle">${escapeHtml(err.message)}</p>
+          </td>
+        </tr>
+      `;
+    }
   }
 }
 
 function updateNodeSelector(nodes) {
   const currentVal = selectNode.value;
-  selectNode.innerHTML = '<option value="all">⚡ Todos os Nós (Consolidado)</option>';
+  selectNode.innerHTML = '<option value="all">Todos os Nós (Consolidado)</option>';
 
   nodes.forEach(node => {
     const opt = document.createElement('option');
     opt.value = node;
-    opt.textContent = `🖥️ ${node}`;
+    opt.textContent = node;
     selectNode.appendChild(opt);
   });
 
@@ -1085,125 +1188,191 @@ function updateNodeSelector(nodes) {
 }
 
 /* ==========================================================================
-   4. Renderização dos Cards dos Computadores (com clique interativo)
+   4. Tabela de Nós com Filtros em Tempo Real (Substituição dos Cards)
    ========================================================================== */
 
+let nodeFilterState = {
+  search: '',
+  status: 'all',
+  group: 'all'
+};
+
+function populateGroupFilter(summaries) {
+  if (!nodesGroupFilter) return;
+  const currentVal = nodesGroupFilter.value;
+  const groupsSet = new Set();
+  summaries.forEach(s => {
+    if (s.group_name) {
+      groupsSet.add(s.group_name);
+    }
+  });
+
+  const sortedGroups = Array.from(groupsSet).sort();
+  nodesGroupFilter.innerHTML = '<option value="all">Todos os Grupos</option>';
+  sortedGroups.forEach(gName => {
+    const opt = document.createElement('option');
+    opt.value = gName;
+    opt.textContent = gName;
+    nodesGroupFilter.appendChild(opt);
+  });
+
+  if (sortedGroups.includes(currentVal)) {
+    nodesGroupFilter.value = currentVal;
+  } else {
+    nodesGroupFilter.value = 'all';
+    nodeFilterState.group = 'all';
+  }
+}
+
+function applyNodeFilters() {
+  if (!currentSummaries) return;
+
+  const query = (nodeFilterState.search || '').trim().toLowerCase();
+  const statusFilter = nodeFilterState.status || 'all';
+  const groupFilter = nodeFilterState.group || 'all';
+
+  const filtered = currentSummaries.filter(s => {
+    // 1. Filtro de Status
+    if (statusFilter === 'online' && !s.is_healthy) return false;
+    if (statusFilter === 'stale' && s.is_healthy) return false;
+
+    // 2. Filtro de Grupo
+    if (groupFilter !== 'all') {
+      if ((s.group_name || '') !== groupFilter) return false;
+    }
+
+    // 3. Filtro de Texto (hostname, local, ip, switch, vlan)
+    if (query) {
+      const matchNodeId = (s.node_id || '').toLowerCase().includes(query);
+      const matchLoc = (s.location || '').toLowerCase().includes(query);
+      const matchGroup = (s.group_name || '').toLowerCase().includes(query);
+      const matchIp = (s.system_info && s.system_info.ip_address) ? s.system_info.ip_address.toLowerCase().includes(query) : false;
+      const matchSwitch = (s.switch_info && s.switch_info.switch_name) ? s.switch_info.switch_name.toLowerCase().includes(query) : false;
+      const matchVlan = s.vlan ? String(s.vlan).includes(query) : false;
+
+      if (!matchNodeId && !matchLoc && !matchGroup && !matchIp && !matchSwitch && !matchVlan) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  if (nodesFilterCount) {
+    nodesFilterCount.textContent = `${filtered.length} de ${currentSummaries.length}`;
+  }
+
+  renderNodesTable(filtered);
+}
+
 function renderSummaryCards(summaries) {
+  // Mantido para integração e compatibilidade com loadDashboardData
+  populateGroupFilter(summaries);
+  applyNodeFilters();
+}
+
+function renderNodesTable(summaries) {
+  if (!nodesTableBody) return;
+
   if (!summaries || summaries.length === 0) {
-    nodesSummaryGrid.innerHTML = `
-      <div class="card-loading">
-        <div style="font-size: 2rem; margin-bottom: 4px;">📡</div>
-        <p class="font-bold text-white">Nenhum computador ou sonda registrada ainda.</p>
-        <p class="text-subtle">Aguardando a primeira telemetria enviada pelo agente UEPG-Net-Tools instalado nas máquinas.</p>
-      </div>
+    nodesTableBody.innerHTML = `
+      <tr>
+        <td colspan="10" class="nodes-empty-state">
+          <p class="font-bold text-white">Nenhuma máquina encontrada com os filtros selecionados.</p>
+          <p class="text-subtle">Ajuste o termo de busca ou limpe os filtros para visualizar as sondas.</p>
+        </td>
+      </tr>
     `;
     return;
   }
 
   const isAdmin = currentUser && currentUser.role === 'admin';
 
-  nodesSummaryGrid.innerHTML = summaries.map(s => {
+  nodesTableBody.innerHTML = summaries.map(s => {
     const lastDate = new Date(s.last_seen);
     const timeAgo = formatTimeAgo(lastDate);
     const healthClass = s.is_healthy ? 'online' : 'stale';
-    const healthText = s.is_healthy ? 'Ativo (1h)' : 'Sem sinal recente';
+    const healthText = s.is_healthy ? 'Online' : 'Sem sinal';
+
+    // Switch & Porta
+    let switchHtml = '<span class="text-subtle">--</span>';
+    if (s.switch_info && s.switch_info.switch_name) {
+      switchHtml = `
+        <div class="switch-cell">
+          <span class="switch-name" title="${escapeHtml(s.switch_info.switch_model || '')}">${escapeHtml(s.switch_info.switch_name)}</span>
+          <span class="switch-port">${escapeHtml(s.switch_info.switch_port || '--')}</span>
+        </div>
+      `;
+    }
+
+    // Grupo e VLAN
+    let groupHtml = '<span class="text-subtle">--</span>';
+    if (s.group_name) {
+      groupHtml = `<span class="vlan-pill">${escapeHtml(s.group_name)}${s.vlan ? ' (VLAN ' + escapeHtml(s.vlan) + ')' : ''}</span>`;
+    }
+
+    // IP
+    const ipHtml = (s.system_info && s.system_info.ip_address)
+      ? `<span class="node-sub-ip">${escapeHtml(s.system_info.ip_address)}</span>`
+      : '';
 
     return `
-      <div class="dc-card" data-node-id="${escapeHtml(s.node_id)}" title="Clique para ver as configurações detalhadas">
-        <div class="dc-card-top">
-          <div class="dc-name-group">
-            <h4>${escapeHtml(s.node_id)}</h4>
-            <div class="dc-location">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path>
-                <circle cx="12" cy="10" r="3"></circle>
-              </svg>
-              <span>${escapeHtml(s.location)}</span>
-            </div>
-            ${s.group_name ? `
-            <div style="margin-top: 4px;">
-              <span class="vlan-pill" title="Grupo e VLAN associada">🏷️ ${escapeHtml(s.group_name)} ${s.vlan ? '(VLAN ' + s.vlan + ')' : ''}</span>
-            </div>` : ''}
+      <tr class="node-row" data-node-id="${escapeHtml(s.node_id)}">
+        <td>
+          <span class="status-indicator-badge ${healthClass}">
+            <span class="status-indicator-dot"></span>
+            ${healthText}
+          </span>
+        </td>
+        <td>
+          <div class="node-cell-main">
+            <button type="button" class="node-name-btn" data-node-id="${escapeHtml(s.node_id)}" title="Inspecionar máquina">
+              ${escapeHtml(s.node_id)}
+            </button>
+            ${ipHtml}
           </div>
-          <div class="dc-card-top-actions">
-            <span class="dc-health-badge ${healthClass}">● ${healthText}</span>
+        </td>
+        <td>
+          <div class="node-cell-location">
+            <svg class="location-pin-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+            <span>${escapeHtml(s.location || '--')}</span>
+          </div>
+        </td>
+        <td>${groupHtml}</td>
+        <td>${switchHtml}</td>
+        <td class="text-right">
+          <span class="metric-num cyan">${s.last_download.toFixed(1)} <small>Mbps</small></span>
+        </td>
+        <td class="text-right">
+          <span class="metric-num purple">${s.last_upload.toFixed(1)} <small>Mbps</small></span>
+        </td>
+        <td class="text-right">
+          <span class="metric-num emerald">${s.last_ping.toFixed(1)} <small>ms</small></span>
+        </td>
+        <td>
+          <span class="text-subtle font-mono">${timeAgo}</span>
+        </td>
+        <td class="text-center">
+          <div class="table-actions">
+            <button type="button" class="btn-table-action btn-inspect" data-node-id="${escapeHtml(s.node_id)}" title="Inspecionar detalhes da máquina">
+              Inspecionar
+            </button>
             ${isAdmin ? `
-              <button class="card-quick-delete" data-node-id="${escapeHtml(s.node_id)}" title="Excluir computador do sistema">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-              </button>
+            <button type="button" class="btn-table-action btn-delete-node" data-node-id="${escapeHtml(s.node_id)}" title="Excluir máquina">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
             ` : ''}
           </div>
-        </div>
-
-        <div class="dc-metrics-row">
-          <div class="metric-col">
-            <div class="metric-lbl">Download</div>
-            <div class="metric-val cyan">${s.last_download.toFixed(1)}</div>
-            <div class="metric-unit">Mbps</div>
-          </div>
-          <div class="metric-col">
-            <div class="metric-lbl">Upload</div>
-            <div class="metric-val purple">${s.last_upload.toFixed(1)}</div>
-            <div class="metric-unit">Mbps</div>
-          </div>
-          <div class="metric-col">
-            <div class="metric-lbl">Ping Gateway</div>
-            <div class="metric-val emerald">${s.last_ping.toFixed(1)}</div>
-            <div class="metric-unit">ms</div>
-          </div>
-        </div>
-
-        ${s.modular_results ? `
-        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
-          ${s.modular_results.packet_loss ? `<span class="module-pill" title="Perda de Pacotes">📉 Perda: ${s.modular_results.packet_loss.loss_percent.toFixed(0)}% (Jitter: ${s.modular_results.packet_loss.jitter_ms.toFixed(1)}ms)</span>` : ''}
-          ${s.modular_results.dns ? `<span class="module-pill" title="Tempo Resolução DNS">🌐 DNS: ${s.modular_results.dns.avg_ms.toFixed(1)}ms</span>` : ''}
-          ${s.modular_results.http_check ? `<span class="module-pill" title="Healthcheck HTTP">⚡ HTTP: ${s.modular_results.http_check.status_code} (${s.modular_results.http_check.duration_ms.toFixed(0)}ms)</span>` : ''}
-        </div>
-        ` : ''}
-
-        ${s.system_info || s.switch_info ? `
-        <div class="dc-hardware-box">
-          ${s.system_info ? `
-          <div class="hw-line">
-            <span class="hw-tag">HOST</span>
-            <span class="hw-desc" title="${escapeHtml(s.system_info.cpu || '')}">${escapeHtml(s.system_info.model || s.system_info.hostname || 'PC')} (${s.system_info.ram_total_gb ? s.system_info.ram_total_gb.toFixed(0) + 'GB' : '--'}) • IP: ${escapeHtml(s.system_info.ip_address || '--')}</span>
-          </div>` : ''}
-          ${s.switch_info && s.switch_info.switch_name ? `
-          <div class="hw-line">
-            <span class="hw-tag switch">LLDP</span>
-            <span class="hw-desc font-bold text-cyan" title="${escapeHtml(s.switch_info.switch_model || '')}">SW: ${escapeHtml(s.switch_info.switch_name)} [${escapeHtml(s.switch_info.switch_port || '--')}] ${s.switch_info.vlan ? '• VLAN ' + s.switch_info.vlan : ''}</span>
-          </div>` : ''}
-        </div>` : ''}
-
-        <div class="dc-footer">
-          <span>Último sync: ${timeAgo}</span>
-          <span style="color: var(--accent-cyan); font-weight: 500;">🔍 Ver configs &raquo;</span>
-        </div>
-      </div>
+        </td>
+      </tr>
     `;
   }).join('');
-
-  // Atribui evento de clique em cada card para abrir o modal de configurações
-  nodesSummaryGrid.querySelectorAll('.dc-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      // Se clicou no botão de exclusão rápida, não abre o modal de detalhes
-      if (e.target.closest('.card-quick-delete')) {
-        e.stopPropagation();
-        const nodeId = e.target.closest('.card-quick-delete').getAttribute('data-node-id');
-        promptDeleteNode(nodeId);
-        return;
-      }
-
-      const nodeId = card.getAttribute('data-node-id');
-      const summary = currentSummaries.find(item => item.node_id === nodeId);
-      if (summary) {
-        openPCDetailsModal(summary);
-      }
-    });
-  });
 }
 
 /* ==========================================================================
@@ -1805,11 +1974,11 @@ function showToast(message, type = 'toast-info') {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
 
-  let icon = 'ℹ️';
-  if (type === 'toast-success') icon = '✅';
-  if (type === 'toast-error') icon = '⚠️';
+  let dotClass = 'toast-dot-info';
+  if (type === 'toast-success') dotClass = 'toast-dot-success';
+  if (type === 'toast-error') dotClass = 'toast-dot-error';
 
-  toast.innerHTML = `<span>${icon}</span><span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<span class="toast-dot ${dotClass}"></span><span>${escapeHtml(message)}</span>`;
   toastContainer.appendChild(toast);
 
   setTimeout(() => {
