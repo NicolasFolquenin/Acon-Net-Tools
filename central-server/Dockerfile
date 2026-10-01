@@ -34,12 +34,13 @@ WORKDIR /app
 # Cria usuário não-root por segurança
 RUN useradd -u 1001 -r -s /bin/false appuser
 
-# Copia o executável e a pasta de frontend estático
+# Copia o executável, frontend estático e configurações padrão
 COPY --from=builder /app/central-server /app/central-server
 COPY --from=builder /app/public /app/public
+COPY --from=builder /app/config /app/config
 
 # Ajusta permissões
-RUN chown -R appuser:appuser /app
+RUN mkdir -p /app/config/machines && chown -R appuser:appuser /app
 
 USER appuser
 
