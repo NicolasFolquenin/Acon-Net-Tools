@@ -9,6 +9,7 @@ let latencyChart = null;
 let currentUser = null;
 let currentSummaries = [];
 let pendingDeleteNodeId = null;
+let selectedChartNode = 'all';
 
 // Elementos de Navegação por Abas & Páginas/Views
 const tabDashboard = document.getElementById('tab-dashboard');
@@ -180,7 +181,7 @@ function setupSegmentedControl() {
 }
 
 function updateMetricToggleVisibility() {
-  const selectedNode = selectNode.value || 'all';
+  const selectedNode = selectedChartNode || (selectNode && selectNode.value) || 'all';
   const btnBoth = document.getElementById('btn-metric-both');
   const toggleContainer = document.getElementById('bandwidth-metric-toggle');
   if (!btnBoth || !toggleContainer) return;
@@ -412,10 +413,14 @@ function setupEventListeners() {
   loginForm.addEventListener('submit', handleLoginSubmit);
   btnLogout.addEventListener('click', handleLogout);
 
-  selectNode.addEventListener('change', () => {
-    updateMetricToggleVisibility();
-    loadDashboardData();
-  });
+  if (selectNode) {
+    selectNode.addEventListener('change', () => {
+      selectedChartNode = selectNode.value || 'all';
+      updateChartFocusUI();
+      updateMetricToggleVisibility();
+      loadDashboardData();
+    });
+  }
 
   setupSegmentedControl();
 
@@ -515,22 +520,44 @@ function setupEventListeners() {
     });
   }
 
-  // Cliques na Tabela de Nós (Inspecionar e Excluir)
+  // Botão de Resetar Foco dos Gráficos
+  const resetChartBtn = document.getElementById('btn-reset-chart-focus');
+  if (resetChartBtn) {
+    resetChartBtn.addEventListener('click', () => {
+      selectedChartNode = 'all';
+      updateChartFocusUI();
+      updateMetricToggleVisibility();
+      loadDashboardData();
+    });
+  }
+
+  // Cliques na Tabela de Nós (Clique na linha ou nome: foca gráficos; Inspecionar: abre modal; Excluir: confirma)
   if (nodesTableBody) {
     nodesTableBody.addEventListener('click', (e) => {
-      const inspectBtn = e.target.closest('.btn-inspect, .node-name-btn');
+      // 1. Inspecionar Detalhes de Hardware/Rede
+      const inspectBtn = e.target.closest('.btn-inspect');
       if (inspectBtn) {
+        e.stopPropagation();
         const nodeId = inspectBtn.getAttribute('data-node-id');
         const summary = currentSummaries.find(item => item.node_id === nodeId);
         if (summary) openPCDetailsModal(summary);
         return;
       }
 
+      // 2. Exclusão de Computador
       const deleteBtn = e.target.closest('.btn-delete-node');
       if (deleteBtn) {
+        e.stopPropagation();
         const nodeId = deleteBtn.getAttribute('data-node-id');
         if (nodeId) promptDeleteNode(nodeId);
         return;
+      }
+
+      // 3. Clique em qualquer outro lugar da linha (ou nome do PC): Foca nos gráficos!
+      const row = e.target.closest('.node-row');
+      if (row) {
+        const nodeId = row.getAttribute('data-node-id');
+        if (nodeId) selectNodeForCharts(nodeId);
       }
     });
   }
@@ -1131,7 +1158,7 @@ function startAutoRefresh() {
 async function loadDashboardData() {
   if (!currentUser) return;
 
-  const selected = selectNode.value || 'all';
+  const selected = selectedChartNode || (selectNode && selectNode.value) || 'all';
   let url = '/api/v1/dashboard/metrics';
   if (selected !== 'all') {
     url += `?node_id=${encodeURIComponent(selected)}`;
@@ -1152,6 +1179,7 @@ async function loadDashboardData() {
     renderSummaryCards(currentSummaries);
     renderComparativeCharts(data.metrics_series || [], data.nodes_list || []);
     renderTelemetryTable(data.metrics_series || []);
+    updateChartFocusUI();
 
     activeNodesCount.textContent = data.total_nodes || 0;
     if (data.generated_at) {
@@ -1173,6 +1201,7 @@ async function loadDashboardData() {
 }
 
 function updateNodeSelector(nodes) {
+  if (!selectNode) return;
   const currentVal = selectNode.value;
   selectNode.innerHTML = '<option value="all">Todos os Nós (Consolidado)</option>';
 
@@ -1185,6 +1214,48 @@ function updateNodeSelector(nodes) {
 
   selectNode.value = nodes.includes(currentVal) ? currentVal : 'all';
   updateMetricToggleVisibility();
+}
+
+function selectNodeForCharts(nodeId) {
+  if (selectedChartNode === nodeId) {
+    // Se clicar na mesma máquina já selecionada, desseleciona e volta para consolidado
+    selectedChartNode = 'all';
+    showToast('Exibindo gráficos consolidados de todas as sondas', 'toast-info');
+  } else {
+    selectedChartNode = nodeId;
+    showToast(`Gráficos focados na sonda: ${nodeId}`, 'toast-info');
+  }
+
+  updateChartFocusUI();
+  updateMetricToggleVisibility();
+  loadDashboardData();
+}
+window.selectNodeForCharts = selectNodeForCharts;
+
+function updateChartFocusUI() {
+  const nameEl = document.getElementById('chart-focus-name');
+  const resetBtn = document.getElementById('btn-reset-chart-focus');
+  const indicator = document.getElementById('chart-focus-indicator');
+
+  if (selectedChartNode === 'all') {
+    if (nameEl) nameEl.textContent = 'Todas as Sondas (Consolidado)';
+    if (indicator) indicator.className = 'chart-focus-pill all';
+    if (resetBtn) resetBtn.style.display = 'none';
+  } else {
+    if (nameEl) nameEl.textContent = selectedChartNode;
+    if (indicator) indicator.className = 'chart-focus-pill focused';
+    if (resetBtn) resetBtn.style.display = 'inline-flex';
+  }
+
+  // Atualiza destaque visual das linhas da tabela
+  if (nodesTableBody) {
+    const rows = nodesTableBody.querySelectorAll('.node-row');
+    rows.forEach(row => {
+      const rowNodeId = row.getAttribute('data-node-id');
+      const isSel = (selectedChartNode !== 'all' && rowNodeId === selectedChartNode);
+      row.classList.toggle('selected-chart-node', isSel);
+    });
+  }
 }
 
 /* ==========================================================================
@@ -1293,6 +1364,7 @@ function renderNodesTable(summaries) {
     const timeAgo = formatTimeAgo(lastDate);
     const healthClass = s.is_healthy ? 'online' : 'stale';
     const healthText = s.is_healthy ? 'Online' : 'Sem sinal';
+    const isSelected = (selectedChartNode !== 'all' && s.node_id === selectedChartNode);
 
     // Switch & Porta
     let switchHtml = '<span class="text-subtle">--</span>';
@@ -1317,16 +1389,17 @@ function renderNodesTable(summaries) {
       : '';
 
     return `
-      <tr class="node-row" data-node-id="${escapeHtml(s.node_id)}">
+      <tr class="node-row ${isSelected ? 'selected-chart-node' : ''}" data-node-id="${escapeHtml(s.node_id)}" title="Clique para focar gráficos nesta máquina">
         <td>
           <span class="status-indicator-badge ${healthClass}">
             <span class="status-indicator-dot"></span>
             ${healthText}
           </span>
+          ${isSelected ? '<span class="selected-pill">No Gráfico</span>' : ''}
         </td>
         <td>
           <div class="node-cell-main">
-            <button type="button" class="node-name-btn" data-node-id="${escapeHtml(s.node_id)}" title="Inspecionar máquina">
+            <button type="button" class="node-name-btn" data-node-id="${escapeHtml(s.node_id)}" title="Filtrar gráficos por esta máquina">
               ${escapeHtml(s.node_id)}
             </button>
             ${ipHtml}
@@ -1469,8 +1542,11 @@ async function executeDeleteNode() {
 
     showToast(`Computador "${nodeId}" foi excluído com sucesso!`, 'toast-success');
 
-    // Se o nó excluído era o filtro selecionado, reseta para "all"
-    if (selectNode.value === nodeId) {
+    if (selectedChartNode === nodeId) {
+      selectedChartNode = 'all';
+      updateChartFocusUI();
+    }
+    if (selectNode && selectNode.value === nodeId) {
       selectNode.value = 'all';
     }
 
@@ -1659,7 +1735,7 @@ function renderComparativeCharts(series, nodesList) {
     return;
   }
 
-  const selectedNode = selectNode.value;
+  const selectedNode = selectedChartNode || (selectNode && selectNode.value) || 'all';
   const ctxBandwidth = document.getElementById('centralBandwidthChart').getContext('2d');
   const ctxLatency = document.getElementById('centralLatencyChart').getContext('2d');
 
