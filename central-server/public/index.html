@@ -33,16 +33,6 @@
       </nav>
 
       <div class="nav-controls">
-        <!-- Node Selector -->
-        <div class="control-group">
-          <label for="select-node" class="control-label">Filtrar Sonda:</label>
-          <div class="select-wrapper">
-            <select id="select-node" class="select-custom">
-              <option value="all">Todos os Nós (Consolidado)</option>
-            </select>
-          </div>
-        </div>
-
         <!-- Botão Atualizar -->
         <button id="btn-refresh" class="btn btn-glass" title="Recarregar Métricas">
           <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -125,7 +115,7 @@
           <!-- Barra de Filtragem Rápida -->
           <div id="nodes-filter-bar" class="filter-bar">
             <div class="filter-search-box">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="filter-search-icon">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
@@ -133,22 +123,18 @@
             </div>
 
             <div class="filter-controls-group">
-              <div class="select-wrapper select-sm">
-                <select id="nodes-status-filter" class="select-custom">
-                  <option value="all">Todos os Status</option>
-                  <option value="online">Ativos (1h)</option>
-                  <option value="stale">Sem sinal recente</option>
-                </select>
-              </div>
+              <select id="nodes-status-filter" class="filter-select">
+                <option value="all">Todos os Status</option>
+                <option value="online">Online (1h)</option>
+                <option value="stale">Sem sinal recente</option>
+              </select>
 
-              <div class="select-wrapper select-sm">
-                <select id="nodes-group-filter" class="select-custom">
-                  <option value="all">Todos os Grupos</option>
-                </select>
-              </div>
+              <select id="nodes-group-filter" class="filter-select">
+                <option value="all">Todos os Grupos</option>
+              </select>
 
               <div class="filter-count-pill" id="nodes-filter-count">
-                Exibindo 0 de 0 sondas
+                3 de 3 sondas
               </div>
             </div>
           </div>
@@ -181,6 +167,23 @@
 
       <!-- Section: Comparative Charts -->
       <section class="section-block">
+        <div class="charts-header-bar">
+          <div class="charts-header-left">
+            <h3 class="charts-section-heading">Desempenho &amp; Métricas Comparativas</h3>
+            <p class="charts-section-sub">Acompanhamento de vazão e latência em tempo real. Clique em uma máquina na lista para isolar seus gráficos.</p>
+          </div>
+          <div class="charts-header-right">
+            <div id="chart-focus-indicator" class="chart-focus-pill all">
+              <span class="focus-dot"></span>
+              <span class="focus-label">Exibindo:</span>
+              <span id="chart-focus-name" class="focus-name">Todas as Sondas (Consolidado)</span>
+            </div>
+            <button id="btn-reset-chart-focus" class="btn btn-sm btn-glass btn-reset-focus" style="display: none;" title="Restaurar visualização de todas as máquinas">
+              Ver Todas as Sondas
+            </button>
+          </div>
+        </div>
+
         <div class="charts-grid">
           <!-- Chart 1: Bandwidth Comparison (Download & Upload) -->
           <div class="chart-panel">

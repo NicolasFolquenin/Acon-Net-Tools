@@ -220,7 +220,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 16px;
+  height: 38px;
+  padding: 0 16px;
   border-radius: var(--radius-md);
   font-size: 0.85rem;
   font-weight: 600;
@@ -294,9 +295,10 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  height: 38px;
   background: var(--bg-card);
   border: 1px solid var(--border-glass-strong);
-  padding: 4px 6px 4px 10px;
+  padding: 0 6px 0 10px;
   border-radius: var(--radius-md);
 }
 
@@ -360,8 +362,9 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border-radius: 9999px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
   background: rgba(16, 185, 129, 0.12);
   border: 1px solid rgba(16, 185, 129, 0.3);
   color: var(--accent-emerald);
@@ -2311,60 +2314,68 @@ body {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 12px 18px;
+  padding: 10px 16px;
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   margin-bottom: 16px;
   backdrop-filter: var(--blur);
   -webkit-backdrop-filter: var(--blur);
 }
 
 .filter-search-box {
-  position: relative;
-  flex: 1;
-  min-width: 260px;
-  max-width: 480px;
-}
-
-.filter-search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-.filter-input {
-  width: 100%;
-  padding: 8px 12px 8px 36px;
-  font-size: 0.82rem;
-  border: 1px solid var(--border-glass);
-  border-radius: 6px;
-  background: var(--bg-input);
-  color: var(--text-main);
-  outline: none;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: var(--bg-input) !important;
+  border: 1px solid var(--border-glass) !important;
+  border-radius: 8px !important;
+  padding: 0 12px !important;
+  height: 38px !important;
+  flex: 1 1 300px !important;
+  max-width: 440px !important;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.filter-input:focus {
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 2px var(--accent-cyan-glow);
+.filter-search-box:focus-within {
+  border-color: var(--accent-cyan) !important;
+  box-shadow: 0 0 0 2px var(--accent-cyan-glow) !important;
+}
+
+.filter-search-box .filter-search-icon {
+  position: static !important;
+  transform: none !important;
+  flex-shrink: 0 !important;
+  color: var(--text-muted) !important;
+  display: block !important;
+}
+
+.filter-search-box .filter-input {
+  border: none !important;
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  font-size: 0.84rem !important;
+  color: var(--text-main) !important;
 }
 
 .filter-controls-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .filter-select {
-  padding: 7px 12px;
+  height: 38px;
+  padding: 0 12px;
   font-size: 0.80rem;
   border: 1px solid var(--border-glass);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--bg-input);
   color: var(--text-main);
   cursor: pointer;
@@ -2377,14 +2388,15 @@ body {
 }
 
 .filter-count-pill {
+  height: 38px;
   display: inline-flex;
   align-items: center;
   font-size: 0.76rem;
   font-weight: 600;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 5px 12px;
-  border-radius: 20px;
+  background: var(--bg-input);
+  padding: 0 14px;
+  border-radius: 8px;
   border: 1px solid var(--border-glass);
   white-space: nowrap;
 }
@@ -2435,11 +2447,34 @@ body {
 }
 
 .nodes-table tbody tr.node-row {
-  transition: background-color 0.15s ease;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-left-color 0.15s ease;
 }
 
 .nodes-table tbody tr.node-row:hover {
   background: var(--table-row-hover);
+}
+
+.nodes-table tbody tr.node-row.selected-chart-node {
+  background: rgba(6, 182, 212, 0.08) !important;
+  border-left: 3px solid var(--accent-cyan);
+}
+
+[data-theme="light"] .nodes-table tbody tr.node-row.selected-chart-node {
+  background: rgba(2, 132, 199, 0.08) !important;
+  border-left: 3px solid var(--accent-cyan);
+}
+
+.selected-pill {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.15);
+  border-radius: 4px;
 }
 
 .nodes-table tbody tr:last-child td {
@@ -2667,6 +2702,83 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* ==========================================================================
+   Charts Header Bar & Focus Indicator
+   ========================================================================== */
+
+.charts-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+
+.charts-section-heading {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.charts-section-sub {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.charts-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chart-focus-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.76rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+}
+
+.chart-focus-pill .focus-name {
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+.chart-focus-pill .focus-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  display: inline-block;
+}
+
+.btn-reset-focus {
+  height: 32px !important;
+  font-size: 0.75rem !important;
+  padding: 0 12px !important;
+  color: var(--accent-cyan) !important;
+  border-color: rgba(6, 182, 212, 0.35) !important;
+  border-radius: 6px !important;
+}
+
+.btn-reset-focus:hover {
+  background: rgba(6, 182, 212, 0.15) !important;
+  border-color: var(--accent-cyan) !important;
 }
 
 /* Toast indicator dots (Zero emojis) */
