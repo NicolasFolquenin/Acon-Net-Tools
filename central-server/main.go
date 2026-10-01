@@ -45,6 +45,7 @@ func main() {
 	oidcHandler := handlers.NewOIDCHandler(cfg, authHandler, mongoClient)
 	profileHandler := handlers.NewProfileHandler(cfg)
 	machineProfileHandler := handlers.NewMachineProfileHandler(cfg, mongoClient)
+	groupsHandler := handlers.NewGroupsHandler(mongoClient, cfg)
 
 	mux := http.NewServeMux()
 
@@ -96,6 +97,11 @@ func main() {
 	mux.HandleFunc("/api/v1/admin/machines/", authHandler.RequireAdmin(machineProfileHandler.HandleAdminMachines))
 	mux.HandleFunc("/api/v1/admin/groups", authHandler.RequireAdmin(machineProfileHandler.HandleAdminGroups))
 	mux.HandleFunc("/api/v1/admin/groups/", authHandler.RequireAdmin(machineProfileHandler.HandleAdminGroups))
+
+	// Endpoints de Grupos de Testes e VLANs (compatibilidade com dashboard e sondas legadas)
+	mux.HandleFunc("/api/v1/config/probe", handlers.RequireBearerToken(cfg.APIToken, groupsHandler.GetProbeConfig))
+	mux.HandleFunc("/api/v1/groups", authHandler.RequireAdmin(groupsHandler.HandleGroups))
+	mux.HandleFunc("/api/v1/groups/", authHandler.RequireAdmin(groupsHandler.HandleGroups))
 
 	// Endpoints da API oficial
 	// POST /api/v1/metrics protegido por Bearer Token

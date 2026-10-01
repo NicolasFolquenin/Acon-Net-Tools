@@ -116,9 +116,22 @@ func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile,
 		cancel()
 	}
 
+	// Identifica Grupo e VLAN correspondente
+	var groupName string
+	var vlan int
+	if currentSwitch != nil {
+		vlan = currentSwitch.VLAN
+	}
+	groupCfg := GetCurrentGroupConfig()
+	if groupCfg.GroupName != "" {
+		groupName = groupCfg.GroupName
+	}
+
 	payload := &MetricPayload{
 		NodeID:         cfg.NodeID,
 		Location:       cfg.Location,
+		GroupName:      groupName,
+		VLAN:           vlan,
 		Timestamp:      time.Now().UTC().Truncate(time.Second),
 		ProfileVersion: prof.Version,
 		DownloadMbps:   math.Round(downloadMbps*100) / 100,
@@ -132,9 +145,8 @@ func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile,
 	return payload, nil
 }
 
-// MeasureAll mantém compatibilidade com chamadas legadas
+// MeasureAll executa os testes do perfil ativo ou fallback
 func (p *NetworkProbe) MeasureAll(ctx context.Context, cfg Config, knownSwitch *SwitchInfo) (*MetricPayload, error) {
 	defaultProf := NewProfileManager().GetBuiltinFallback()
 	return p.RunProfile(ctx, defaultProf, cfg, knownSwitch, nil)
 }
-

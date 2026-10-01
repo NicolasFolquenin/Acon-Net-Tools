@@ -23,6 +23,7 @@
           <div class="node-meta">
             <span id="node-id-display" class="mono-badge">minipc-dc-01</span>
             <span id="node-location-display" class="location-badge">Guarapuava-DC1</span>
+            <span id="group-badge-display" class="location-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Grupo: Carregando...</span>
             <span id="profile-badge" class="profile-badge" title="Perfil de Medição Ativo">Perfil: Sincronizando...</span>
           </div>
         </div>
@@ -322,8 +323,9 @@
       </div>
       <form id="settings-form" class="modal-body">
         <div class="form-group">
-          <label for="cfg-node-id">Node ID (Identificador da máquina)</label>
-          <input type="text" id="cfg-node-id" class="form-control" required />
+          <label for="cfg-node-id">Node ID (Hostname do Sistema - Fixo)</label>
+          <input type="text" id="cfg-node-id" class="form-control" disabled readonly style="opacity: 0.75; cursor: not-allowed; background: rgba(0,0,0,0.2);" title="O hostname da máquina é fixo e identificado automaticamente" />
+          <small style="color: var(--text-muted); font-size: 0.72rem; display: block; margin-top: 4px;">Identificado automaticamente pelo Windows (imutável).</small>
         </div>
         <div class="form-group">
           <label for="cfg-location">Localização / Data Center</label>

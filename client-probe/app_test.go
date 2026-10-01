@@ -80,3 +80,49 @@ func TestIsCentralSynced(t *testing.T) {
 		t.Errorf("Expected IsCentralSynced to be false when ServerURL is empty")
 	}
 }
+
+func TestDefaultModulesConfig(t *testing.T) {
+	mods := DefaultModulesConfig()
+	if !mods.Ping.Enabled {
+		t.Errorf("Expected Ping to be enabled by default")
+	}
+	if !mods.PacketLoss.Enabled {
+		t.Errorf("Expected PacketLoss to be enabled by default")
+	}
+	if !mods.Download.Enabled {
+		t.Errorf("Expected Download to be enabled by default")
+	}
+	if !mods.Upload.Enabled {
+		t.Errorf("Expected Upload to be enabled by default")
+	}
+	if !mods.DNS.Enabled {
+		t.Errorf("Expected DNS to be enabled by default")
+	}
+	if !mods.HTTPCheck.Enabled {
+		t.Errorf("Expected HTTPCheck to be enabled by default")
+	}
+	if !mods.LLDP.Enabled {
+		t.Errorf("Expected LLDP to be enabled by default")
+	}
+}
+
+func TestNodeIDLocked(t *testing.T) {
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+	if cfg.NodeID == "" {
+		t.Errorf("Expected NodeID to be populated")
+	}
+
+	// Tenta forçar alteração
+	cfg.NodeID = "novo-nome-hackeado"
+	_ = SaveConfig(*cfg)
+
+	// Recarrega e valida se permaneceu travado no hostname
+	reloaded, _ := LoadConfig("")
+	if reloaded.NodeID == "novo-nome-hackeado" {
+		t.Errorf("NodeID should not be modifiable by user")
+	}
+}
+

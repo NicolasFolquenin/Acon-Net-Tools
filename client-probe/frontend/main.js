@@ -170,6 +170,16 @@ function updateStatusBadge(status) {
     statusText.textContent = status.status_text || (status.sync_with_central ? 'Sincronizado com o servidor central' : 'Agendado');
   }
 
+  // Atualiza badge de Grupo / VLAN
+  const groupBadge = document.getElementById('group-badge-display');
+  if (groupBadge) {
+    if (status.group_name) {
+      groupBadge.textContent = `Grupo: ${status.group_name}${status.current_vlan ? ' (VLAN ' + status.current_vlan + ')' : ''}`;
+    } else {
+      groupBadge.textContent = 'Grupo: Padrão';
+    }
+  }
+
   // Atualiza badge de Perfil de Medição
   const profileBadge = document.getElementById('profile-badge');
   if (profileBadge && status.current_profile) {

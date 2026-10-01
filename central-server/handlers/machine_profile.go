@@ -259,7 +259,7 @@ func (h *MachineProfileHandler) HandleAdminGroups(w http.ResponseWriter, r *http
 	if r.Method == http.MethodGet {
 		var groups []models.MachineGroup
 		if h.mongoClient != nil {
-			groups, _ = h.mongoClient.ListGroups(ctx)
+			groups, _ = h.mongoClient.ListMachineGroups(ctx)
 		}
 		if len(groups) == 0 {
 			groups = models.GetInitialGroups()
@@ -289,7 +289,7 @@ func (h *MachineProfileHandler) HandleAdminGroups(w http.ResponseWriter, r *http
 		}
 
 		if h.mongoClient != nil {
-			if err := h.mongoClient.SaveGroup(ctx, &grp); err != nil {
+			if err := h.mongoClient.SaveMachineGroup(ctx, &grp); err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusInternalServerError)
 				_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -313,7 +313,7 @@ func (h *MachineProfileHandler) HandleAdminGroups(w http.ResponseWriter, r *http
 func (h *MachineProfileHandler) matchGroupForProbe(ctx context.Context, vlan int, ipStr string) models.MachineGroup {
 	groups := models.GetInitialGroups()
 	if h.mongoClient != nil {
-		if dbGroups, err := h.mongoClient.ListGroups(ctx); err == nil && len(dbGroups) > 0 {
+		if dbGroups, err := h.mongoClient.ListMachineGroups(ctx); err == nil && len(dbGroups) > 0 {
 			groups = dbGroups
 		}
 	}
@@ -370,13 +370,13 @@ func (h *MachineProfileHandler) buildProfileForMachine(ctx context.Context, mach
 	// Caso contrário, herda do grupo correspondente
 	groups := models.GetInitialGroups()
 	if h.mongoClient != nil {
-		if grp, err := h.mongoClient.GetGroup(ctx, mach.GroupID); err == nil && grp != nil {
+		if grp, err := h.mongoClient.GetMachineGroup(ctx, mach.GroupID); err == nil && grp != nil {
 			prof := grp.Profile
 			prof.Version = fmt.Sprintf("%s-%s", grp.ID, mach.Hostname)
 			prof.UpdatedAt = now
 			return prof
 		}
-		if dbGroups, err := h.mongoClient.ListGroups(ctx); err == nil && len(dbGroups) > 0 {
+		if dbGroups, err := h.mongoClient.ListMachineGroups(ctx); err == nil && len(dbGroups) > 0 {
 			groups = dbGroups
 		}
 	}

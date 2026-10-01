@@ -244,9 +244,16 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 			}
 		}
 
+		vlan := agg.latest.VLAN
+		if vlan == 0 && sw != nil && sw.VLAN > 0 {
+			vlan = sw.VLAN
+		}
+
 		summaries = append(summaries, models.NodeSummaryCard{
 			NodeID:          agg.latest.NodeID,
 			Location:        agg.latest.Location,
+			GroupName:       agg.latest.GroupName,
+			VLAN:            vlan,
 			LastSeen:        agg.latest.Timestamp,
 			LastDownload:    agg.latest.DownloadMbps,
 			LastUpload:      agg.latest.UploadMbps,
@@ -257,6 +264,7 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 			TotalReadings24: agg.count,
 			SystemInfo:      sys,
 			SwitchInfo:      sw,
+			ModularResults:  agg.latest.ModularResults,
 		})
 	}
 

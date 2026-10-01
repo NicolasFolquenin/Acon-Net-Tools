@@ -379,10 +379,22 @@ func (a *App) GetStatus() ProbeStatus {
 		statusText = "Sincronizado com o servidor central"
 	}
 
+	groupCfg := GetCurrentGroupConfig()
+	groupName := groupCfg.GroupName
+	currentVlan := 0
+	if a.currentSwitch != nil {
+		currentVlan = a.currentSwitch.VLAN
+	}
+	if a.lastMetric != nil && a.lastMetric.GroupName != "" {
+		groupName = a.lastMetric.GroupName
+	}
+
 	return ProbeStatus{
 		IsRunning:       a.isRunning,
 		StatusText:      statusText,
 		ActiveTask:      a.activeTask,
+		GroupName:       groupName,
+		CurrentVLAN:     currentVlan,
 		LastRun:         a.lastRun,
 		NextRun:         a.nextRun,
 		LastMetric:      a.lastMetric,

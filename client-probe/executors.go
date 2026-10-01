@@ -79,6 +79,12 @@ func NewExecutorRegistry() map[TaskType]TaskExecutor {
 			sys, metric := ExecuteSystemInfoTask(ctx, task, execCtx)
 			return TaskExecutionResult{Metric: metric, SystemInfo: sys}
 		}),
+		TaskTypeHTTPCheck: TaskExecutorFunc(func(ctx context.Context, task TestTaskConfig, execCtx *ExecutionContext) TaskExecutionResult {
+			return TaskExecutionResult{Metric: ExecuteHTTPCheckTask(ctx, task, execCtx)}
+		}),
+		TaskTypeTraceroute: TaskExecutorFunc(func(ctx context.Context, task TestTaskConfig, execCtx *ExecutionContext) TaskExecutionResult {
+			return TaskExecutionResult{Metric: ExecuteTracerouteTask(ctx, task, execCtx)}
+		}),
 	}
 }
 
@@ -489,5 +495,79 @@ func ExecuteSystemInfoTask(ctx context.Context, task TestTaskConfig, execCtx *Ex
 		Unit:    "host",
 		Status:  "ok",
 		Details: fmt.Sprintf("%s (%s) IP: %s", sys.Hostname, sys.NetworkAdapter, sys.IPAddress),
+	}
+}
+
+// ExecuteHTTPCheckTask executa a validação HTTP usando RunHTTPCheckModule
+func ExecuteHTTPCheckTask(ctx context.Context, task TestTaskConfig, execCtx *ExecutionContext) DynamicMetricResult {
+	url := strings.TrimSpace(task.Endpoint)
+	if url == "" {
+		url = strings.TrimSpace(task.Target)
+	}
+	if url == "" {
+		url = "https://www.google.com"
+	}
+	expectedStatus := 200
+	if task.ExtraParams != nil {
+		if val, ok := task.ExtraParams["expected_status"].(float64); ok && val > 0 {
+			expectedStatus = int(val)
+		}
+	}
+
+	res := RunHTTPCheckModule(ctx, HTTPCheckModuleConfig{
+		Enabled:        true,
+		URL:            url,
+		ExpectedStatus: expectedStatus,
+	})
+
+	if res == nil {
+		return DynamicMetricResult{Status: "error", Unit: "ms", Error: "resultado nulo"}
+	}
+
+	status := "ok"
+	if !res.Success {
+		status = "error"
+	}
+	return DynamicMetricResult{
+		Value:   res.DurationMs,
+		Unit:    "ms",
+		Status:  status,
+		Details: fmt.Sprintf("HTTP %d para %s (%.1f ms)", res.StatusCode, res.URL, res.DurationMs),
+		Error:   res.Error,
+	}
+}
+
+// ExecuteTracerouteTask executa o traceroute usando RunTracerouteModule
+func ExecuteTracerouteTask(ctx context.Context, task TestTaskConfig, execCtx *ExecutionContext) DynamicMetricResult {
+	target := strings.TrimSpace(task.Target)
+	if target == "" {
+		target = "1.1.1.1"
+	}
+	maxHops := 15
+	if task.ExtraParams != nil {
+		if val, ok := task.ExtraParams["max_hops"].(float64); ok && val > 0 {
+			maxHops = int(val)
+		}
+	}
+
+	res := RunTracerouteModule(ctx, TracerouteModuleConfig{
+		Enabled: true,
+		Target:  target,
+		MaxHops: maxHops,
+	})
+
+	if res == nil {
+		return DynamicMetricResult{Status: "error", Unit: "hops", Error: "resultado nulo"}
+	}
+
+	status := "ok"
+	if !res.Success {
+		status = "warning"
+	}
+	return DynamicMetricResult{
+		Value:   float64(res.TotalHops),
+		Unit:    "hops",
+		Status:  status,
+		Details: fmt.Sprintf("Alvo: %s (%d saltos)", res.Target, res.TotalHops),
 	}
 }
