@@ -324,6 +324,27 @@ body {
   height: 38px;
   padding: 0;
   border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-icon-only svg,
+#btn-open-settings svg {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px;
+  min-height: 18px;
+  display: block;
+}
+
+#btn-open-settings svg {
+  transition: transform 0.3s ease;
+}
+
+#btn-open-settings:hover svg {
+  transform: rotate(60deg);
 }
 
 /* Theme Toggle Button */
