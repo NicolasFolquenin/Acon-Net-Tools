@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UEPG Net Tools - Monitoramento de Rede</title>
-  <link rel="stylesheet" href="style.css?v=2.2.2" />
+  <link rel="stylesheet" href="style.css?v=2.2.3" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -69,7 +69,12 @@
         <!-- User Profile & Logout -->
         <div id="user-nav-box" class="user-nav-box">
           <div class="user-info-chip">
-            <div class="user-avatar" id="user-avatar">ADM</div>
+            <div class="user-avatar" id="user-avatar" title="Usuário Autenticado">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </div>
             <div class="user-meta">
               <span id="nav-username" class="user-name">Carregando...</span>
               <span id="nav-role-badge" class="role-badge">--</span>
