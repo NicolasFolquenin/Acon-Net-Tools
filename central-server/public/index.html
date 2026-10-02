@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UEPG Net Tools - Monitoramento de Rede</title>
-  <link rel="stylesheet" href="style.css?v=2.3.0" />
+  <link rel="stylesheet" href="style.css?v=2.3.1" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -21,6 +21,12 @@
             <h2>UEPG Net Tools</h2>
             <p>Coletor Distribuído Go</p>
           </div>
+          <button class="btn-sidebar-collapse btn-toggle-sidebar" title="Recolher Menu Lateral" aria-label="Recolher Menu Lateral">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <polyline points="11 17 6 12 11 7"></polyline>
+              <polyline points="18 17 13 12 18 7"></polyline>
+            </svg>
+          </button>
         </div>
 
         <nav class="sidebar-nav">
@@ -111,6 +117,13 @@
       <!-- Topbar Minimalista -->
       <header class="main-topbar">
         <div class="topbar-left">
+          <button id="btn-toggle-sidebar" class="btn btn-glass btn-icon-only btn-toggle-sidebar" title="Alternar Menu Lateral (Abrir/Fechar)" aria-label="Alternar Menu Lateral">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <div class="topbar-breadcrumbs">
             <span class="breadcrumb-root">UEPG Net Tools</span>
             <span class="breadcrumb-sep">/</span>
@@ -1138,6 +1151,6 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="app.js?v=2.3.0"></script>
+  <script src="app.js?v=2.3.1"></script>
 </body>
 </html>
