@@ -100,15 +100,90 @@
     <main class="dashboard-body" id="main-content">
       <!-- VIEW 1: DASHBOARD & TELEMETRIA -->
       <div id="view-dashboard" class="page-view active">
+        <!-- Hero KPI Executive Strip -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Sondas Monitoradas</span>
+              <span class="kpi-icon-wrap cyan">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                  <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                  <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                  <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                </svg>
+              </span>
+            </div>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="kpi-total-nodes">0</span>
+              <span class="kpi-badge success" id="kpi-health-rate">0% Online</span>
+            </div>
+            <span class="kpi-subtext" id="kpi-nodes-sub">Carregando sondas do campus...</span>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Throughput Download</span>
+              <span class="kpi-icon-wrap blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+              </span>
+            </div>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="kpi-avg-download">0.0</span>
+              <span class="kpi-unit">Mbps</span>
+            </div>
+            <span class="kpi-subtext">Taxa média das sondas ativas</span>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Throughput Upload</span>
+              <span class="kpi-icon-wrap purple">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </span>
+            </div>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="kpi-avg-upload">0.0</span>
+              <span class="kpi-unit">Mbps</span>
+            </div>
+            <span class="kpi-subtext">Taxa de envio agregada</span>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Latência Gateway</span>
+              <span class="kpi-icon-wrap emerald">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </span>
+            </div>
+            <div class="kpi-value-row">
+              <span class="kpi-value" id="kpi-avg-ping">0.0</span>
+              <span class="kpi-unit">ms</span>
+            </div>
+            <span class="kpi-subtext" id="kpi-ping-status">Resposta média de enlace</span>
+          </div>
+        </div>
+
         <!-- Section: Data Center Summary List -->
         <section class="section-block">
           <div class="section-title-row">
             <div>
-              <h3>Computadores & Sondas Monitoradas</h3>
-              <p class="section-subtitle">Selecione uma máquina da lista para inspecionar configurações detalhadas de hardware, rede e switch LLDP</p>
+              <h3>Computadores &amp; Sondas Monitoradas</h3>
+              <p class="section-subtitle">Selecione uma máquina para inspecionar configurações de rede, switch LLDP e isolar seus gráficos</p>
             </div>
             <div id="nodes-count-badge" class="count-badge">
-              <span id="active-nodes-count">0</span> Sondas Registradas
+              <span id="active-nodes-count">0</span> Sondas
             </div>
           </div>
 
@@ -119,7 +194,7 @@
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-              <input type="text" id="nodes-search-input" class="filter-input" placeholder="Buscar por computador, local, VLAN, switch ou IP..." />
+              <input type="text" id="nodes-search-input" class="filter-input" placeholder="Buscar por computador, IP, local, VLAN ou switch..." />
             </div>
 
             <div class="filter-controls-group">
@@ -144,15 +219,15 @@
             <table class="nodes-table" id="nodes-table">
               <thead>
                 <tr>
-                  <th style="width: 140px;">Status</th>
+                  <th style="width: 120px;">Status</th>
                   <th>Computador</th>
-                  <th>Local</th>
-                  <th>Grupo & VLAN</th>
+                  <th>Localização</th>
+                  <th>Grupo &amp; VLAN</th>
                   <th>Switch / Porta (LLDP)</th>
-                  <th style="text-align: right;">Download</th>
-                  <th style="text-align: right;">Upload</th>
-                  <th style="text-align: right;">Ping</th>
-                  <th>Último Sync</th>
+                  <th style="text-align: right; width: 110px;">Download</th>
+                  <th style="text-align: right; width: 110px;">Upload</th>
+                  <th style="text-align: right; width: 90px;">Ping</th>
+                  <th style="width: 130px;">Último Sync</th>
                   <th style="text-align: center; width: 110px;">Ações</th>
                 </tr>
               </thead>
@@ -165,119 +240,125 @@
           </div>
         </section>
 
-      <!-- Section: Comparative Charts -->
-      <section class="section-block">
-        <div class="charts-header-bar">
-          <div class="charts-header-left">
-            <h3 class="charts-section-heading">Desempenho &amp; Métricas Comparativas</h3>
-            <p class="charts-section-sub">Acompanhamento de vazão e latência em tempo real. Clique em uma máquina na lista para isolar seus gráficos.</p>
-          </div>
-          <div class="charts-header-right">
-            <div id="chart-focus-indicator" class="chart-focus-pill all">
-              <span class="focus-dot"></span>
-              <span class="focus-label">Exibindo:</span>
-              <span id="chart-focus-name" class="focus-name">Todas as Sondas (Consolidado)</span>
+        <!-- Section: Comparative Charts -->
+        <section class="section-block">
+          <div class="charts-header-bar">
+            <div class="charts-header-left">
+              <h3 class="charts-section-heading">Desempenho &amp; Métricas Comparativas</h3>
+              <p class="charts-section-sub">Acompanhamento contínuo de vazão e latência. Clique em qualquer linha acima para filtrar.</p>
             </div>
-            <button id="btn-reset-chart-focus" class="btn btn-sm btn-glass btn-reset-focus" style="display: none;" title="Restaurar visualização de todas as máquinas">
-              Ver Todas as Sondas
-            </button>
-          </div>
-        </div>
-
-        <div class="charts-grid">
-          <!-- Chart 1: Bandwidth Comparison (Download & Upload) -->
-          <div class="chart-panel">
-            <div class="panel-header">
-              <div>
-                <h4 id="bandwidth-chart-title">Histórico de Throughput</h4>
-                <p id="bandwidth-chart-desc" class="panel-desc">Taxa de Download dos últimos 20 testes (Mbps)</p>
+            <div class="charts-header-right">
+              <div id="chart-focus-indicator" class="chart-focus-pill all">
+                <span class="focus-dot"></span>
+                <span class="focus-label">Exibindo:</span>
+                <span id="chart-focus-name" class="focus-name">Todas as Sondas (Consolidado)</span>
               </div>
-              <div class="panel-header-right">
-                <div class="segmented-control" id="bandwidth-metric-toggle" role="group" aria-label="Métrica de Throughput">
-                  <button type="button" class="segment-btn active" data-metric="download" onclick="handleMetricBtnClick('download')" title="Filtrar por taxa de Download">
-                    <svg class="segment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    <span>Download</span>
-                  </button>
-                  <button type="button" class="segment-btn" data-metric="upload" onclick="handleMetricBtnClick('upload')" title="Filtrar por taxa de Upload">
-                    <svg class="segment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="17 8 12 3 7 8"></polyline>
-                      <line x1="12" y1="3" x2="12" y2="15"></line>
-                    </svg>
-                    <span>Upload</span>
-                  </button>
-                  <button type="button" class="segment-btn hidden-metric" data-metric="both" id="btn-metric-both" onclick="handleMetricBtnClick('both')" title="Comparar Download e Upload">
-                    <svg class="segment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                      <line x1="18" y1="20" x2="18" y2="10"></line>
-                      <line x1="12" y1="20" x2="12" y2="4"></line>
-                      <line x1="6" y1="20" x2="6" y2="14"></line>
-                    </svg>
-                    <span>Ambos</span>
-                  </button>
+              <button id="btn-reset-chart-focus" class="btn btn-sm btn-glass btn-reset-focus" style="display: none;" title="Restaurar visualização de todas as máquinas">
+                Ver Todas as Sondas
+              </button>
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <!-- Chart 1: Bandwidth Comparison (Download & Upload) -->
+            <div class="chart-panel">
+              <div class="panel-header">
+                <div>
+                  <h4 id="bandwidth-chart-title">Histórico de Throughput</h4>
+                  <p id="bandwidth-chart-desc" class="panel-desc">Taxa de Download dos últimos 20 testes (Mbps)</p>
                 </div>
-                <div id="bandwidth-legend-container" class="chart-legend-custom">
-                  <span class="legend-badge cyan-dot">Download</span>
-                  <span class="legend-badge purple-dot">Upload</span>
+                <div class="panel-header-right">
+                  <div class="segmented-control" id="bandwidth-metric-toggle" role="group" aria-label="Métrica de Throughput">
+                    <button type="button" class="segment-btn active" data-metric="download" onclick="handleMetricBtnClick('download')" title="Filtrar por taxa de Download">
+                      <svg class="segment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </svg>
+                      <span>Download</span>
+                    </button>
+                    <button type="button" class="segment-btn" data-metric="upload" onclick="handleMetricBtnClick('upload')" title="Filtrar por taxa de Upload">
+                      <svg class="segment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                      </svg>
+                      <span>Upload</span>
+                    </button>
+                    <button type="button" class="segment-btn hidden-metric" data-metric="both" id="btn-metric-both" onclick="handleMetricBtnClick('both')" title="Comparar Download e Upload">
+                      <svg class="segment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                      </svg>
+                      <span>Ambos</span>
+                    </button>
+                  </div>
+                  <!-- Legendas compactas mantidas ocultas por redundância -->
+                  <div id="bandwidth-legend-container" class="chart-legend-custom" style="display: none;">
+                    <span class="legend-badge cyan-dot">Download</span>
+                    <span class="legend-badge purple-dot">Upload</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="chart-canvas-container">
-              <canvas id="centralBandwidthChart"></canvas>
-            </div>
-          </div>
-
-          <!-- Chart 2: Latency Comparison (Gateway Ping) -->
-          <div class="chart-panel">
-            <div class="panel-header">
-              <div>
-                <h4>Histórico de Latência (Gateway)</h4>
-                <p class="panel-desc">Tempo de resposta dos últimos 20 testes (ms)</p>
-              </div>
-              <div id="latency-legend-container" class="chart-legend-custom">
-                <span class="legend-badge emerald-dot">Ping Gateway</span>
+              <div class="chart-canvas-container">
+                <canvas id="centralBandwidthChart"></canvas>
               </div>
             </div>
-            <div class="chart-canvas-container">
-              <canvas id="centralLatencyChart"></canvas>
+
+            <!-- Chart 2: Latency Comparison (Gateway Ping) -->
+            <div class="chart-panel">
+              <div class="panel-header">
+                <div>
+                  <h4>Histórico de Latência (Gateway)</h4>
+                  <p class="panel-desc">Tempo de resposta dos últimos 20 testes (ms)</p>
+                </div>
+                <div id="latency-legend-container" class="chart-legend-custom">
+                  <span class="legend-badge emerald-dot">Ping Gateway</span>
+                </div>
+              </div>
+              <div class="chart-canvas-container">
+                <canvas id="centralLatencyChart"></canvas>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- Section: Telemetry Stream Feed -->
-      <section class="section-block">
-        <div class="panel-header">
-          <div>
-            <h4>Feed de Telemetria em Tempo Real (Últimas Leituras)</h4>
-            <p class="panel-desc">Registro histórico ingerido na coleção Time Series <code>network_central.metrics</code></p>
+        <!-- Section: Telemetry Stream Feed (Elegante e Recolhível) -->
+        <section class="section-block telemetry-section">
+          <div class="panel-header" id="telemetry-header-bar">
+            <div>
+              <h4>Feed de Telemetria em Tempo Real (Últimas Leituras)</h4>
+              <p class="panel-desc">Registro histórico ingerido na coleção Time Series <code>network_central.metrics</code></p>
+            </div>
+            <div class="panel-header-right">
+              <span id="last-ingest-time" class="text-subtle">Aguardando dados...</span>
+              <button type="button" id="btn-toggle-telemetry" class="btn btn-sm btn-glass" onclick="toggleTelemetryFeed()" title="Recolher ou Expandir o feed de telemetria">
+                <span id="telemetry-toggle-text">Recolher</span>
+              </button>
+            </div>
           </div>
-          <span id="last-ingest-time" class="text-subtle">Aguardando dados...</span>
-        </div>
-        <div class="table-container">
-          <table class="telemetry-table">
-            <thead>
-              <tr>
-                <th>Timestamp (UTC)</th>
-                <th>Nó (Node ID)</th>
-                <th>Localização</th>
-                <th>Download</th>
-                <th>Upload</th>
-                <th>Ping Gateway</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="telemetry-table-body">
-              <tr>
-                <td colspan="7" class="text-center text-muted">Carregando feed de telemetria...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+          <div class="table-container" id="telemetry-table-container">
+            <table class="telemetry-table">
+              <thead>
+                <tr>
+                  <th>Timestamp (UTC)</th>
+                  <th>Nó (Node ID)</th>
+                  <th>Localização</th>
+                  <th style="text-align: right;">Download</th>
+                  <th style="text-align: right;">Upload</th>
+                  <th style="text-align: right;">Ping Gateway</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="telemetry-table-body">
+                <tr>
+                  <td colspan="7" class="text-center text-muted">Carregando feed de telemetria...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div> <!-- /#view-dashboard -->
 
       <!-- VIEW 2: GRUPOS & VLANS (PÁGINA DEDICADA) -->

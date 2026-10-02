@@ -24,10 +24,7 @@ type ProfileManager struct {
 
 // NewProfileManager instancia o gerenciador
 func NewProfileManager() *ProfileManager {
-	hostname, _ := os.Hostname()
-	if hostname == "" {
-		hostname = "local-probe"
-	}
+	hostname := GetSystemHostname()
 
 	execDir, errExec := filepath.Abs(filepath.Dir(os.Args[0]))
 	if errExec != nil {
@@ -56,7 +53,7 @@ func NewProfileManager() *ProfileManager {
 
 // FetchRemoteProfile tenta baixar o perfil mais recente para a máquina atual
 func (pm *ProfileManager) FetchRemoteProfile(ctx context.Context, serverURL, apiToken string) (*MeasurementProfile, error) {
-	hostname, _ := os.Hostname()
+	hostname := GetSystemHostname()
 	return pm.FetchRemoteProfileForHost(ctx, serverURL, apiToken, HostBootstrapInfo{Hostname: hostname})
 }
 
@@ -74,10 +71,7 @@ func (pm *ProfileManager) FetchRemoteProfileForHost(ctx context.Context, serverU
 
 	hostname := strings.TrimSpace(hostInfo.Hostname)
 	if hostname == "" {
-		hostname, _ = os.Hostname()
-	}
-	if hostname == "" {
-		hostname = "local-probe"
+		hostname = GetSystemHostname()
 	}
 
 	// Atualiza caminho do cache para o host atual
