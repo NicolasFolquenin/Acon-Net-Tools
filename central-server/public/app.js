@@ -413,33 +413,11 @@ function applyTheme(theme, notify = false) {
   }
 }
 
-function setupSidebarToggle() {
-  const layout = document.querySelector('.dashboard-layout');
-  const toggleBtns = document.querySelectorAll('.btn-toggle-sidebar');
-  if (!layout) return;
-
-  // Carrega preferência persistida
-  const isCollapsed = localStorage.getItem('uepg_sidebar_collapsed') === 'true';
-  if (isCollapsed) {
-    layout.classList.add('sidebar-collapsed');
-  }
-
-  toggleBtns.forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      layout.classList.toggle('sidebar-collapsed');
-      const collapsed = layout.classList.contains('sidebar-collapsed');
-      localStorage.setItem('uepg_sidebar_collapsed', collapsed ? 'true' : 'false');
-    });
-  });
-}
-
 /* ==========================================================================
    2. Configuração de Eventos
    ========================================================================== */
 
 function setupEventListeners() {
-  setupSidebarToggle();
   loginForm.addEventListener('submit', handleLoginSubmit);
   btnLogout.addEventListener('click', handleLogout);
 
