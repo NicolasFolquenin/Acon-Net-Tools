@@ -340,11 +340,19 @@ body {
 }
 
 #btn-open-settings svg {
-  transition: transform 0.3s ease;
+  overflow: visible;
 }
 
-#btn-open-settings:hover svg {
-  transform: rotate(60deg);
+#btn-open-settings .gear-spinner {
+  transform-origin: 12px 12px;
+  transform-box: view-box;
+  transform: rotate(0deg);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+#btn-open-settings:hover .gear-spinner {
+  transform: rotate(45deg);
 }
 
 /* Theme Toggle Button */
