@@ -2086,7 +2086,7 @@ function renderTelemetryTable(series) {
         <td><strong style="color: var(--accent-cyan);">${item.download_mbps.toFixed(1)}</strong> Mbps</td>
         <td><strong style="color: #c084fc;">${item.upload_mbps.toFixed(1)}</strong> Mbps</td>
         <td><strong style="color: #34d399;">${item.ping_gateway.toFixed(1)}</strong> ms</td>
-        <td><span class="dc-health-badge online" style="display:inline-flex;">● Ingerido</span></td>
+        <td><span class="dc-health-badge online" style="display:inline-flex;">● Sincronizado</span></td>
       </tr>
     `;
   }).join('');
