@@ -2685,16 +2685,29 @@ body {
   gap: 2px;
 }
 
-.node-name-text {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: var(--text-main);
-  letter-spacing: -0.01em;
-  transition: color 0.15s ease;
+.node-name-text,
+.node-name-btn {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  color: var(--text-main) !important;
+  letter-spacing: -0.01em !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  display: inline-block !important;
+  transition: color 0.15s ease !important;
 }
 
-.nodes-table tbody tr.node-row:hover .node-name-text {
-  color: var(--accent-cyan);
+.nodes-table tbody tr.node-row:hover .node-name-text,
+.nodes-table tbody tr.node-row:hover .node-name-btn,
+.node-name-btn:hover {
+  color: var(--accent-cyan) !important;
 }
 
 .node-sub-ip {
