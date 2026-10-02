@@ -273,14 +273,17 @@ function setAuthenticatedUser(user) {
   navRoleBadge.className = `role-badge ${user.role}`;
 
   // Se for admin, os botões e abas de administração estarão visíveis
+  const adminSection = document.getElementById('sidebar-admin-section');
   if (user.role === 'admin') {
     modalBtnDeletePc.style.display = 'inline-flex';
-    if (btnOpenUsers) btnOpenUsers.style.display = 'inline-flex';
-    if (tabGroups) tabGroups.style.display = 'inline-flex';
+    if (btnOpenUsers) btnOpenUsers.style.display = 'flex';
+    if (tabGroups) tabGroups.style.display = 'flex';
+    if (adminSection) adminSection.style.display = 'block';
   } else {
     modalBtnDeletePc.style.display = 'none';
     if (btnOpenUsers) btnOpenUsers.style.display = 'none';
     if (tabGroups) tabGroups.style.display = 'none';
+    if (adminSection) adminSection.style.display = 'none';
     if (window.location.hash === '#groups') {
       switchView('dashboard');
     }
@@ -296,6 +299,8 @@ function showLoginModal() {
   loginErrorAlert.style.display = 'none';
   loginUsernameInput.value = '';
   loginPasswordInput.value = '';
+  const adminSection = document.getElementById('sidebar-admin-section');
+  if (adminSection) adminSection.style.display = 'none';
   if (btnOpenUsers) btnOpenUsers.style.display = 'none';
   if (usersModal) usersModal.style.display = 'none';
   if (btnOpenGroups) btnOpenGroups.style.display = 'none';
@@ -310,6 +315,7 @@ function showLoginModal() {
    ========================================================================== */
 
 function switchView(viewName) {
+  const pageTitle = document.getElementById('page-title');
   if (viewName === 'groups') {
     if (!currentUser || currentUser.role !== 'admin') {
       showToast('Acesso restrito a administradores', 'toast-error');
@@ -320,6 +326,7 @@ function switchView(viewName) {
     if (viewGroups) viewGroups.style.display = 'block';
     if (tabDashboard) tabDashboard.classList.remove('active');
     if (tabGroups) tabGroups.classList.add('active');
+    if (pageTitle) pageTitle.textContent = 'Grupos & VLANs';
     window.location.hash = '#groups';
     loadGroupsList();
   } else {
@@ -327,6 +334,7 @@ function switchView(viewName) {
     if (viewDashboard) viewDashboard.style.display = 'block';
     if (tabGroups) tabGroups.classList.remove('active');
     if (tabDashboard) tabDashboard.classList.add('active');
+    if (pageTitle) pageTitle.textContent = 'Dashboard';
     window.location.hash = '#dashboard';
   }
 }

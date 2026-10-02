@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UEPG Net Tools - Monitoramento de Rede</title>
-  <link rel="stylesheet" href="style.css?v=2.2.3" />
+  <link rel="stylesheet" href="style.css?v=2.3.0" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -12,62 +12,56 @@
 </head>
 <body>
   <div class="dashboard-layout">
-    <!-- Navbar / Header -->
-    <header class="navbar">
-      <div class="nav-brand">
-        <img src="uepg-logo.png" alt="Logo UEPG" class="brand-logo" />
-        <div class="brand-text">
-          <h2>UEPG Net Tools</h2>
-          <p>Coletor Distribuído Go + MongoDB Time Series</p>
+    <!-- Barra Lateral (Sidebar) -->
+    <aside class="app-sidebar" id="app-sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-brand">
+          <img src="uepg-logo.png" alt="Logo UEPG" class="brand-logo" />
+          <div class="brand-text">
+            <h2>UEPG Net Tools</h2>
+            <p>Coletor Distribuído Go</p>
+          </div>
         </div>
+
+        <nav class="sidebar-nav">
+          <span class="nav-section-title">Menu Principal</span>
+          <button id="tab-dashboard" class="sidebar-nav-btn active" onclick="switchView('dashboard')" title="Visão Geral do Monitoramento">
+            <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            </svg>
+            <span>Dashboard</span>
+          </button>
+
+          <button id="tab-groups" class="sidebar-nav-btn" onclick="switchView('groups')" style="display: none;" title="Gerenciar Grupos e VLANs">
+            <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+            <span>Grupos & VLANs</span>
+          </button>
+
+          <div id="sidebar-admin-section" style="display: none;">
+            <span class="nav-section-title">Administração</span>
+            <button id="btn-open-users" class="sidebar-nav-btn" title="Gerenciar Usuários (Apenas Administrador)">
+              <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              <span>Usuários</span>
+            </button>
+          </div>
+        </nav>
       </div>
 
-      <!-- Abas Principais de Navegação -->
-      <nav class="nav-tabs" id="main-nav-tabs">
-        <button id="tab-dashboard" class="nav-tab-btn active" onclick="switchView('dashboard')">
-          Dashboard
-        </button>
-        <button id="tab-groups" class="nav-tab-btn" onclick="switchView('groups')" style="display: none;">
-          Grupos & VLANs
-        </button>
-      </nav>
-
-      <div class="nav-controls">
-        <!-- Botão Atualizar -->
-        <button id="btn-refresh" class="btn btn-glass" title="Recarregar Métricas">
-          <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M23 4v6h-6"></path>
-            <path d="M1 20v-6h6"></path>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-          </svg>
-          <span>Atualizar</span>
-        </button>
-
-        <div class="live-pill">
-          <span class="live-indicator"></span>
-          <span id="auto-refresh-timer">Auto: 15s</span>
-        </div>
-
-        <!-- Botão Alternar Modo Claro / Escuro -->
-        <button id="btn-theme-toggle" class="btn btn-glass btn-theme" title="Alternar Modo Claro / Escuro" aria-label="Alternar Tema">
-          <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
-          <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
-        </button>
-
-        <!-- User Profile & Logout -->
-        <div id="user-nav-box" class="user-nav-box">
+      <!-- Rodapé da Barra Lateral (Perfil e Ações Rápidas) -->
+      <div class="sidebar-footer">
+        <div class="sidebar-user-box" id="user-nav-box">
           <div class="user-info-chip">
             <div class="user-avatar" id="user-avatar" title="Usuário Autenticado">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
@@ -80,15 +74,26 @@
               <span id="nav-role-badge" class="role-badge">--</span>
             </div>
           </div>
-          <button id="btn-open-users" class="btn btn-glass btn-users-nav" title="Gerenciar Usuários (Apenas Administrador)" style="display: none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </div>
+
+        <div class="sidebar-actions-row">
+          <button id="btn-theme-toggle" class="btn btn-glass btn-theme" title="Alternar Modo Claro / Escuro" aria-label="Alternar Tema">
+            <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
             </svg>
-            <span>Usuários</span>
+            <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
           </button>
+
           <button id="btn-logout" class="btn btn-logout" title="Encerrar Sessão">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -99,7 +104,36 @@
           </button>
         </div>
       </div>
-    </header>
+    </aside>
+
+    <!-- Área Principal de Conteúdo -->
+    <div class="app-main-content">
+      <!-- Topbar Minimalista -->
+      <header class="main-topbar">
+        <div class="topbar-left">
+          <div class="topbar-breadcrumbs">
+            <span class="breadcrumb-root">UEPG Net Tools</span>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current" id="page-title">Dashboard</span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button id="btn-refresh" class="btn btn-glass" title="Recarregar Métricas">
+            <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            <span>Atualizar</span>
+          </button>
+
+          <div class="live-pill">
+            <span class="live-indicator"></span>
+            <span id="auto-refresh-timer">Auto: 15s</span>
+          </div>
+        </div>
+      </header>
 
     <!-- Main Container -->
     <main class="dashboard-body" id="main-content">
@@ -642,6 +676,7 @@
         <span>Contrato API: <code>POST /api/v1/metrics</code></span>
       </div>
     </footer>
+    </div>
   </div>
 
   <!-- =========================================================================
@@ -1103,6 +1138,6 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="app.js?v=2.2.2"></script>
+  <script src="app.js?v=2.3.0"></script>
 </body>
 </html>
