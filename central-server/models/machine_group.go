@@ -115,8 +115,8 @@ func GetInitialGroups() []MachineGroup {
 			Name:        "Grupo ACON (Anel de Conectividade)",
 			Description: "Sondas dedicadas de alta prioridade instaladas nos blocos do Anel",
 			Rules: GroupAutoRules{
-				VLANs:     []int{50, 52},
-				IPSubnets: []string{"10.50.0.0/16"},
+				VLANs:     []int{50, 52, 1101},
+				IPSubnets: []string{"10.50.0.0/16", "10.0.0.0/16"},
 			},
 			Profile: MeasurementProfile{
 				Version:         "2026.group-acon",

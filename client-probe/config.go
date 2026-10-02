@@ -45,10 +45,26 @@ func LoadEnvFile(filename string) {
 	}
 }
 
+// GetSystemHostname obtém e força estritamente o hostname do computador real.
+// Impede qualquer alteração manual pelo usuário, arquivo de configuração ou variáveis de ambiente.
+func GetSystemHostname() string {
+	if h, err := os.Hostname(); err == nil && strings.TrimSpace(h) != "" {
+		return strings.TrimSpace(h)
+	}
+	if h := os.Getenv("COMPUTERNAME"); strings.TrimSpace(h) != "" {
+		return strings.TrimSpace(h)
+	}
+	if h := os.Getenv("HOSTNAME"); strings.TrimSpace(h) != "" {
+		return strings.TrimSpace(h)
+	}
+	return "pc-windows"
+}
+
 // LoadConfig carrega as configurações com a seguinte prioridade:
 // 1. Variáveis de ambiente (ou arquivo .env)
 // 2. Arquivo config.json (se existir)
 // 3. Valores padrão
+// NOTA: O NodeID é SEMPRE forçado para o hostname real do computador.
 func LoadConfig(customPath string) (*Config, error) {
 	configMu.Lock()
 	defer configMu.Unlock()
@@ -84,9 +100,7 @@ func LoadConfig(customPath string) (*Config, error) {
 	}
 
 	// 2. Sobrescreve com variáveis do .env / Ambiente (têm prioridade)
-	if v := os.Getenv("PROBE_NODE_ID"); v != "" {
-		cfg.NodeID = v
-	}
+	// PROBE_NODE_ID é ignorado intencionalmente para garantir integridade do hostname
 	if v := os.Getenv("PROBE_LOCATION"); v != "" {
 		cfg.Location = v
 	}
@@ -119,11 +133,8 @@ func LoadConfig(customPath string) (*Config, error) {
 	}
 
 	// 3. Força ESTRITAMENTE o Hostname real do SO como NodeID (não pode mais ser alterado)
-	if hostname, errHost := os.Hostname(); errHost == nil && strings.TrimSpace(hostname) != "" {
-		cfg.NodeID = strings.TrimSpace(hostname)
-	} else if cfg.NodeID == "" {
-		cfg.NodeID = "pc-windows"
-	}
+	cfg.NodeID = GetSystemHostname()
+
 	if cfg.Location == "" {
 		cfg.Location = "Escritorio-Local"
 	}
@@ -147,7 +158,7 @@ func LoadConfig(customPath string) (*Config, error) {
 	}
 
 	appConfig = cfg
-	log.Printf("[CONFIG] Configurações ativas: NodeID=%s, Location=%s, Server=%s, Interval=%dm, SyncCentral=%v, Ping=%s",
+	log.Printf("[CONFIG] Configurações ativas: NodeID=%s (Hostname Fixo), Location=%s, Server=%s, Interval=%dm, SyncCentral=%v, Ping=%s",
 		cfg.NodeID, cfg.Location, cfg.ServerURL, cfg.IntervalMinutes, cfg.SyncWithCentral, cfg.PingTarget)
 
 	return appConfig, nil
@@ -157,17 +168,21 @@ func LoadConfig(customPath string) (*Config, error) {
 func GetCurrentConfig() Config {
 	configMu.RLock()
 	defer configMu.RUnlock()
+	hostname := GetSystemHostname()
 	if appConfig == nil {
 		return Config{
-			NodeID:          "meu-pc-windows",
+			NodeID:          hostname,
 			Location:        "Escritorio-Local",
 			ServerURL:       "http://localhost:8090",
 			APIToken:        "super-secret-probe-token-2026",
 			IntervalMinutes: 60,
 			PingTarget:      "1.1.1.1",
+			SyncWithCentral: true,
 		}
 	}
-	return *appConfig
+	cfg := *appConfig
+	cfg.NodeID = hostname
+	return cfg
 }
 
 // SaveConfig atualiza o arquivo config.json e o arquivo .env
@@ -175,10 +190,8 @@ func SaveConfig(cfg Config) error {
 	configMu.Lock()
 	defer configMu.Unlock()
 
-	// Preserva estritamente o hostname real da máquina (NodeID não pode ser alterado)
-	if hostname, errHost := os.Hostname(); errHost == nil && strings.TrimSpace(hostname) != "" {
-		cfg.NodeID = strings.TrimSpace(hostname)
-	}
+	// Preserva estritamente o hostname real da máquina (NodeID não pode ser alterado por ninguém)
+	cfg.NodeID = GetSystemHostname()
 
 	// 1. Atualiza config.json
 	data, err := json.MarshalIndent(cfg, "", "  ")

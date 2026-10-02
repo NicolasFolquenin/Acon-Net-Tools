@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"testing"
 	"time"
 )
@@ -111,18 +112,27 @@ func TestNodeIDLocked(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
-	if cfg.NodeID == "" {
-		t.Errorf("Expected NodeID to be populated")
+	expectedHostname := GetSystemHostname()
+	if cfg.NodeID != expectedHostname {
+		t.Errorf("Expected NodeID to be '%s', got '%s'", expectedHostname, cfg.NodeID)
 	}
 
-	// Tenta forçar alteração
+	// 1. Tenta forçar alteração via SaveConfig
 	cfg.NodeID = "novo-nome-hackeado"
 	_ = SaveConfig(*cfg)
 
 	// Recarrega e valida se permaneceu travado no hostname
 	reloaded, _ := LoadConfig("")
-	if reloaded.NodeID == "novo-nome-hackeado" {
-		t.Errorf("NodeID should not be modifiable by user")
+	if reloaded.NodeID == "novo-nome-hackeado" || reloaded.NodeID != expectedHostname {
+		t.Errorf("NodeID should not be modifiable by SaveConfig, got '%s'", reloaded.NodeID)
+	}
+
+	// 2. Tenta forçar alteração via variável de ambiente
+	_ = os.Setenv("PROBE_NODE_ID", "hack-via-env")
+	defer os.Unsetenv("PROBE_NODE_ID")
+	reloadedEnv, _ := LoadConfig("")
+	if reloadedEnv.NodeID != expectedHostname {
+		t.Errorf("NodeID should not be modifiable via PROBE_NODE_ID env var, got '%s'", reloadedEnv.NodeID)
 	}
 }
 

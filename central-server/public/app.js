@@ -1340,6 +1340,74 @@ function renderSummaryCards(summaries) {
   // Mantido para integração e compatibilidade com loadDashboardData
   populateGroupFilter(summaries);
   applyNodeFilters();
+  renderKpiCards(summaries);
+}
+
+function renderKpiCards(summaries) {
+  const totalEl = document.getElementById('kpi-total-nodes');
+  const healthEl = document.getElementById('kpi-health-rate');
+  const subEl = document.getElementById('kpi-nodes-sub');
+  const downEl = document.getElementById('kpi-avg-download');
+  const upEl = document.getElementById('kpi-avg-upload');
+  const pingEl = document.getElementById('kpi-avg-ping');
+  const pingSubEl = document.getElementById('kpi-ping-status');
+
+  if (!summaries || summaries.length === 0) {
+    if (totalEl) totalEl.textContent = '0';
+    if (healthEl) { healthEl.textContent = '0% Online'; healthEl.className = 'kpi-badge warning'; }
+    if (subEl) subEl.textContent = 'Nenhuma sonda detectada';
+    if (downEl) downEl.textContent = '0.0';
+    if (upEl) upEl.textContent = '0.0';
+    if (pingEl) pingEl.textContent = '0.0';
+    return;
+  }
+
+  const total = summaries.length;
+  const onlineCount = summaries.filter(s => s.is_healthy).length;
+  const healthPct = Math.round((onlineCount / total) * 100);
+
+  if (totalEl) totalEl.textContent = total;
+  if (healthEl) {
+    healthEl.textContent = `${healthPct}% Online`;
+    healthEl.className = `kpi-badge ${healthPct >= 80 ? 'success' : (healthPct >= 50 ? 'warning' : 'danger')}`;
+  }
+  if (subEl) subEl.textContent = `${onlineCount} de ${total} ativas no campus`;
+
+  let sumDown = 0, sumUp = 0, sumPing = 0;
+  summaries.forEach(s => {
+    sumDown += (s.last_download || 0);
+    sumUp += (s.last_upload || 0);
+    sumPing += (s.last_ping || 0);
+  });
+
+  const avgDown = (sumDown / total).toFixed(1);
+  const avgUp = (sumUp / total).toFixed(1);
+  const avgPing = (sumPing / total).toFixed(1);
+
+  if (downEl) downEl.textContent = avgDown;
+  if (upEl) upEl.textContent = avgUp;
+  if (pingEl) pingEl.textContent = avgPing;
+  if (pingSubEl) {
+    const p = parseFloat(avgPing);
+    if (p <= 5) pingSubEl.textContent = 'Latência excelente (< 5ms)';
+    else if (p <= 20) pingSubEl.textContent = 'Latência estável (< 20ms)';
+    else pingSubEl.textContent = 'Atenção (> 20ms)';
+  }
+}
+
+let isTelemetryCollapsed = false;
+function toggleTelemetryFeed() {
+  const container = document.getElementById('telemetry-table-container');
+  const label = document.getElementById('telemetry-toggle-text');
+  if (!container) return;
+  isTelemetryCollapsed = !isTelemetryCollapsed;
+  if (isTelemetryCollapsed) {
+    container.style.display = 'none';
+    if (label) label.textContent = 'Expandir Feed';
+  } else {
+    container.style.display = 'block';
+    if (label) label.textContent = 'Recolher';
+  }
 }
 
 function renderNodesTable(summaries) {
@@ -1395,13 +1463,10 @@ function renderNodesTable(summaries) {
             <span class="status-indicator-dot"></span>
             ${healthText}
           </span>
-          ${isSelected ? '<span class="selected-pill">No Gráfico</span>' : ''}
         </td>
         <td>
           <div class="node-cell-main">
-            <button type="button" class="node-name-btn" data-node-id="${escapeHtml(s.node_id)}" title="Filtrar gráficos por esta máquina">
-              ${escapeHtml(s.node_id)}
-            </button>
+            <span class="node-name-text">${escapeHtml(s.node_id)}</span>
             ${ipHtml}
           </div>
         </td>
@@ -1431,11 +1496,15 @@ function renderNodesTable(summaries) {
         <td class="text-center">
           <div class="table-actions">
             <button type="button" class="btn-table-action btn-inspect" data-node-id="${escapeHtml(s.node_id)}" title="Inspecionar detalhes da máquina">
-              Inspecionar
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span>Detalhes</span>
             </button>
             ${isAdmin ? `
             <button type="button" class="btn-table-action btn-delete-node" data-node-id="${escapeHtml(s.node_id)}" title="Excluir máquina">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>

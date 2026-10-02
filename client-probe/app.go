@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -470,10 +469,7 @@ func (a *App) emitStatus() {
 // getHostBootstrapInfo coleta os dados locais do host e switch para identificação e auto-registro
 func (a *App) getHostBootstrapInfo() HostBootstrapInfo {
 	sys := CollectSystemInfo()
-	hostname := sys.Hostname
-	if hostname == "" {
-		hostname, _ = os.Hostname()
-	}
+	hostname := GetSystemHostname()
 	info := HostBootstrapInfo{
 		Hostname:   hostname,
 		IPAddress:  sys.IPAddress,
