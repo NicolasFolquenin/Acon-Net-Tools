@@ -327,6 +327,14 @@ function initCharts() {
   const commonOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: {
+      padding: {
+        left: 8,
+        right: 32, // Garante que a linha e o rótulo do último tick (ex: 13:50) não transbordem na borda direita
+        top: 14,
+        bottom: 6
+      }
+    },
     interaction: {
       mode: 'index',
       intersect: false
@@ -352,7 +360,13 @@ function initCharts() {
     scales: {
       x: {
         grid: { color: colors.gridColor, drawBorder: false },
-        ticks: { color: colors.textColor, font: { size: 10, family: "'JetBrains Mono', monospace" } }
+        ticks: {
+          color: colors.textColor,
+          font: { size: 10, family: "'JetBrains Mono', monospace" },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 12
+        }
       },
       y: {
         grid: { color: colors.gridColor, drawBorder: false },

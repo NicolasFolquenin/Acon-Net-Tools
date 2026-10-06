@@ -46,6 +46,7 @@ func main() {
 	profileHandler := handlers.NewProfileHandler(cfg)
 	machineProfileHandler := handlers.NewMachineProfileHandler(cfg, mongoClient)
 	groupsHandler := handlers.NewGroupsHandler(mongoClient, cfg)
+	modulesHandler := handlers.NewModulesHandler(cfg, mongoClient)
 
 	mux := http.NewServeMux()
 
@@ -92,11 +93,13 @@ func main() {
 	// Auto-registro de novas sondas (quando 404 no perfil)
 	mux.HandleFunc("/api/v1/probes/register", handlers.RequireBearerToken(cfg.APIToken, machineProfileHandler.HandleRegisterProbe))
 
-	// Endpoints Administrativos para Máquinas e Grupos
+	// Endpoints Administrativos para Máquinas, Grupos e Módulos
 	mux.HandleFunc("/api/v1/admin/machines", authHandler.RequireAdmin(machineProfileHandler.HandleAdminMachines))
 	mux.HandleFunc("/api/v1/admin/machines/", authHandler.RequireAdmin(machineProfileHandler.HandleAdminMachines))
 	mux.HandleFunc("/api/v1/admin/groups", authHandler.RequireAdmin(machineProfileHandler.HandleAdminGroups))
 	mux.HandleFunc("/api/v1/admin/groups/", authHandler.RequireAdmin(machineProfileHandler.HandleAdminGroups))
+	mux.HandleFunc("/api/v1/admin/modules", authHandler.RequireAdmin(modulesHandler.HandleModules))
+	mux.HandleFunc("/api/v1/admin/modules/", authHandler.RequireAdmin(modulesHandler.HandleModules))
 
 	// Endpoints de Grupos de Testes e VLANs (compatibilidade com dashboard e sondas legadas)
 	mux.HandleFunc("/api/v1/config/probe", handlers.RequireBearerToken(cfg.APIToken, groupsHandler.GetProbeConfig))
