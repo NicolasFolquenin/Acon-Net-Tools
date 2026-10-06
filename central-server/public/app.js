@@ -11,11 +11,68 @@ let currentSummaries = [];
 let pendingDeleteNodeId = null;
 let selectedChartNode = 'all';
 
-// Elementos de Navegação por Abas & Páginas/Views
 const tabDashboard = document.getElementById('tab-dashboard');
+const tabMachines = document.getElementById('tab-machines');
 const tabGroups = document.getElementById('tab-groups');
+const tabModules = document.getElementById('tab-modules');
 const viewDashboard = document.getElementById('view-dashboard');
+const viewMachines = document.getElementById('view-machines');
 const viewGroups = document.getElementById('view-groups');
+const viewModules = document.getElementById('view-modules');
+
+// Elementos da Aba Máquinas
+const machinesSearchInput = document.getElementById('machines-search-input');
+const machinesGroupFilter = document.getElementById('machines-group-filter');
+const machinesModuleFilter = document.getElementById('machines-module-filter');
+const machinesStatusFilter = document.getElementById('machines-status-filter');
+const machinesFilterCount = document.getElementById('machines-filter-count');
+const machinesTableBody = document.getElementById('machines-table-body');
+const btnRefreshMachines = document.getElementById('btn-refresh-machines');
+
+// Elementos do Modal de Métricas da Máquina
+const machineMetricsModal = document.getElementById('machine-metrics-modal');
+const modalBtnCloseMm = document.getElementById('modal-btn-close-mm');
+const modalBtnCloseMmBottom = document.getElementById('modal-btn-close-mm-bottom');
+const mmBtnFocusDashboard = document.getElementById('mm-btn-focus-dashboard');
+
+// Elementos do Modal de Configuração da Máquina
+const machineConfigModal = document.getElementById('machine-config-modal');
+const modalBtnCloseMc = document.getElementById('modal-btn-close-mc');
+const machineConfigForm = document.getElementById('machine-config-form');
+const mcInputHostname = document.getElementById('mc-input-hostname');
+const mcHostnameTitle = document.getElementById('mc-hostname-title');
+const mcSelectGroup = document.getElementById('mc-select-group');
+const mcToggleCustom = document.getElementById('mc-toggle-custom');
+const mcCustomModulesContainer = document.getElementById('mc-custom-modules-container');
+const mcModulesCheckboxesList = document.getElementById('mc-modules-checkboxes-list');
+
+// Elementos do Catálogo de Módulos & Upload JSON
+const modulesCardsGrid = document.getElementById('modules-cards-grid');
+const modulesCountTag = document.getElementById('modules-count-tag');
+const btnOpenUploadModule = document.getElementById('btn-open-upload-module');
+const moduleUploadModal = document.getElementById('module-upload-modal');
+const modalBtnCloseUploadMod = document.getElementById('modal-btn-close-upload-mod');
+const btnCancelUploadMod = document.getElementById('btn-cancel-upload-mod');
+const btnSubmitUploadMod = document.getElementById('btn-submit-upload-mod');
+const jsonDropzone = document.getElementById('json-dropzone');
+const modFileInput = document.getElementById('mod-file-input');
+const modJsonTextarea = document.getElementById('mod-json-textarea');
+const modJsonErrorAlert = document.getElementById('mod-json-error-alert');
+const modJsonErrorText = document.getElementById('mod-json-error-text');
+
+// Estado de Máquinas e Módulos
+let allAdminMachines = [];
+let allCatalogModules = [];
+let mmLatencyChart = null;
+let mmThroughputChart = null;
+let currentInspectedMachine = null;
+const machineFilterState = {
+  search: '',
+  group: 'all',
+  module: 'all',
+  status: 'all'
+};
+
 
 // Elementos DOM principais
 const selectNode = document.getElementById('select-node');
@@ -272,19 +329,24 @@ function setAuthenticatedUser(user) {
   navRoleBadge.textContent = user.role === 'admin' ? 'Administrador' : 'Operador';
   navRoleBadge.className = `role-badge ${user.role}`;
 
-  // Se for admin, os botões e abas de administração estarão visíveis
+  // Aba Máquinas visível para todos os usuários autenticados
+  if (tabMachines) tabMachines.style.display = 'flex';
+
+  // Se for admin, as abas e botões de administração estarão visíveis
   const adminSection = document.getElementById('sidebar-admin-section');
   if (user.role === 'admin') {
     modalBtnDeletePc.style.display = 'inline-flex';
     if (btnOpenUsers) btnOpenUsers.style.display = 'flex';
     if (tabGroups) tabGroups.style.display = 'flex';
+    if (tabModules) tabModules.style.display = 'flex';
     if (adminSection) adminSection.style.display = 'block';
   } else {
     modalBtnDeletePc.style.display = 'none';
     if (btnOpenUsers) btnOpenUsers.style.display = 'none';
     if (tabGroups) tabGroups.style.display = 'none';
+    if (tabModules) tabModules.style.display = 'none';
     if (adminSection) adminSection.style.display = 'none';
-    if (window.location.hash === '#groups') {
+    if (window.location.hash === '#groups' || window.location.hash === '#modules') {
       switchView('dashboard');
     }
   }
@@ -303,36 +365,63 @@ function showLoginModal() {
   if (adminSection) adminSection.style.display = 'none';
   if (btnOpenUsers) btnOpenUsers.style.display = 'none';
   if (usersModal) usersModal.style.display = 'none';
+  if (tabMachines) tabMachines.style.display = 'none';
   if (btnOpenGroups) btnOpenGroups.style.display = 'none';
   if (tabGroups) tabGroups.style.display = 'none';
+  if (tabModules) tabModules.style.display = 'none';
   if (groupsModal) groupsModal.style.display = 'none';
   switchView('dashboard');
   if (refreshInterval) clearInterval(refreshInterval);
 }
 
 /* ==========================================================================
-   Controle de Views / Páginas (Dashboard vs Grupos & VLANs)
+   Controle de Views / Páginas (Dashboard vs Máquinas vs Grupos vs Módulos)
    ========================================================================== */
 
 function switchView(viewName) {
   const pageTitle = document.getElementById('page-title');
-  if (viewName === 'groups') {
+
+  // Remove classe active de todas as abas
+  [tabDashboard, tabMachines, tabGroups, tabModules].forEach(t => {
+    if (t) t.classList.remove('active');
+  });
+
+  // Oculta todas as views principais
+  if (viewDashboard) viewDashboard.style.display = 'none';
+  if (viewMachines) viewMachines.style.display = 'none';
+  if (viewGroups) viewGroups.style.display = 'none';
+  if (viewModules) viewModules.style.display = 'none';
+
+  if (viewName === 'machines') {
+    if (viewMachines) viewMachines.style.display = 'block';
+    if (tabMachines) tabMachines.classList.add('active');
+    if (pageTitle) pageTitle.textContent = 'Máquinas & Sondas';
+    window.location.hash = '#machines';
+    loadAdminMachines();
+  } else if (viewName === 'groups') {
     if (!currentUser || currentUser.role !== 'admin') {
       showToast('Acesso restrito a administradores', 'toast-error');
       switchView('dashboard');
       return;
     }
-    if (viewDashboard) viewDashboard.style.display = 'none';
     if (viewGroups) viewGroups.style.display = 'block';
-    if (tabDashboard) tabDashboard.classList.remove('active');
     if (tabGroups) tabGroups.classList.add('active');
     if (pageTitle) pageTitle.textContent = 'Grupos & VLANs';
     window.location.hash = '#groups';
     loadGroupsList();
+  } else if (viewName === 'modules') {
+    if (!currentUser || currentUser.role !== 'admin') {
+      showToast('Acesso restrito a administradores', 'toast-error');
+      switchView('dashboard');
+      return;
+    }
+    if (viewModules) viewModules.style.display = 'block';
+    if (tabModules) tabModules.classList.add('active');
+    if (pageTitle) pageTitle.textContent = 'Módulos JSON';
+    window.location.hash = '#modules';
+    loadModulesCatalog();
   } else {
-    if (viewGroups) viewGroups.style.display = 'none';
     if (viewDashboard) viewDashboard.style.display = 'block';
-    if (tabGroups) tabGroups.classList.remove('active');
     if (tabDashboard) tabDashboard.classList.add('active');
     if (pageTitle) pageTitle.textContent = 'Dashboard';
     window.location.hash = '#dashboard';
@@ -570,9 +659,118 @@ function setupEventListeners() {
     });
   }
 
+  // Navegação para Novas Abas
+  if (tabMachines) {
+    tabMachines.addEventListener('click', () => switchView('machines'));
+  }
+  if (tabModules) {
+    tabModules.addEventListener('click', () => switchView('modules'));
+  }
+  if (btnRefreshMachines) {
+    btnRefreshMachines.addEventListener('click', loadAdminMachines);
+  }
+
+  // Filtros em Tempo Real da Aba de Máquinas
+  if (machinesSearchInput) {
+    machinesSearchInput.addEventListener('input', (e) => {
+      machineFilterState.search = e.target.value.toLowerCase().trim();
+      applyMachineFilters();
+    });
+  }
+  if (machinesGroupFilter) {
+    machinesGroupFilter.addEventListener('change', (e) => {
+      machineFilterState.group = e.target.value;
+      applyMachineFilters();
+    });
+  }
+  if (machinesModuleFilter) {
+    machinesModuleFilter.addEventListener('change', (e) => {
+      machineFilterState.module = e.target.value;
+      applyMachineFilters();
+    });
+  }
+  if (machinesStatusFilter) {
+    machinesStatusFilter.addEventListener('change', (e) => {
+      machineFilterState.status = e.target.value;
+      applyMachineFilters();
+    });
+  }
+
+  // Modal de Métricas da Máquina
+  if (modalBtnCloseMm) modalBtnCloseMm.addEventListener('click', closeMachineMetricsModal);
+  if (modalBtnCloseMmBottom) modalBtnCloseMmBottom.addEventListener('click', closeMachineMetricsModal);
+  if (machineMetricsModal) {
+    machineMetricsModal.addEventListener('click', (e) => {
+      if (e.target === machineMetricsModal) closeMachineMetricsModal();
+    });
+  }
+  if (mmBtnFocusDashboard) {
+    mmBtnFocusDashboard.addEventListener('click', () => {
+      if (currentInspectedMachine) {
+        selectNodeForCharts(currentInspectedMachine);
+        closeMachineMetricsModal();
+        switchView('dashboard');
+      }
+    });
+  }
+
+  // Modal de Configuração da Máquina
+  if (modalBtnCloseMc) modalBtnCloseMc.addEventListener('click', closeMachineConfigModal);
+  if (machineConfigModal) {
+    machineConfigModal.addEventListener('click', (e) => {
+      if (e.target === machineConfigModal) closeMachineConfigModal();
+    });
+  }
+  if (machineConfigForm) {
+    machineConfigForm.addEventListener('submit', handleSaveMachineConfigSubmit);
+  }
+  if (mcToggleCustom) {
+    mcToggleCustom.addEventListener('change', (e) => {
+      if (mcCustomModulesContainer) {
+        mcCustomModulesContainer.style.display = e.target.checked ? 'block' : 'none';
+      }
+    });
+  }
+
+  // Modal de Upload de Módulo JSON
+  if (btnOpenUploadModule) btnOpenUploadModule.addEventListener('click', openModuleUploadModal);
+  if (modalBtnCloseUploadMod) modalBtnCloseUploadMod.addEventListener('click', closeModuleUploadModal);
+  if (btnCancelUploadMod) btnCancelUploadMod.addEventListener('click', closeModuleUploadModal);
+  if (moduleUploadModal) {
+    moduleUploadModal.addEventListener('click', (e) => {
+      if (e.target === moduleUploadModal) closeModuleUploadModal();
+    });
+  }
+  if (btnSubmitUploadMod) btnSubmitUploadMod.addEventListener('click', handleSaveModuleUploadSubmit);
+
+  // Dropzone de Arquivos JSON
+  if (jsonDropzone && modFileInput) {
+    jsonDropzone.addEventListener('click', () => modFileInput.click());
+    modFileInput.addEventListener('change', handleFileSelect);
+
+    jsonDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      jsonDropzone.classList.add('dragover');
+    });
+    jsonDropzone.addEventListener('dragleave', () => {
+      jsonDropzone.classList.remove('dragover');
+    });
+    jsonDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      jsonDropzone.classList.remove('dragover');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        processUploadedJsonFile(e.dataTransfer.files[0]);
+      }
+    });
+  }
+
   window.addEventListener('hashchange', () => {
-    if (window.location.hash === '#groups') {
+    if (window.location.hash === '#machines') {
+      switchView('machines');
+    } else if (window.location.hash === '#groups') {
       switchView('groups');
+    } else if (window.location.hash === '#modules') {
+      switchView('modules');
     } else {
       switchView('dashboard');
     }
@@ -594,6 +792,12 @@ function setupEventListeners() {
         closeGroupsModal();
       } else if (pcModal && pcModal.style.display !== 'none') {
         closePCModal();
+      } else if (machineMetricsModal && machineMetricsModal.style.display !== 'none') {
+        closeMachineMetricsModal();
+      } else if (machineConfigModal && machineConfigModal.style.display !== 'none') {
+        closeMachineConfigModal();
+      } else if (moduleUploadModal && moduleUploadModal.style.display !== 'none') {
+        closeModuleUploadModal();
       }
     }
   });
@@ -2138,3 +2342,748 @@ function showToast(message, type = 'toast-info') {
     toast.remove();
   }, 3500);
 }
+
+/* ==========================================================================
+   10. Gerenciamento Avançado de Máquinas & Sondas
+   ========================================================================== */
+
+async function loadAdminMachines() {
+  if (!machinesTableBody) return;
+  machinesTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando máquinas e perfis...</td></tr>`;
+
+  try {
+    const [machRes, grpRes, modRes, dashRes] = await Promise.all([
+      fetch('/api/v1/admin/machines'),
+      fetch('/api/v1/admin/groups'),
+      fetch('/api/v1/admin/modules'),
+      fetch('/api/v1/dashboard/metrics')
+    ]);
+
+    if (!machRes.ok) throw new Error('Falha ao buscar máquinas');
+
+    allAdminMachines = await machRes.json() || [];
+    currentGroups = grpRes.ok ? await grpRes.json() : [];
+    allCatalogModules = modRes.ok ? await modRes.json() : [];
+    if (dashRes.ok) {
+      const dashData = await dashRes.json();
+      currentSummaries = dashData.summaries || [];
+    }
+
+    populateMachineGroupFilterOptions();
+    applyMachineFilters();
+  } catch (err) {
+    machinesTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-rose">Erro ao carregar máquinas: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+window.loadAdminMachines = loadAdminMachines;
+
+function populateMachineGroupFilterOptions() {
+  if (!machinesGroupFilter) return;
+  const currentVal = machinesGroupFilter.value;
+  machinesGroupFilter.innerHTML = '<option value="all">Todos os Grupos</option>';
+
+  const groupIds = new Set();
+  currentGroups.forEach(g => groupIds.add(g.id));
+  allAdminMachines.forEach(m => { if (m.group_id) groupIds.add(m.group_id); });
+
+  groupIds.forEach(gid => {
+    const opt = document.createElement('option');
+    opt.value = gid;
+    const grp = currentGroups.find(g => g.id === gid);
+    opt.textContent = grp ? `${grp.name} (${gid})` : gid;
+    machinesGroupFilter.appendChild(opt);
+  });
+
+  if (groupIds.has(currentVal)) {
+    machinesGroupFilter.value = currentVal;
+  }
+}
+
+function applyMachineFilters() {
+  if (!allAdminMachines) return;
+
+  const query = (machineFilterState.search || '').trim().toLowerCase();
+  const statusFilter = machineFilterState.status || 'all';
+  const groupFilter = machineFilterState.group || 'all';
+  const moduleFilter = machineFilterState.module || 'all';
+
+  const filtered = allAdminMachines.filter(m => {
+    // 1. Status Filter
+    const summary = currentSummaries.find(s => s.node_id === m.hostname);
+    const isOnline = summary ? summary.is_healthy : (m.last_seen && (Date.now() - new Date(m.last_seen).getTime()) < 15 * 60 * 1000);
+
+    if (statusFilter === 'online' && !isOnline) return false;
+    if (statusFilter === 'offline' && isOnline) return false;
+
+    // 2. Group Filter
+    if (groupFilter !== 'all' && m.group_id !== groupFilter) return false;
+
+    // 3. Module Filter
+    if (moduleFilter !== 'all') {
+      let effectiveTests = [];
+      if (m.is_custom && m.custom_tests && m.custom_tests.length > 0) {
+        effectiveTests = m.custom_tests;
+      } else {
+        const grp = currentGroups.find(g => g.id === m.group_id);
+        if (grp && grp.profile && grp.profile.tests) {
+          effectiveTests = grp.profile.tests;
+        }
+      }
+      const hasModule = effectiveTests.some(t => t.type === moduleFilter || t.id.includes(moduleFilter));
+      if (!hasModule) return false;
+    }
+
+    // 4. Text Search
+    if (query) {
+      const matchHost = (m.hostname || '').toLowerCase().includes(query);
+      const matchIp = (m.ip_address || '').toLowerCase().includes(query);
+      const matchMac = (m.mac_address || '').toLowerCase().includes(query);
+      const matchSwitch = (m.switch_name || '').toLowerCase().includes(query);
+      const matchVlan = m.vlan ? String(m.vlan).includes(query) : false;
+      const matchGroup = (m.group_id || '').toLowerCase().includes(query);
+      if (!matchHost && !matchIp && !matchMac && !matchSwitch && !matchVlan && !matchGroup) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  if (machinesFilterCount) {
+    machinesFilterCount.textContent = `${filtered.length} de ${allAdminMachines.length} máquina${allAdminMachines.length !== 1 ? 's' : ''}`;
+  }
+
+  renderMachinesTable(filtered);
+}
+
+function renderMachinesTable(machines) {
+  if (!machinesTableBody) return;
+
+  if (machines.length === 0) {
+    machinesTableBody.innerHTML = `
+      <tr>
+        <td colspan="8" class="text-center py-5 text-subtle">
+          <p class="font-bold text-white mb-1">Nenhuma máquina encontrada com os filtros selecionados.</p>
+          <p>Tente ajustar os termos de busca ou limpar os filtros de grupo/módulo.</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  machinesTableBody.innerHTML = machines.map(m => {
+    const summary = currentSummaries.find(s => s.node_id === m.hostname);
+    const isOnline = summary ? summary.is_healthy : (m.last_seen && (Date.now() - new Date(m.last_seen).getTime()) < 15 * 60 * 1000);
+    const statusClass = isOnline ? 'online' : 'stale';
+    const statusText = isOnline ? 'Online' : 'Sem sinal';
+
+    // Módulos Ativos Efetivos
+    let effectiveTests = [];
+    if (m.is_custom && m.custom_tests && m.custom_tests.length > 0) {
+      effectiveTests = m.custom_tests;
+    } else {
+      const grp = currentGroups.find(g => g.id === m.group_id);
+      if (grp && grp.profile && grp.profile.tests) {
+        effectiveTests = grp.profile.tests;
+      }
+    }
+
+    const moduleTagsHtml = effectiveTests.map(t => {
+      let tagClass = 'ping';
+      if (t.type.includes('download')) tagClass = 'download';
+      else if (t.type.includes('upload')) tagClass = 'upload';
+      else if (t.type.includes('dns')) tagClass = 'dns';
+      else if (t.type.includes('discovery')) tagClass = 'discovery';
+      return `<span class="module-tag-pill ${tagClass}" title="${escapeHtml(t.name)}">${escapeHtml(t.id)}</span>`;
+    }).join('');
+
+    const customBadgeHtml = m.is_custom
+      ? `<span class="badge-custom-tag mr-1" title="Perfil customizado">Custom</span>`
+      : '';
+
+    // Switch & Porta
+    const switchName = m.switch_name || (summary && summary.switch_info && summary.switch_info.switch_name) || '--';
+    const switchPort = m.switch_port || (summary && summary.switch_info && summary.switch_info.switch_port) || '';
+    const switchHtml = switchName !== '--'
+      ? `<div class="switch-cell"><span class="switch-name">${escapeHtml(switchName)}</span><span class="switch-port">${escapeHtml(switchPort)}</span></div>`
+      : '<span class="text-subtle">--</span>';
+
+    // Tempo decorrido
+    const lastDate = m.last_seen ? new Date(m.last_seen) : (summary ? new Date(summary.last_seen) : null);
+    const timeAgo = lastDate ? formatTimeAgo(lastDate) : '--';
+
+    // Select de troca rápida de grupo (ou badge)
+    let groupSelectHtml = `<span class="badge-group-tag">${escapeHtml(m.group_id || 'default')}</span>`;
+    if (isAdmin) {
+      groupSelectHtml = `
+        <select class="form-input form-input-sm" style="min-width: 110px; padding: 2px 8px; font-size: 0.78rem;" onchange="handleQuickChangeGroup('${escapeHtml(m.hostname)}', this.value)">
+          ${currentGroups.map(g => `<option value="${escapeHtml(g.id)}" ${g.id === m.group_id ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
+        </select>
+      `;
+    }
+
+    return `
+      <tr class="node-row" data-hostname="${escapeHtml(m.hostname)}">
+        <td>
+          <span class="status-indicator-badge ${statusClass}">
+            <span class="status-indicator-dot"></span>
+            ${statusText}
+          </span>
+        </td>
+        <td>
+          <div class="node-cell-main">
+            <span class="node-name-text font-bold">${escapeHtml(m.hostname)}</span>
+            <span class="node-sub-ip">${escapeHtml(m.ip_address || '--')}</span>
+          </div>
+        </td>
+        <td>
+          <div style="font-size: 0.78rem; font-family: 'JetBrains Mono', monospace;">
+            <div>${escapeHtml(m.ip_address || '--')}</div>
+            <div style="color: var(--text-muted); font-size: 0.72rem;">${escapeHtml(m.mac_address || '--')}</div>
+          </div>
+        </td>
+        <td>
+          ${groupSelectHtml}
+        </td>
+        <td>
+          <div class="modules-tags-wrapper">
+            ${customBadgeHtml}
+            ${moduleTagsHtml || '<span class="text-subtle">Nenhum</span>'}
+          </div>
+        </td>
+        <td>${switchHtml}</td>
+        <td><span class="text-subtle font-mono">${timeAgo}</span></td>
+        <td style="text-align: right;">
+          <div class="table-actions" style="justify-content: flex-end;">
+            <button type="button" class="btn btn-glass btn-sm" onclick="openMachineMetricsModal('${escapeHtml(m.hostname)}')" title="Visualizar gráficos e estatísticas da máquina">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+              <span>Gráficos</span>
+            </button>
+            <button type="button" class="btn btn-glass btn-sm" onclick="openMachineConfigModal('${escapeHtml(m.hostname)}')" title="Alterar grupo e módulos">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span>Editar</span>
+            </button>
+            ${isAdmin ? `
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="promptDeleteNode('${escapeHtml(m.hostname)}')" title="Excluir máquina">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+            ` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function handleQuickChangeGroup(hostname, newGroupId) {
+  if (!confirm(`Deseja alterar a máquina "${hostname}" para o grupo "${newGroupId}"?`)) {
+    loadAdminMachines();
+    return;
+  }
+  try {
+    const res = await fetch(`/api/v1/admin/machines/${encodeURIComponent(hostname)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        group_id: newGroupId,
+        is_custom: false
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Falha ao alterar grupo');
+    showToast(`Máquina "${hostname}" movida para o grupo "${newGroupId}"!`, 'toast-success');
+    await loadAdminMachines();
+  } catch (err) {
+    showToast(`Erro ao alterar grupo: ${err.message}`, 'toast-error');
+    await loadAdminMachines();
+  }
+}
+window.handleQuickChangeGroup = handleQuickChangeGroup;
+
+/* ==========================================================================
+   11. Modal de Métricas e Gráficos da Máquina
+   ========================================================================== */
+
+async function openMachineMetricsModal(hostname) {
+  if (!machineMetricsModal) return;
+  currentInspectedMachine = hostname;
+
+  const machine = allAdminMachines.find(m => m.hostname === hostname) || { hostname };
+  const summary = currentSummaries.find(s => s.node_id === hostname);
+
+  document.getElementById('mm-hostname').textContent = hostname;
+  document.getElementById('mm-subtitle').textContent = `Grupo: ${machine.group_id || 'default'} • ${machine.is_custom ? 'Perfil Personalizado' : 'Perfil Herdado'}`;
+
+  document.getElementById('mm-stat-ping').textContent = summary ? summary.last_ping.toFixed(1) : '--';
+  document.getElementById('mm-stat-down').textContent = summary ? summary.last_download.toFixed(1) : '--';
+  document.getElementById('mm-stat-up').textContent = summary ? summary.last_upload.toFixed(1) : '--';
+  document.getElementById('mm-stat-readings').textContent = summary ? summary.total_readings_24h : '0';
+
+  const subStatus = document.getElementById('mm-sub-status');
+  if (subStatus) {
+    const isOnline = summary && summary.is_healthy;
+    subStatus.textContent = isOnline ? 'Online na rede' : 'Sem sinal recente';
+    subStatus.style.color = isOnline ? '#34d399' : '#f87171';
+  }
+
+  // Hardware e Rede
+  const sys = (summary && summary.system_info) || {};
+  document.getElementById('mm-hw-ip').textContent = machine.ip_address || sys.ip_address || '--';
+  document.getElementById('mm-hw-mac').textContent = machine.mac_address || sys.mac_address || '--';
+  document.getElementById('mm-hw-os').textContent = sys.os || '--';
+  document.getElementById('mm-hw-specs').textContent = `${sys.cpu || '--'} (${sys.ram_total_gb ? sys.ram_total_gb.toFixed(1) + 'GB' : '--'})`;
+
+  // Switch LLDP
+  const sw = (summary && summary.switch_info) || {};
+  document.getElementById('mm-sw-name').textContent = machine.switch_name || sw.switch_name || 'Não descoberto';
+  document.getElementById('mm-sw-port').textContent = machine.switch_port || sw.switch_port || '--';
+  document.getElementById('mm-sw-vlan').textContent = machine.vlan ? `VLAN ${machine.vlan}` : (sw.vlan ? `VLAN ${sw.vlan}` : '--');
+  document.getElementById('mm-sw-proto').textContent = sw.protocol || 'LLDP/CDP';
+
+  machineMetricsModal.style.display = 'flex';
+
+  try {
+    const res = await fetch(`/api/v1/dashboard/metrics?node_id=${encodeURIComponent(hostname)}`);
+    if (res.ok) {
+      const data = await res.json();
+      renderMachineMetricsCharts(data.metrics_series || []);
+    }
+  } catch (err) {
+    console.error('Falha ao carregar gráficos da máquina:', err);
+  }
+}
+window.openMachineMetricsModal = openMachineMetricsModal;
+
+function closeMachineMetricsModal() {
+  if (machineMetricsModal) machineMetricsModal.style.display = 'none';
+  if (mmLatencyChart) { mmLatencyChart.destroy(); mmLatencyChart = null; }
+  if (mmThroughputChart) { mmThroughputChart.destroy(); mmThroughputChart = null; }
+}
+
+function renderMachineMetricsCharts(metricsSeries) {
+  const ctxLatency = document.getElementById('mmLatencyChart');
+  const ctxThroughput = document.getElementById('mmThroughputChart');
+  if (!ctxLatency || !ctxThroughput) return;
+
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  const colors = getChartThemeColors(currentTheme);
+
+  if (mmLatencyChart) { mmLatencyChart.destroy(); mmLatencyChart = null; }
+  if (mmThroughputChart) { mmThroughputChart.destroy(); mmThroughputChart = null; }
+
+  const sorted = [...metricsSeries].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const labels = sorted.map(m => new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  const pings = sorted.map(m => m.ping_gateway || 0);
+  const downs = sorted.map(m => m.download_mbps || 0);
+  const ups = sorted.map(m => m.upload_mbps || 0);
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { left: 8, right: 28, top: 10, bottom: 4 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: colors.tooltipBg,
+        titleColor: colors.tooltipTitle,
+        bodyColor: colors.tooltipBody,
+        borderColor: colors.tooltipBorder,
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 6
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: colors.gridColor, drawBorder: false },
+        ticks: { color: colors.textColor, font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }
+      },
+      y: {
+        grid: { color: colors.gridColor, drawBorder: false },
+        ticks: { color: colors.textColor, font: { size: 10 } }
+      }
+    }
+  };
+
+  const ctxLat = ctxLatency.getContext('2d');
+  mmLatencyChart = new Chart(ctxLat, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Ping Gateway',
+        data: pings,
+        borderColor: '#10b981',
+        backgroundColor: createFillGradient(ctxLat, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
+        fill: true,
+        tension: 0.35,
+        borderWidth: 2,
+        pointRadius: 2.5,
+        pointHoverRadius: 5
+      }]
+    },
+    options: {
+      ...chartOptions,
+      scales: {
+        ...chartOptions.scales,
+        y: {
+          ...chartOptions.scales.y,
+          title: { display: true, text: 'ms', color: colors.textColor, font: { size: 10 } }
+        }
+      }
+    }
+  });
+
+  const ctxThr = ctxThroughput.getContext('2d');
+  mmThroughputChart = new Chart(ctxThr, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Download',
+          data: downs,
+          borderColor: '#0284c7',
+          backgroundColor: createFillGradient(ctxThr, 'rgba(2, 132, 199, 0.22)', 'rgba(2, 132, 199, 0.01)'),
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2,
+          pointRadius: 2.5,
+          pointHoverRadius: 5
+        },
+        {
+          label: 'Upload',
+          data: ups,
+          borderColor: '#4f46e5',
+          backgroundColor: createFillGradient(ctxThr, 'rgba(79, 70, 229, 0.20)', 'rgba(79, 70, 229, 0.01)'),
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2,
+          pointRadius: 2.5,
+          pointHoverRadius: 5
+        }
+      ]
+    },
+    options: {
+      ...chartOptions,
+      scales: {
+        ...chartOptions.scales,
+        y: {
+          ...chartOptions.scales.y,
+          title: { display: true, text: 'Mbps', color: colors.textColor, font: { size: 10 } }
+        }
+      }
+    }
+  });
+}
+
+/* ==========================================================================
+   12. Modal de Configuração Customizada da Máquina
+   ========================================================================== */
+
+function openMachineConfigModal(hostname) {
+  if (!machineConfigModal) return;
+  const machine = allAdminMachines.find(m => m.hostname === hostname);
+  if (!machine) {
+    showToast(`Máquina ${hostname} não encontrada`, 'toast-error');
+    return;
+  }
+
+  mcInputHostname.value = machine.hostname;
+  mcHostnameTitle.textContent = `Configurações da sonda: ${machine.hostname}`;
+
+  mcSelectGroup.innerHTML = '';
+  const availableGroups = currentGroups.length > 0 ? currentGroups : [
+    { id: 'default', name: 'Grupo Padrão' },
+    { id: 'reitoria', name: 'Grupo Reitoria' },
+    { id: 'acon', name: 'Grupo ACON' }
+  ];
+
+  availableGroups.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g.id;
+    opt.textContent = `${g.name} (${g.id})`;
+    if (g.id === machine.group_id) opt.selected = true;
+    mcSelectGroup.appendChild(opt);
+  });
+
+  mcToggleCustom.checked = !!machine.is_custom;
+  mcCustomModulesContainer.style.display = machine.is_custom ? 'block' : 'none';
+
+  renderMachineModulesCheckboxes(machine);
+
+  machineConfigModal.style.display = 'flex';
+}
+window.openMachineConfigModal = openMachineConfigModal;
+
+function closeMachineConfigModal() {
+  if (machineConfigModal) machineConfigModal.style.display = 'none';
+}
+
+function renderMachineModulesCheckboxes(machine) {
+  if (!mcModulesCheckboxesList) return;
+  const activeCustomIds = new Set((machine.custom_tests || []).map(t => t.id));
+
+  if (allCatalogModules.length === 0) {
+    mcModulesCheckboxesList.innerHTML = '<p class="text-subtle text-center py-2">Nenhum módulo encontrado no catálogo.</p>';
+    return;
+  }
+
+  mcModulesCheckboxesList.innerHTML = allCatalogModules.map(mod => {
+    const isChecked = activeCustomIds.has(mod.id);
+    return `
+      <label class="mc-module-check-item">
+        <div class="mc-module-check-left">
+          <input type="checkbox" class="mc-module-cb" data-module-id="${escapeHtml(mod.id)}" ${isChecked ? 'checked' : ''} />
+          <div>
+            <div class="mc-module-title">${escapeHtml(mod.name)}</div>
+            <div class="mc-module-sub">${escapeHtml(mod.id)} • ${escapeHtml(mod.type)}</div>
+          </div>
+        </div>
+        <span class="module-type-badge ${escapeHtml(mod.type)}">${escapeHtml(mod.type)}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+async function handleSaveMachineConfigSubmit(e) {
+  e.preventDefault();
+  const hostname = mcInputHostname.value.trim();
+  if (!hostname) return;
+
+  const groupId = mcSelectGroup.value;
+  const isCustom = mcToggleCustom.checked;
+  let customTests = [];
+
+  if (isCustom) {
+    const checkboxes = mcModulesCheckboxesList.querySelectorAll('.mc-module-cb:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-module-id'));
+    customTests = allCatalogModules.filter(m => selectedIds.includes(m.id));
+  }
+
+  const btnSubmit = document.getElementById('btn-save-machine-config');
+  if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerHTML = '<span>Salvando...</span>'; }
+
+  try {
+    const res = await fetch(`/api/v1/admin/machines/${encodeURIComponent(hostname)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        group_id: groupId,
+        is_custom: isCustom,
+        custom_tests: customTests
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Falha ao atualizar máquina');
+
+    showToast(`Configuração da máquina "${hostname}" salva com sucesso!`, 'toast-success');
+    closeMachineConfigModal();
+    await loadAdminMachines();
+  } catch (err) {
+    showToast(`Erro ao salvar: ${err.message}`, 'toast-error');
+  } finally {
+    if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '<span>Salvar Alterações</span>'; }
+  }
+}
+
+/* ==========================================================================
+   13. Catálogo de Módulos & Upload de Arquivos JSON
+   ========================================================================== */
+
+async function loadModulesCatalog() {
+  if (!modulesCardsGrid) return;
+  modulesCardsGrid.innerHTML = '<div class="module-skeleton-loader">Carregando catálogo de módulos...</div>';
+
+  try {
+    const res = await fetch('/api/v1/admin/modules');
+    if (!res.ok) throw new Error('Falha ao carregar catálogo');
+    const modules = await res.json() || [];
+    allCatalogModules = modules;
+
+    if (modulesCountTag) {
+      modulesCountTag.textContent = `${modules.length} módulo${modules.length !== 1 ? 's' : ''}`;
+    }
+
+    renderModulesCards(modules);
+  } catch (err) {
+    modulesCardsGrid.innerHTML = `<div class="text-rose text-center py-4">Erro ao carregar módulos: ${escapeHtml(err.message)}</div>`;
+  }
+}
+window.loadModulesCatalog = loadModulesCatalog;
+
+function renderModulesCards(modules) {
+  if (!modulesCardsGrid) return;
+  if (modules.length === 0) {
+    modulesCardsGrid.innerHTML = '<div class="text-subtle text-center py-4 col-span-full">Nenhum módulo cadastrado. Importe um arquivo .json para começar.</div>';
+    return;
+  }
+
+  modulesCardsGrid.innerHTML = modules.map(mod => {
+    let targetInfo = '--';
+    if (mod.target) targetInfo = `Alvo: ${mod.target}`;
+    else if (mod.domain) targetInfo = `Domínio: ${mod.domain}`;
+    else if (mod.endpoint) targetInfo = `Endpoint: ${mod.endpoint}`;
+    else if (mod.protocol) targetInfo = `Protocolo: ${mod.protocol}`;
+
+    let extraInfo = '';
+    if (mod.size_mb) extraInfo = `Tamanho: ${mod.size_mb} MB`;
+    else if (mod.count) extraInfo = `Pacotes: ${mod.count}`;
+    else if (mod.timeout_seconds) extraInfo = `Timeout: ${mod.timeout_seconds}s`;
+
+    return `
+      <div class="module-card">
+        <div class="module-card-top">
+          <div class="module-card-title">${escapeHtml(mod.name)}</div>
+          <span class="module-type-badge ${escapeHtml(mod.type)}">${escapeHtml(mod.type)}</span>
+        </div>
+        <div class="module-card-id">${escapeHtml(mod.id)}</div>
+        <div class="module-card-details">
+          <div class="module-card-details-row">
+            <span>Alvo / Destino:</span>
+            <span class="font-semibold text-white">${escapeHtml(targetInfo)}</span>
+          </div>
+          ${extraInfo ? `
+          <div class="module-card-details-row">
+            <span>Parâmetro:</span>
+            <span class="font-mono">${escapeHtml(extraInfo)}</span>
+          </div>
+          ` : ''}
+          <div class="module-card-details-row">
+            <span>Timeout:</span>
+            <span class="font-mono">${mod.timeout_seconds || 15}s</span>
+          </div>
+        </div>
+        <div class="module-card-footer">
+          <button type="button" class="btn btn-glass btn-sm" onclick="downloadModuleJson('${escapeHtml(mod.id)}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>Baixar .json</span>
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm" onclick="handleDeleteModule('${escapeHtml(mod.id)}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            <span>Excluir</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function downloadModuleJson(moduleId) {
+  const mod = allCatalogModules.find(m => m.id === moduleId);
+  if (!mod) return;
+  const jsonStr = JSON.stringify(mod, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${mod.id}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+window.downloadModuleJson = downloadModuleJson;
+
+async function handleDeleteModule(moduleId) {
+  if (!confirm(`Deseja realmente remover o módulo "${moduleId}" do catálogo?`)) return;
+  try {
+    const res = await fetch(`/api/v1/admin/modules/${encodeURIComponent(moduleId)}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Falha ao excluir módulo');
+    showToast(`Módulo "${moduleId}" excluído com sucesso`, 'toast-info');
+    await loadModulesCatalog();
+  } catch (err) {
+    showToast(`Erro ao excluir: ${err.message}`, 'toast-error');
+  }
+}
+window.handleDeleteModule = handleDeleteModule;
+
+function openModuleUploadModal() {
+  if (!moduleUploadModal) return;
+  if (modJsonErrorAlert) modJsonErrorAlert.style.display = 'none';
+  if (modJsonTextarea) modJsonTextarea.value = '';
+  moduleUploadModal.style.display = 'flex';
+}
+
+function closeModuleUploadModal() {
+  if (moduleUploadModal) moduleUploadModal.style.display = 'none';
+}
+
+function handleFileSelect(e) {
+  if (e.target.files && e.target.files.length > 0) {
+    processUploadedJsonFile(e.target.files[0]);
+  }
+}
+
+function processUploadedJsonFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    try {
+      const content = event.target.result;
+      const parsed = JSON.parse(content);
+      if (modJsonTextarea) {
+        modJsonTextarea.value = JSON.stringify(parsed, null, 2);
+      }
+      if (modJsonErrorAlert) modJsonErrorAlert.style.display = 'none';
+      showToast(`Arquivo "${file.name}" carregado. Revise e confirme para salvar.`, 'toast-info');
+    } catch (err) {
+      if (modJsonErrorText) modJsonErrorText.textContent = `Erro ao processar JSON: ${err.message}`;
+      if (modJsonErrorAlert) modJsonErrorAlert.style.display = 'flex';
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function handleSaveModuleUploadSubmit() {
+  if (!modJsonTextarea) return;
+  const raw = modJsonTextarea.value.trim();
+  if (!raw) {
+    if (modJsonErrorText) modJsonErrorText.textContent = 'Cole ou selecione um arquivo JSON válido.';
+    if (modJsonErrorAlert) modJsonErrorAlert.style.display = 'flex';
+    return;
+  }
+
+  let parsedMod;
+  try {
+    parsedMod = JSON.parse(raw);
+  } catch (e) {
+    if (modJsonErrorText) modJsonErrorText.textContent = 'JSON malformado: ' + e.message;
+    if (modJsonErrorAlert) modJsonErrorAlert.style.display = 'flex';
+    return;
+  }
+
+  if (!parsedMod.id || !parsedMod.type) {
+    if (modJsonErrorText) modJsonErrorText.textContent = 'Os campos "id" e "type" são obrigatórios no JSON do módulo.';
+    if (modJsonErrorAlert) modJsonErrorAlert.style.display = 'flex';
+    return;
+  }
+
+  if (btnSubmitUploadMod) { btnSubmitUploadMod.disabled = true; btnSubmitUploadMod.innerHTML = '<span>Salvando...</span>'; }
+
+  try {
+    const res = await fetch('/api/v1/admin/modules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(parsedMod)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Falha ao salvar módulo');
+
+    showToast(`Módulo "${parsedMod.id}" salvo com sucesso no catálogo!`, 'toast-success');
+    closeModuleUploadModal();
+    await loadModulesCatalog();
+  } catch (err) {
+    if (modJsonErrorText) modJsonErrorText.textContent = err.message;
+    if (modJsonErrorAlert) modJsonErrorAlert.style.display = 'flex';
+  } finally {
+    if (btnSubmitUploadMod) { btnSubmitUploadMod.disabled = false; btnSubmitUploadMod.innerHTML = '<span>Salvar no Catálogo</span>'; }
+  }
+}
+

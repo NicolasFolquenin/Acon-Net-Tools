@@ -13,6 +13,8 @@ const (
 	TaskTypeDNSLookup          TaskType = "dns_lookup"
 	TaskTypeDiscoveryProtocol  TaskType = "discovery_protocol"
 	TaskTypeSystemInfo         TaskType = "system_info"
+	TaskTypeHTTPCheck          TaskType = "http_check"
+	TaskTypeTraceroute         TaskType = "traceroute"
 )
 
 // TestTaskConfig define a configuração de um teste individual enviado à sonda
