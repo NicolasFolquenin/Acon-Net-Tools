@@ -285,8 +285,12 @@ async function checkAuthAndInitialize() {
       const data = await res.json();
       if (data.authenticated && data.user) {
         setAuthenticatedUser(data.user);
-        if (window.location.hash === '#groups' && data.user.role === 'admin') {
+        if (window.location.hash === '#machines') {
+          switchView('machines');
+        } else if (window.location.hash === '#groups' && data.user.role === 'admin') {
           switchView('groups');
+        } else if (window.location.hash === '#modules' && data.user.role === 'admin') {
+          switchView('modules');
         } else {
           switchView('dashboard');
         }
@@ -381,19 +385,24 @@ function showLoginModal() {
 function switchView(viewName) {
   const pageTitle = document.getElementById('page-title');
 
-  // Remove classe active de todas as abas
+  // Remove classe active de todas as abas de navegação
   [tabDashboard, tabMachines, tabGroups, tabModules].forEach(t => {
     if (t) t.classList.remove('active');
   });
 
-  // Oculta todas as views principais
-  if (viewDashboard) viewDashboard.style.display = 'none';
-  if (viewMachines) viewMachines.style.display = 'none';
-  if (viewGroups) viewGroups.style.display = 'none';
-  if (viewModules) viewModules.style.display = 'none';
+  // Oculta todas as views principais e remove classe active
+  [viewDashboard, viewMachines, viewGroups, viewModules].forEach(v => {
+    if (v) {
+      v.style.display = 'none';
+      v.classList.remove('active');
+    }
+  });
 
   if (viewName === 'machines') {
-    if (viewMachines) viewMachines.style.display = 'block';
+    if (viewMachines) {
+      viewMachines.style.display = 'block';
+      viewMachines.classList.add('active');
+    }
     if (tabMachines) tabMachines.classList.add('active');
     if (pageTitle) pageTitle.textContent = 'Máquinas & Sondas';
     window.location.hash = '#machines';
@@ -404,7 +413,10 @@ function switchView(viewName) {
       switchView('dashboard');
       return;
     }
-    if (viewGroups) viewGroups.style.display = 'block';
+    if (viewGroups) {
+      viewGroups.style.display = 'block';
+      viewGroups.classList.add('active');
+    }
     if (tabGroups) tabGroups.classList.add('active');
     if (pageTitle) pageTitle.textContent = 'Grupos & VLANs';
     window.location.hash = '#groups';
@@ -415,13 +427,19 @@ function switchView(viewName) {
       switchView('dashboard');
       return;
     }
-    if (viewModules) viewModules.style.display = 'block';
+    if (viewModules) {
+      viewModules.style.display = 'block';
+      viewModules.classList.add('active');
+    }
     if (tabModules) tabModules.classList.add('active');
     if (pageTitle) pageTitle.textContent = 'Módulos JSON';
     window.location.hash = '#modules';
     loadModulesCatalog();
   } else {
-    if (viewDashboard) viewDashboard.style.display = 'block';
+    if (viewDashboard) {
+      viewDashboard.style.display = 'block';
+      viewDashboard.classList.add('active');
+    }
     if (tabDashboard) tabDashboard.classList.add('active');
     if (pageTitle) pageTitle.textContent = 'Dashboard';
     window.location.hash = '#dashboard';
@@ -2359,14 +2377,29 @@ async function loadAdminMachines() {
       fetch('/api/v1/dashboard/metrics')
     ]);
 
-    if (!machRes.ok) throw new Error('Falha ao buscar máquinas');
-
-    allAdminMachines = await machRes.json() || [];
-    currentGroups = grpRes.ok ? await grpRes.json() : [];
-    allCatalogModules = modRes.ok ? await modRes.json() : [];
     if (dashRes.ok) {
       const dashData = await dashRes.json();
       currentSummaries = dashData.summaries || [];
+    }
+    currentGroups = grpRes.ok ? await grpRes.json() : [];
+    allCatalogModules = modRes.ok ? await modRes.json() : [];
+
+    if (machRes.ok) {
+      allAdminMachines = await machRes.json() || [];
+    } else {
+      // Fallback gracioso para usuários sem permissão de admin completa
+      allAdminMachines = currentSummaries.map(s => ({
+        hostname: s.node_id,
+        ip_address: (s.system_info && s.system_info.ip_address) || '',
+        mac_address: (s.system_info && s.system_info.mac_address) || '',
+        switch_name: (s.switch_info && s.switch_info.switch_name) || '',
+        switch_port: (s.switch_info && s.switch_info.switch_port) || '',
+        vlan: (s.switch_info && s.switch_info.vlan) || '',
+        last_seen: s.last_seen || '',
+        group_id: s.group_id || 'acon',
+        is_custom: false,
+        custom_tests: []
+      }));
     }
 
     populateMachineGroupFilterOptions();
