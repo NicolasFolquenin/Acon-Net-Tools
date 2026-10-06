@@ -80,7 +80,7 @@
       <!-- Metric Cards Grid -->
       <section class="cards-grid">
         <!-- Download Card -->
-        <div class="card card-stat card-cyan">
+        <div class="card card-stat card-cyan" id="card-download">
           <div class="card-header">
             <div class="card-title">DOWNLOAD</div>
             <div class="card-icon cyan">
@@ -101,7 +101,7 @@
         </div>
 
         <!-- Upload Card -->
-        <div class="card card-stat card-purple">
+        <div class="card card-stat card-purple" id="card-upload">
           <div class="card-header">
             <div class="card-title">UPLOAD</div>
             <div class="card-icon purple">
@@ -122,7 +122,7 @@
         </div>
 
         <!-- Ping Card -->
-        <div class="card card-stat card-emerald">
+        <div class="card card-stat card-emerald" id="card-ping">
           <div class="card-header">
             <div class="card-title">PING GATEWAY</div>
             <div class="card-icon emerald">
@@ -142,7 +142,7 @@
         </div>
 
         <!-- Central Sync Card -->
-        <div class="card card-stat card-blue">
+        <div class="card card-stat card-blue" id="card-sync">
           <div class="card-header">
             <div class="card-title">SYNC CENTRAL</div>
             <div class="card-icon blue">
@@ -240,17 +240,17 @@
       </section>
 
       <!-- Charts Section (Last 24 runs) -->
-      <section class="charts-container">
+      <section class="charts-container" id="charts-container">
         <!-- Throughput Chart -->
-        <div class="chart-card">
+        <div class="chart-card" id="throughput-chart-card">
           <div class="chart-card-header">
             <div>
               <h3>Histórico de Throughput (Últimas 24 execuções)</h3>
               <p class="chart-subtitle">Taxas de Download e Upload em Megabits por segundo (Mbps)</p>
             </div>
             <div class="chart-legend-custom">
-              <span class="legend-badge cyan-dot">Download</span>
-              <span class="legend-badge purple-dot">Upload</span>
+              <span class="legend-badge cyan-dot" id="legend-download">Download</span>
+              <span class="legend-badge purple-dot" id="legend-upload">Upload</span>
             </div>
           </div>
           <div class="chart-wrapper">
@@ -259,7 +259,7 @@
         </div>
 
         <!-- Latency Chart -->
-        <div class="chart-card">
+        <div class="chart-card" id="latency-chart-card">
           <div class="chart-card-header">
             <div>
               <h3>Histórico de Latência (Gateway)</h3>
@@ -286,9 +286,9 @@
             <thead>
               <tr>
                 <th>Data & Hora</th>
-                <th>Download</th>
-                <th>Upload</th>
-                <th>Ping Gateway</th>
+                <th id="th-download">Download</th>
+                <th id="th-upload">Upload</th>
+                <th id="th-ping">Ping Gateway</th>
                 <th>Status Sync</th>
               </tr>
             </thead>

@@ -48,6 +48,13 @@ const WailsApp = {
     };
   },
 
+  async getActiveProfile() {
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.GetActiveProfile) {
+      return await window.go.main.App.GetActiveProfile();
+    }
+    return null;
+  },
+
   async getHistory() {
     if (window.go && window.go.main && window.go.main.App) {
       return await window.go.main.App.GetHistory();
@@ -457,20 +464,140 @@ function initCharts() {
   });
 }
 
-// Atualiza Dashboard com métricas do SQLite
+// Avalia quais medições estão de fato ativas e configuradas no perfil da máquina
+let currentCapabilities = {
+  hasDownload: true,
+  hasUpload: true,
+  hasThroughput: true,
+  hasPing: true,
+  hasDNS: false,
+  hasPacketLoss: false,
+  hasLLDP: true,
+};
+
+function getProfileCapabilities(profile, history) {
+  if (profile && Array.isArray(profile.tests) && profile.tests.length > 0) {
+    const enabledTests = profile.tests.filter(t => t.enabled !== false);
+    const hasDownload = enabledTests.some(t =>
+      t.type === 'http_throughput_download' || t.id === 'throughput_download'
+    );
+    const hasUpload = enabledTests.some(t =>
+      t.type === 'http_throughput_upload' || t.id === 'throughput_upload'
+    );
+    const hasPing = enabledTests.some(t =>
+      t.type === 'ping' || t.id.startsWith('ping_')
+    );
+    const hasPacketLoss = enabledTests.some(t =>
+      t.type === 'packet_loss' || t.id.startsWith('packet_loss_')
+    );
+    const hasDNS = enabledTests.some(t =>
+      t.type === 'dns_lookup' || t.id.startsWith('dns_')
+    );
+    const hasLLDP = enabledTests.some(t =>
+      t.type === 'discovery_protocol' || t.id.includes('discovery') || t.id.includes('lldp')
+    );
+
+    return {
+      hasDownload,
+      hasUpload,
+      hasThroughput: hasDownload || hasUpload,
+      hasPing,
+      hasPacketLoss,
+      hasDNS,
+      hasLLDP,
+    };
+  }
+
+  // Fallback: se não há perfil definido ainda, verifica histórico de medições reais
+  const hasHistoryThroughput = Array.isArray(history) && history.some(r => (r.download_mbps > 0 || r.upload_mbps > 0));
+  return {
+    hasDownload: hasHistoryThroughput,
+    hasUpload: hasHistoryThroughput,
+    hasThroughput: hasHistoryThroughput,
+    hasPing: true,
+    hasPacketLoss: false,
+    hasDNS: false,
+    hasLLDP: true,
+  };
+}
+
+function applyCapabilitiesToUI(caps) {
+  currentCapabilities = caps;
+
+  // 1. Cards de métricas no topo
+  const cardDownload = document.getElementById('card-download');
+  const cardUpload = document.getElementById('card-upload');
+  const cardPing = document.getElementById('card-ping');
+
+  if (cardDownload) cardDownload.style.display = caps.hasDownload ? '' : 'none';
+  if (cardUpload) cardUpload.style.display = caps.hasUpload ? '' : 'none';
+  if (cardPing) cardPing.style.display = caps.hasPing ? '' : 'none';
+
+  // 2. Gráficos (se o perfil não mede Throughput, oculta o card e expande o Ping)
+  const chartsContainer = document.getElementById('charts-container');
+  const throughputChartCard = document.getElementById('throughput-chart-card');
+  const latencyChartCard = document.getElementById('latency-chart-card');
+  const legendDownload = document.getElementById('legend-download');
+  const legendUpload = document.getElementById('legend-upload');
+
+  if (throughputChartCard) {
+    const wasHidden = throughputChartCard.style.display === 'none';
+    throughputChartCard.style.display = caps.hasThroughput ? '' : 'none';
+    if (caps.hasThroughput && wasHidden && throughputChart) {
+      setTimeout(() => {
+        try { throughputChart.resize(); throughputChart.update(); } catch (_) {}
+      }, 50);
+    }
+  }
+
+  if (legendDownload) legendDownload.style.display = caps.hasDownload ? '' : 'none';
+  if (legendUpload) legendUpload.style.display = caps.hasUpload ? '' : 'none';
+
+  if (latencyChartCard) {
+    latencyChartCard.style.display = caps.hasPing ? '' : 'none';
+  }
+
+  if (chartsContainer) {
+    if (!caps.hasThroughput && caps.hasPing) {
+      chartsContainer.classList.add('single-chart');
+      chartsContainer.style.display = '';
+    } else if (!caps.hasThroughput && !caps.hasPing) {
+      chartsContainer.style.display = 'none';
+    } else {
+      chartsContainer.classList.remove('single-chart');
+      chartsContainer.style.display = '';
+    }
+  }
+
+  // 3. Colunas da tabela de execuções recentes
+  const thDownload = document.getElementById('th-download');
+  const thUpload = document.getElementById('th-upload');
+  const thPing = document.getElementById('th-ping');
+
+  if (thDownload) thDownload.style.display = caps.hasDownload ? '' : 'none';
+  if (thUpload) thUpload.style.display = caps.hasUpload ? '' : 'none';
+  if (thPing) thPing.style.display = caps.hasPing ? '' : 'none';
+}
+
+// Atualiza Dashboard com métricas do SQLite e adaptação dinâmica ao Perfil
 async function refreshDashboard() {
   const history = await WailsApp.getHistory();
   const status = await WailsApp.getStatus();
+
+  // Avalia capacidades do perfil ativo e adapta interface
+  const profile = status.current_profile || (await WailsApp.getActiveProfile()) || null;
+  const capabilities = getProfileCapabilities(profile, history);
+  applyCapabilitiesToUI(capabilities);
 
   updateStatusBadge(status);
 
   if (history && history.length > 0) {
     const latest = history[history.length - 1];
 
-    // Atualiza cards numéricos
-    statDownload.textContent = latest.download_mbps.toFixed(1);
-    statUpload.textContent = latest.upload_mbps.toFixed(1);
-    statPing.textContent = latest.ping_gateway.toFixed(1);
+    // Atualiza cards numéricos somente dos itens ativos
+    if (capabilities.hasDownload) statDownload.textContent = latest.download_mbps.toFixed(1);
+    if (capabilities.hasUpload) statUpload.textContent = latest.upload_mbps.toFixed(1);
+    if (capabilities.hasPing) statPing.textContent = latest.ping_gateway.toFixed(1);
 
     // Formata timestamps e alimenta gráficos (últimas 24 execuções)
     const labels = history.map(item => {
@@ -482,30 +609,40 @@ async function refreshDashboard() {
     const uploads = history.map(item => item.upload_mbps);
     const pings = history.map(item => item.ping_gateway);
 
-    // Atualiza Chart Throughput
-    throughputChart.data.labels = labels;
-    throughputChart.data.datasets[0].data = downloads;
-    throughputChart.data.datasets[1].data = uploads;
-    throughputChart.update();
+    // Atualiza Chart Throughput somente se habilitado
+    if (capabilities.hasThroughput && throughputChart) {
+      throughputChart.data.labels = labels;
+      throughputChart.data.datasets[0].data = capabilities.hasDownload ? downloads : [];
+      throughputChart.data.datasets[1].data = capabilities.hasUpload ? uploads : [];
+      throughputChart.update();
+    }
 
-    // Atualiza Chart Latência
-    latencyChart.data.labels = labels;
-    latencyChart.data.datasets[0].data = pings;
-    latencyChart.update();
+    // Atualiza Chart Latência somente se habilitado
+    if (capabilities.hasPing && latencyChart) {
+      latencyChart.data.labels = labels;
+      latencyChart.data.datasets[0].data = pings;
+      latencyChart.update();
+    }
 
-    // Renderiza tabela de log recente (inversa para mostrar mais novo no topo)
-    renderTable([...history].reverse());
+    // Renderiza tabela de log recente (apenas colunas ativas)
+    renderTable([...history].reverse(), capabilities);
     lastUpdatedText.textContent = `Última leitura: ${new Date(latest.timestamp).toLocaleTimeString()}`;
   } else {
     statDownload.textContent = '--';
     statUpload.textContent = '--';
     statPing.textContent = '--';
+    renderTable([], capabilities);
   }
 }
 
-function renderTable(records) {
+function renderTable(records, caps = currentCapabilities) {
+  let colSpan = 2; // Data & Hora + Status Sync
+  if (caps.hasDownload) colSpan++;
+  if (caps.hasUpload) colSpan++;
+  if (caps.hasPing) colSpan++;
+
   if (!records || records.length === 0) {
-    metricsTableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum teste registrado ainda.</td></tr>';
+    metricsTableBody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted">Nenhum teste registrado ainda.</td></tr>`;
     return;
   }
 
@@ -524,17 +661,24 @@ function renderTable(records) {
       if (r.metrics.ping_nti_core && r.metrics.ping_nti_core.value > 0) {
         extraBadges += `<span class="mono-badge" style="font-size: 0.68rem; margin-left: 4px; color: #c084fc; border-color: rgba(192, 132, 252, 0.3);" title="Ping Core NTI">NTI ${r.metrics.ping_nti_core.value.toFixed(1)}ms</span>`;
       }
+      if (r.metrics.packet_loss && r.metrics.packet_loss.value >= 0) {
+        extraBadges += `<span class="mono-badge" style="font-size: 0.68rem; margin-left: 4px; color: #f87171;" title="Perda de Pacotes">Perda ${r.metrics.packet_loss.value.toFixed(0)}%</span>`;
+      }
     }
 
-    return `
-      <tr>
-        <td>${dateFormatted} ${extraBadges}</td>
-        <td><strong style="color: var(--cyan-light)">${r.download_mbps.toFixed(1)}</strong> Mbps</td>
-        <td><strong style="color: var(--purple-light)">${r.upload_mbps.toFixed(1)}</strong> Mbps</td>
-        <td><strong style="color: var(--emerald-light)">${r.ping_gateway.toFixed(1)}</strong> ms</td>
-        <td>${syncBadge}</td>
-      </tr>
-    `;
+    let cells = `<td>${dateFormatted} ${extraBadges}</td>`;
+    if (caps.hasDownload) {
+      cells += `<td><strong style="color: var(--cyan-light)">${r.download_mbps.toFixed(1)}</strong> Mbps</td>`;
+    }
+    if (caps.hasUpload) {
+      cells += `<td><strong style="color: var(--purple-light)">${r.upload_mbps.toFixed(1)}</strong> Mbps</td>`;
+    }
+    if (caps.hasPing) {
+      cells += `<td><strong style="color: var(--emerald-light)">${r.ping_gateway.toFixed(1)}</strong> ms</td>`;
+    }
+    cells += `<td>${syncBadge}</td>`;
+
+    return `<tr>${cells}</tr>`;
   }).join('');
 }
 

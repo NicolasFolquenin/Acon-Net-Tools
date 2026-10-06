@@ -536,6 +536,10 @@ body {
   margin-bottom: 24px;
 }
 
+.charts-container.single-chart {
+  grid-template-columns: 1fr;
+}
+
 .chart-card {
   background: var(--bg-card);
   backdrop-filter: var(--glass-blur);
