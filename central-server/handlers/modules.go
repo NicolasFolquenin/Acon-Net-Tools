@@ -173,6 +173,27 @@ func (h *ModulesHandler) HandleModules(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		if len(modules) == 0 {
+			h.mu.RUnlock()
+			h.ensureDefaultModules()
+			h.mu.RLock()
+
+			files, err = os.ReadDir(h.modulesDir)
+			if err == nil {
+				for _, file := range files {
+					if !file.IsDir() && strings.HasSuffix(strings.ToLower(file.Name()), ".json") {
+						content, errRead := os.ReadFile(filepath.Join(h.modulesDir, file.Name()))
+						if errRead == nil {
+							var mod models.TestTaskConfig
+							if errJSON := json.Unmarshal(content, &mod); errJSON == nil && mod.ID != "" {
+								modules = append(modules, mod)
+							}
+						}
+					}
+				}
+			}
+		}
+
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(modules)
 		return

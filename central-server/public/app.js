@@ -742,10 +742,28 @@ function setupEventListeners() {
   if (machineConfigForm) {
     machineConfigForm.addEventListener('submit', handleSaveMachineConfigSubmit);
   }
-  if (mcToggleCustom) {
-    mcToggleCustom.addEventListener('change', (e) => {
-      if (mcCustomModulesContainer) {
-        mcCustomModulesContainer.style.display = e.target.checked ? 'block' : 'none';
+  const btnMcResetGroup = document.getElementById('btn-mc-reset-group');
+  if (btnMcResetGroup) {
+    btnMcResetGroup.addEventListener('click', () => {
+      const activeGrp = currentGroups.find(g => g.id === mcSelectGroup.value);
+      const grpTests = (activeGrp && activeGrp.profile && activeGrp.profile.tests) ? activeGrp.profile.tests : [];
+      const grpIds = new Set(grpTests.map(t => t.id));
+      renderMachineModulesCheckboxes(mcSelectGroup.value, grpIds);
+      showToast('Módulos redefinidos para o padrão do grupo!', 'toast-info');
+    });
+  }
+  if (mcSelectGroup) {
+    mcSelectGroup.addEventListener('change', () => {
+      const activeGrp = currentGroups.find(g => g.id === mcSelectGroup.value);
+      const grpTests = (activeGrp && activeGrp.profile && activeGrp.profile.tests) ? activeGrp.profile.tests : [];
+      const grpIds = new Set(grpTests.map(t => t.id));
+      renderMachineModulesCheckboxes(mcSelectGroup.value, grpIds);
+    });
+  }
+  if (mcModulesCheckboxesList) {
+    mcModulesCheckboxesList.addEventListener('change', (e) => {
+      if (e.target.classList.contains('mc-module-cb')) {
+        updateMachineConfigStatusSummary(mcSelectGroup.value);
       }
     });
   }
@@ -2523,18 +2541,48 @@ function renderMachinesTable(machines) {
       }
     }
 
-    const moduleTagsHtml = effectiveTests.map(t => {
-      let tagClass = 'ping';
-      if (t.type.includes('download')) tagClass = 'download';
-      else if (t.type.includes('upload')) tagClass = 'upload';
-      else if (t.type.includes('dns')) tagClass = 'dns';
-      else if (t.type.includes('discovery')) tagClass = 'discovery';
-      return `<span class="module-tag-pill ${tagClass}" title="${escapeHtml(t.name)}">${escapeHtml(t.id)}</span>`;
-    }).join('');
+    // Grupo e Módulos vinculados
+    const grp = currentGroups.find(g => g.id === m.group_id);
+    const grpName = grp ? grp.name : (m.group_id || 'default');
+    const grpTests = (grp && grp.profile && grp.profile.tests) ? grp.profile.tests : [];
 
-    const customBadgeHtml = m.is_custom
-      ? `<span class="badge-custom-tag mr-1" title="Perfil customizado">Custom</span>`
-      : '';
+    let effectiveTests = [];
+    if (m.is_custom && m.custom_tests && m.custom_tests.length > 0) {
+      effectiveTests = m.custom_tests;
+    } else {
+      effectiveTests = grpTests;
+    }
+
+    const grpTestIds = new Set(grpTests.map(t => t.id));
+    const activeTestIds = new Set(effectiveTests.map(t => t.id));
+
+    const addedModules = effectiveTests.filter(t => !grpTestIds.has(t.id));
+    const removedModules = grpTests.filter(t => !activeTestIds.has(t.id));
+    const isModified = m.is_custom && (addedModules.length > 0 || removedModules.length > 0);
+
+    const tooltipTests = effectiveTests.map(t => t.name || t.id).join(' • ');
+
+    let modulesBadgeHtml = '';
+    if (effectiveTests.length === 0) {
+      modulesBadgeHtml = `<span class="text-subtle font-mono text-xs">Nenhum</span>`;
+    } else if (!isModified) {
+      modulesBadgeHtml = `
+        <span class="badge-group-standard" title="Executa todos os ${effectiveTests.length} módulos padrão do grupo (${escapeHtml(tooltipTests)})">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;"></span>
+          Padrão do Grupo (${effectiveTests.length})
+        </span>
+      `;
+    } else {
+      const diffParts = [];
+      if (addedModules.length > 0) diffParts.push(`+${addedModules.length} a mais`);
+      if (removedModules.length > 0) diffParts.push(`-${removedModules.length} a menos`);
+      const diffText = diffParts.join(', ') || `${effectiveTests.length} ativos`;
+      modulesBadgeHtml = `
+        <span class="badge-custom-tag" title="Módulos ativos (${effectiveTests.length}): ${escapeHtml(tooltipTests)}">
+          ⚙️ Alterado (${diffText})
+        </span>
+      `;
+    }
 
     // Switch & Porta
     const switchName = m.switch_name || (summary && summary.switch_info && summary.switch_info.switch_name) || '--';
@@ -2548,7 +2596,7 @@ function renderMachinesTable(machines) {
     const timeAgo = lastDate ? formatTimeAgo(lastDate) : '--';
 
     // Select de troca rápida de grupo (ou badge)
-    let groupSelectHtml = `<span class="badge-group-tag">${escapeHtml(m.group_id || 'default')}</span>`;
+    let groupSelectHtml = `<span class="badge-group-tag">${escapeHtml(grpName)}</span>`;
     if (isAdmin) {
       groupSelectHtml = `
         <select class="form-input form-input-sm" style="min-width: 110px; padding: 2px 8px; font-size: 0.78rem;" onchange="handleQuickChangeGroup('${escapeHtml(m.hostname)}', this.value)">
@@ -2572,18 +2620,17 @@ function renderMachinesTable(machines) {
           </div>
         </td>
         <td>
-          <div style="font-size: 0.78rem; font-family: 'JetBrains Mono', monospace;">
+          <div style="font-size: 0.76rem; font-family: 'JetBrains Mono', monospace; line-height: 1.25;">
             <div>${escapeHtml(m.ip_address || '--')}</div>
-            <div style="color: var(--text-muted); font-size: 0.72rem;">${escapeHtml(m.mac_address || '--')}</div>
+            <div style="color: var(--text-muted); font-size: 0.70rem;">${escapeHtml(m.mac_address || '--')}</div>
           </div>
         </td>
         <td>
           ${groupSelectHtml}
         </td>
         <td>
-          <div class="modules-tags-wrapper">
-            ${customBadgeHtml}
-            ${moduleTagsHtml || '<span class="text-subtle">Nenhum</span>'}
+          <div class="modules-compact-cell">
+            ${modulesBadgeHtml}
           </div>
         </td>
         <td>${switchHtml}</td>
@@ -2816,6 +2863,42 @@ function renderMachineMetricsCharts(metricsSeries) {
    12. Modal de Configuração Customizada da Máquina
    ========================================================================== */
 
+function getAllAvailableModules() {
+  const modMap = new Map();
+
+  // 1. Módulos padrão do sistema (garante que nunca venha vazio)
+  const systemDefaults = [
+    { id: 'ping_gateway', name: 'Latência Gateway Local', type: 'ping', target: 'auto_gateway', timeout_seconds: 15 },
+    { id: 'ping_nti_core', name: 'Latência Core NTI (Anel)', type: 'ping', target: '177.101.22.40', timeout_seconds: 15 },
+    { id: 'packet_loss_gateway', name: 'Perda de Pacotes Gateway', type: 'packet_loss', target: 'auto_gateway', timeout_seconds: 20 },
+    { id: 'dns_uepg', name: 'Resolução DNS Institucional', type: 'dns_lookup', domain: 'uepg.br', timeout_seconds: 10 },
+    { id: 'throughput_download', name: 'Throughput Download ACON', type: 'http_throughput_download', endpoint: '/api/v1/speedtest/download', size_mb: 5, timeout_seconds: 45 },
+    { id: 'throughput_upload', name: 'Throughput Upload ACON', type: 'http_throughput_upload', endpoint: '/api/v1/speedtest/upload', size_mb: 2, timeout_seconds: 45 },
+    { id: 'switch_discovery', name: 'Descoberta de Switch LLDP/CDP', type: 'discovery_protocol', protocol: 'LLDP_CDP', timeout_seconds: 60 },
+    { id: 'ping_central_server', name: 'Ping Servidor Central', type: 'ping', target: 'auto_gateway', timeout_seconds: 10 },
+    { id: 'http_check_portal', name: 'Disponibilidade Portal UEPG', type: 'http_check', endpoint: 'https://www.uepg.br', timeout_seconds: 15 }
+  ];
+  systemDefaults.forEach(m => modMap.set(m.id, m));
+
+  // 2. Módulos de todos os grupos carregados
+  currentGroups.forEach(g => {
+    if (g.profile && g.profile.tests) {
+      g.profile.tests.forEach(t => {
+        if (t && t.id) modMap.set(t.id, t);
+      });
+    }
+  });
+
+  // 3. Módulos do catálogo importados
+  if (allCatalogModules && allCatalogModules.length > 0) {
+    allCatalogModules.forEach(m => {
+      if (m && m.id) modMap.set(m.id, m);
+    });
+  }
+
+  return Array.from(modMap.values());
+}
+
 function openMachineConfigModal(hostname) {
   if (!machineConfigModal) return;
   const machine = allAdminMachines.find(m => m.hostname === hostname);
@@ -2842,11 +2925,18 @@ function openMachineConfigModal(hostname) {
     mcSelectGroup.appendChild(opt);
   });
 
-  mcToggleCustom.checked = !!machine.is_custom;
-  mcCustomModulesContainer.style.display = machine.is_custom ? 'block' : 'none';
+  // Determina os IDs inicialmente marcados
+  const initialCheckedIds = new Set();
+  const activeGrp = currentGroups.find(g => g.id === machine.group_id);
+  const grpTests = (activeGrp && activeGrp.profile && activeGrp.profile.tests) ? activeGrp.profile.tests : [];
 
-  renderMachineModulesCheckboxes(machine);
+  if (machine.is_custom && machine.custom_tests && machine.custom_tests.length > 0) {
+    machine.custom_tests.forEach(t => initialCheckedIds.add(t.id));
+  } else {
+    grpTests.forEach(t => initialCheckedIds.add(t.id));
+  }
 
+  renderMachineModulesCheckboxes(machine.group_id, initialCheckedIds);
   machineConfigModal.style.display = 'flex';
 }
 window.openMachineConfigModal = openMachineConfigModal;
@@ -2855,30 +2945,150 @@ function closeMachineConfigModal() {
   if (machineConfigModal) machineConfigModal.style.display = 'none';
 }
 
-function renderMachineModulesCheckboxes(machine) {
+function renderMachineModulesCheckboxes(groupId, checkedModuleIds) {
   if (!mcModulesCheckboxesList) return;
-  const activeCustomIds = new Set((machine.custom_tests || []).map(t => t.id));
 
-  if (allCatalogModules.length === 0) {
-    mcModulesCheckboxesList.innerHTML = '<p class="text-subtle text-center py-2">Nenhum módulo encontrado no catálogo.</p>';
-    return;
+  const activeGrp = currentGroups.find(g => g.id === groupId);
+  const grpTests = (activeGrp && activeGrp.profile && activeGrp.profile.tests) ? activeGrp.profile.tests : [];
+  const grpTestIds = new Set(grpTests.map(t => t.id));
+
+  const allModules = getAllAvailableModules();
+
+  const groupModules = allModules.filter(m => grpTestIds.has(m.id));
+  const otherModules = allModules.filter(m => !grpTestIds.has(m.id));
+
+  let html = '';
+
+  if (groupModules.length > 0) {
+    html += `<div class="mc-section-heading"><span>Módulos do Grupo (${escapeHtml(activeGrp ? activeGrp.name : groupId)})</span></div>`;
+    groupModules.forEach(mod => {
+      const isChecked = checkedModuleIds.has(mod.id);
+      const stateClass = isChecked ? '' : 'is-unchecked-group';
+      const stateBadge = isChecked
+        ? '<span class="mc-module-tag-state state-default">Padrão do Grupo</span>'
+        : '<span class="mc-module-tag-state state-removed">- Removido</span>';
+
+      html += `
+        <label class="mc-module-check-item ${stateClass}" data-module-id="${escapeHtml(mod.id)}" data-is-group="true">
+          <div class="mc-module-check-left">
+            <input type="checkbox" class="mc-module-cb" data-module-id="${escapeHtml(mod.id)}" ${isChecked ? 'checked' : ''} />
+            <div>
+              <div class="mc-module-title">${escapeHtml(mod.name)}</div>
+              <div class="mc-module-sub">${escapeHtml(mod.id)} • ${escapeHtml(mod.type)}</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${stateBadge}
+            <span class="module-type-badge ${escapeHtml(mod.type)}">${escapeHtml(mod.type)}</span>
+          </div>
+        </label>
+      `;
+    });
   }
 
-  mcModulesCheckboxesList.innerHTML = allCatalogModules.map(mod => {
-    const isChecked = activeCustomIds.has(mod.id);
-    return `
-      <label class="mc-module-check-item">
-        <div class="mc-module-check-left">
-          <input type="checkbox" class="mc-module-cb" data-module-id="${escapeHtml(mod.id)}" ${isChecked ? 'checked' : ''} />
-          <div>
-            <div class="mc-module-title">${escapeHtml(mod.name)}</div>
-            <div class="mc-module-sub">${escapeHtml(mod.id)} • ${escapeHtml(mod.type)}</div>
+  if (otherModules.length > 0) {
+    html += `<div class="mc-section-heading"><span>Módulos Adicionais do Catálogo (Opcionais)</span></div>`;
+    otherModules.forEach(mod => {
+      const isChecked = checkedModuleIds.has(mod.id);
+      const stateClass = isChecked ? 'is-added-extra' : '';
+      const stateBadge = isChecked
+        ? '<span class="mc-module-tag-state state-added">+ Adicionado a Mais</span>'
+        : '<span class="text-subtle font-mono" style="font-size: 0.68rem;">Opcional</span>';
+
+      html += `
+        <label class="mc-module-check-item ${stateClass}" data-module-id="${escapeHtml(mod.id)}" data-is-group="false">
+          <div class="mc-module-check-left">
+            <input type="checkbox" class="mc-module-cb" data-module-id="${escapeHtml(mod.id)}" ${isChecked ? 'checked' : ''} />
+            <div>
+              <div class="mc-module-title">${escapeHtml(mod.name)}</div>
+              <div class="mc-module-sub">${escapeHtml(mod.id)} • ${escapeHtml(mod.type)}</div>
+            </div>
           </div>
-        </div>
-        <span class="module-type-badge ${escapeHtml(mod.type)}">${escapeHtml(mod.type)}</span>
-      </label>
-    `;
-  }).join('');
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${stateBadge}
+            <span class="module-type-badge ${escapeHtml(mod.type)}">${escapeHtml(mod.type)}</span>
+          </div>
+        </label>
+      `;
+    });
+  }
+
+  mcModulesCheckboxesList.innerHTML = html;
+  updateMachineConfigStatusSummary(groupId);
+}
+
+function updateMachineConfigStatusSummary(groupId) {
+  if (!mcModulesCheckboxesList) return;
+
+  const activeGrp = currentGroups.find(g => g.id === groupId);
+  const grpTests = (activeGrp && activeGrp.profile && activeGrp.profile.tests) ? activeGrp.profile.tests : [];
+  const grpTestIds = new Set(grpTests.map(t => t.id));
+
+  const checkedBoxes = mcModulesCheckboxesList.querySelectorAll('.mc-module-cb:checked');
+  const checkedIds = new Set(Array.from(checkedBoxes).map(cb => cb.getAttribute('data-module-id')));
+
+  // Atualiza tags de estado dinamicamente
+  const allItems = mcModulesCheckboxesList.querySelectorAll('.mc-module-check-item');
+  allItems.forEach(item => {
+    const modId = item.getAttribute('data-module-id');
+    const isGrp = item.getAttribute('data-is-group') === 'true';
+    const isChecked = checkedIds.has(modId);
+    const cb = item.querySelector('.mc-module-cb');
+    if (cb) cb.checked = isChecked;
+
+    const stateContainer = item.querySelector('.mc-module-tag-state') || item.querySelector('.text-subtle');
+
+    if (isGrp) {
+      if (isChecked) {
+        item.classList.remove('is-unchecked-group');
+        if (stateContainer) stateContainer.outerHTML = '<span class="mc-module-tag-state state-default">Padrão do Grupo</span>';
+      } else {
+        item.classList.add('is-unchecked-group');
+        if (stateContainer) stateContainer.outerHTML = '<span class="mc-module-tag-state state-removed">- Removido</span>';
+      }
+    } else {
+      if (isChecked) {
+        item.classList.add('is-added-extra');
+        if (stateContainer) stateContainer.outerHTML = '<span class="mc-module-tag-state state-added">+ Adicionado a Mais</span>';
+      } else {
+        item.classList.remove('is-added-extra');
+        if (stateContainer) stateContainer.outerHTML = '<span class="text-subtle font-mono" style="font-size: 0.68rem;">Opcional</span>';
+      }
+    }
+  });
+
+  const added = Array.from(checkedIds).filter(id => !grpTestIds.has(id));
+  const removed = Array.from(grpTestIds).filter(id => !checkedIds.has(id));
+  const isCustom = (added.length > 0 || removed.length > 0);
+
+  const mcStatusBadge = document.getElementById('mc-status-badge');
+  const mcStatusDiffText = document.getElementById('mc-status-diff-text');
+  const mcModulesCountTag = document.getElementById('mc-modules-count-tag');
+
+  if (mcModulesCountTag) {
+    mcModulesCountTag.textContent = `${checkedIds.size} ativo${checkedIds.size !== 1 ? 's' : ''}`;
+  }
+
+  if (!isCustom) {
+    if (mcStatusBadge) {
+      mcStatusBadge.className = 'badge-group-standard';
+      mcStatusBadge.innerHTML = '● Padrão do Grupo';
+    }
+    if (mcStatusDiffText) {
+      mcStatusDiffText.textContent = `Herda todos os ${grpTestIds.size} módulos do grupo sem alterações`;
+    }
+  } else {
+    if (mcStatusBadge) {
+      mcStatusBadge.className = 'badge-custom-tag';
+      mcStatusBadge.innerHTML = '⚙️ Perfil Customizado';
+    }
+    const diffParts = [];
+    if (added.length > 0) diffParts.push(`+${added.length} a mais`);
+    if (removed.length > 0) diffParts.push(`-${removed.length} a menos`);
+    if (mcStatusDiffText) {
+      mcStatusDiffText.textContent = `Alteração: ${diffParts.join(', ')} (${checkedIds.size} módulos ativos no total)`;
+    }
+  }
 }
 
 async function handleSaveMachineConfigSubmit(e) {
@@ -2887,13 +3097,21 @@ async function handleSaveMachineConfigSubmit(e) {
   if (!hostname) return;
 
   const groupId = mcSelectGroup.value;
-  const isCustom = mcToggleCustom.checked;
-  let customTests = [];
+  const activeGrp = currentGroups.find(g => g.id === groupId);
+  const grpTests = (activeGrp && activeGrp.profile && activeGrp.profile.tests) ? activeGrp.profile.tests : [];
+  const grpTestIds = new Set(grpTests.map(t => t.id));
 
+  const allModules = getAllAvailableModules();
+  const checkedBoxes = mcModulesCheckboxesList.querySelectorAll('.mc-module-cb:checked');
+  const selectedIds = new Set(Array.from(checkedBoxes).map(cb => cb.getAttribute('data-module-id')));
+
+  const added = Array.from(selectedIds).filter(id => !grpTestIds.has(id));
+  const removed = Array.from(grpTestIds).filter(id => !selectedIds.has(id));
+  const isCustom = (added.length > 0 || removed.length > 0);
+
+  let customTests = [];
   if (isCustom) {
-    const checkboxes = mcModulesCheckboxesList.querySelectorAll('.mc-module-cb:checked');
-    const selectedIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-module-id'));
-    customTests = allCatalogModules.filter(m => selectedIds.includes(m.id));
+    customTests = allModules.filter(m => selectedIds.has(m.id));
   }
 
   const btnSubmit = document.getElementById('btn-save-machine-config');

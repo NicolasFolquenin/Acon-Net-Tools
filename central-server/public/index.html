@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UEPG Net Tools - Monitoramento de Rede</title>
-  <link rel="stylesheet" href="style.css?v=2.5.1" />
+  <link rel="stylesheet" href="style.css?v=2.5.2" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1414,28 +1414,36 @@
           <input type="hidden" id="mc-input-hostname" />
 
           <!-- Seleção de Grupo -->
-          <div class="form-group mb-4">
-            <label for="mc-select-group">Grupo de Testes Associado</label>
-            <select id="mc-select-group" class="form-input" required></select>
-            <span class="form-help">Ao mudar de grupo, a máquina herda as regras e módulos de teste daquele grupo.</span>
-          </div>
-
-          <!-- Switch para Modo Customizado -->
-          <div class="form-switch-row mb-4">
-            <div class="switch-info">
-              <span class="switch-title">Perfil de Módulos Customizado</span>
-              <span class="switch-desc">Ative para definir testes específicos para esta máquina em vez de herdar do grupo</span>
+          <div class="form-group mb-3">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label for="mc-select-group" style="margin-bottom: 0;">Grupo de Testes Associado</label>
+              <button type="button" id="btn-mc-reset-group" class="btn btn-glass btn-sm" title="Restaurar exatamente os módulos padrão do grupo selecionado">
+                Restaurar Padrão do Grupo
+              </button>
             </div>
-            <label class="toggle-switch" for="mc-toggle-custom">
-              <input type="checkbox" id="mc-toggle-custom" />
-              <span class="toggle-slider"></span>
-            </label>
+            <select id="mc-select-group" class="form-input" required></select>
+            <span class="form-help">A máquina adota o perfil base do grupo. Abaixo você pode desmarcar módulos (tirar) ou marcar novos módulos (adicionar).</span>
           </div>
 
-          <!-- Seleção de Módulos Customizados (se is_custom for true) -->
-          <div id="mc-custom-modules-container" style="display: none;">
-            <label class="form-section-label">Módulos de Medição Ativos Nesta Máquina</label>
-            <p class="form-help mb-2">Marque os módulos do catálogo que devem ser executados por esta sonda:</p>
+          <!-- Barra de Status de Customização -->
+          <div class="mc-status-bar mb-3">
+            <div class="mc-status-info">
+              <span class="mc-status-label">Status da Máquina:</span>
+              <span id="mc-status-badge" class="badge-group-standard">● Padrão do Grupo</span>
+            </div>
+            <span id="mc-status-diff-text" class="mc-status-diff-text">Herda todos os módulos do grupo</span>
+          </div>
+
+          <!-- Gerenciador de Módulos (Adicionar / Tirar) -->
+          <div class="mc-modules-manager">
+            <div class="mc-modules-header">
+              <div>
+                <label class="form-section-label" style="margin-bottom: 2px;">Módulos de Medição Desta Máquina</label>
+                <p class="form-help" style="margin-bottom: 0;">Marque ou desmarque para definir exatamente o que esta máquina executará:</p>
+              </div>
+              <span id="mc-modules-count-tag" class="count-tag">0 ativos</span>
+            </div>
+
             <div id="mc-modules-checkboxes-list" class="mc-modules-checkboxes-list"></div>
           </div>
 
@@ -1508,6 +1516,6 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="app.js?v=2.5.1"></script>
+  <script src="app.js?v=2.5.2"></script>
 </body>
 </html>
