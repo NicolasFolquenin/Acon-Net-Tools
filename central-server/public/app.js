@@ -1490,10 +1490,10 @@ function renderNodesTable(summaries) {
         <td>${groupHtml}</td>
         <td>${switchHtml}</td>
         <td class="text-right">
-          <span class="metric-num cyan">${s.last_download.toFixed(1)} <small>Mbps</small></span>
+          ${s.last_download > 0 ? `<span class="metric-num cyan">${s.last_download.toFixed(1)} <small>Mbps</small></span>` : `<span class="text-subtle font-mono" title="Não configurado no grupo">--</span>`}
         </td>
         <td class="text-right">
-          <span class="metric-num purple">${s.last_upload.toFixed(1)} <small>Mbps</small></span>
+          ${s.last_upload > 0 ? `<span class="metric-num purple">${s.last_upload.toFixed(1)} <small>Mbps</small></span>` : `<span class="text-subtle font-mono" title="Não configurado no grupo">--</span>`}
         </td>
         <td class="text-right">
           <span class="metric-num emerald">${s.last_ping.toFixed(1)} <small>ms</small></span>
@@ -2091,8 +2091,8 @@ function renderTelemetryTable(series) {
         <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${dateFormatted}</td>
         <td><span class="telemetry-node-tag">${escapeHtml(id)}</span></td>
         <td>${escapeHtml(item.location || 'Desconhecido')}</td>
-        <td><strong style="color: var(--accent-cyan);">${item.download_mbps.toFixed(1)}</strong> Mbps</td>
-        <td><strong style="color: #c084fc;">${item.upload_mbps.toFixed(1)}</strong> Mbps</td>
+        <td>${item.download_mbps > 0 ? `<strong style="color: var(--accent-cyan);">${item.download_mbps.toFixed(1)}</strong> Mbps` : `<span class="text-subtle font-mono">--</span>`}</td>
+        <td>${item.upload_mbps > 0 ? `<strong style="color: #c084fc;">${item.upload_mbps.toFixed(1)}</strong> Mbps` : `<span class="text-subtle font-mono">--</span>`}</td>
         <td><strong style="color: #34d399;">${item.ping_gateway.toFixed(1)}</strong> ms</td>
         <td><span class="dc-health-badge online" style="display:inline-flex;">● Sincronizado</span></td>
       </tr>
