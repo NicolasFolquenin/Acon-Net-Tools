@@ -1,0 +1,9 @@
+{
+  "id": "throughput_upload",
+  "type": "http_throughput_upload",
+  "name": "Throughput Upload ACON",
+  "enabled": true,
+  "endpoint": "/api/v1/speedtest/upload",
+  "size_mb": 2,
+  "timeout_seconds": 45
+}
