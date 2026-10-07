@@ -11,6 +11,22 @@ let currentSummaries = [];
 let pendingDeleteNodeId = null;
 let selectedChartNode = 'all';
 
+// Gerenciamento de Sessão JWT e Fetch Resiliente
+let authToken = '';
+try {
+  authToken = localStorage.getItem('noc_token') || sessionStorage.getItem('noc_token') || '';
+} catch {}
+
+async function apiFetch(url, options = {}) {
+  const opts = { ...options };
+  const headers = new Headers(opts.headers || {});
+  if (authToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${authToken}`);
+  }
+  opts.headers = headers;
+  return fetch(url, opts);
+}
+
 const tabDashboard = document.getElementById('tab-dashboard');
 const tabMachines = document.getElementById('tab-machines');
 const tabGroups = document.getElementById('tab-groups');
@@ -255,13 +271,36 @@ function updateMetricToggleVisibility() {
   }
 }
 
-// Inicialização
-document.addEventListener('DOMContentLoaded', async () => {
-  initTheme();
-  initCharts();
-  setupEventListeners();
-  await checkAuthAndInitialize();
-});
+// Inicialização Segura da Aplicação
+function initApp() {
+  try {
+    initTheme();
+  } catch (err) {
+    console.warn('[INIT] Erro ao inicializar tema:', err);
+  }
+
+  try {
+    setupEventListeners();
+  } catch (err) {
+    console.error('[INIT] Erro ao configurar listeners:', err);
+  }
+
+  try {
+    initCharts();
+  } catch (err) {
+    console.warn('[INIT] Erro ao inicializar gráficos:', err);
+  }
+
+  checkAuthAndInitialize().catch(err => {
+    console.warn('[INIT] Falha na verificação de sessão inicial:', err);
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 /* ==========================================================================
    1. Autenticação & Sessão
@@ -269,7 +308,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function checkAuthAndInitialize() {
   // 1. Verifica se o servidor possui integração com Keycloak/OIDC ativa
-  checkOIDCConfig();
+  try {
+    await checkOIDCConfig();
+  } catch (oidcErr) {
+    console.warn('[AUTH] Falha ao verificar OIDC:', oidcErr);
+  }
 
   // 2. Notifica caso haja erro retornado pelo redirecionamento do SSO
   const urlParams = new URLSearchParams(window.location.search);
@@ -280,7 +323,7 @@ async function checkAuthAndInitialize() {
   }
 
   try {
-    const res = await fetch('/api/v1/auth/me');
+    const res = await apiFetch('/api/v1/auth/me');
     if (res.ok) {
       const data = await res.json();
       if (data.authenticated && data.user) {
@@ -294,8 +337,12 @@ async function checkAuthAndInitialize() {
         } else {
           switchView('dashboard');
         }
-        await loadDashboardData();
-        startAutoRefresh();
+        try {
+          await loadDashboardData();
+          startAutoRefresh();
+        } catch (dashErr) {
+          console.warn('[AUTH] Aviso ao carregar dashboard após checkAuth:', dashErr);
+        }
         return;
       }
     }
@@ -310,7 +357,7 @@ async function checkAuthAndInitialize() {
 async function checkOIDCConfig() {
   if (!oidcSSOWrapper) return;
   try {
-    const res = await fetch('/api/v1/auth/oidc/config');
+    const res = await apiFetch('/api/v1/auth/oidc/config');
     if (res.ok) {
       const data = await res.json();
       if (data.enabled) {
@@ -327,11 +374,13 @@ async function checkOIDCConfig() {
 
 function setAuthenticatedUser(user) {
   currentUser = user;
-  loginModalOverlay.style.display = 'none';
+  if (loginModalOverlay) loginModalOverlay.style.display = 'none';
 
-  navUsername.textContent = user.username;
-  navRoleBadge.textContent = user.role === 'admin' ? 'Administrador' : 'Operador';
-  navRoleBadge.className = `role-badge ${user.role}`;
+  if (navUsername) navUsername.textContent = user.username;
+  if (navRoleBadge) {
+    navRoleBadge.textContent = user.role === 'admin' ? 'Administrador' : 'Operador';
+    navRoleBadge.className = `role-badge ${user.role}`;
+  }
 
   // Aba Máquinas visível para todos os usuários autenticados
   if (tabMachines) tabMachines.style.display = 'flex';
@@ -339,13 +388,13 @@ function setAuthenticatedUser(user) {
   // Se for admin, as abas e botões de administração estarão visíveis
   const adminSection = document.getElementById('sidebar-admin-section');
   if (user.role === 'admin') {
-    modalBtnDeletePc.style.display = 'inline-flex';
+    if (modalBtnDeletePc) modalBtnDeletePc.style.display = 'inline-flex';
     if (btnOpenUsers) btnOpenUsers.style.display = 'flex';
     if (tabGroups) tabGroups.style.display = 'flex';
     if (tabModules) tabModules.style.display = 'flex';
     if (adminSection) adminSection.style.display = 'block';
   } else {
-    modalBtnDeletePc.style.display = 'none';
+    if (modalBtnDeletePc) modalBtnDeletePc.style.display = 'none';
     if (btnOpenUsers) btnOpenUsers.style.display = 'none';
     if (tabGroups) tabGroups.style.display = 'none';
     if (tabModules) tabModules.style.display = 'none';
@@ -358,13 +407,15 @@ function setAuthenticatedUser(user) {
 
 function showLoginModal() {
   currentUser = null;
-  loginModalOverlay.style.display = 'flex';
-  navUsername.textContent = 'Não conectado';
-  navRoleBadge.textContent = '--';
-  navRoleBadge.className = 'role-badge';
-  loginErrorAlert.style.display = 'none';
-  loginUsernameInput.value = '';
-  loginPasswordInput.value = '';
+  if (loginModalOverlay) loginModalOverlay.style.display = 'flex';
+  if (navUsername) navUsername.textContent = 'Não conectado';
+  if (navRoleBadge) {
+    navRoleBadge.textContent = '--';
+    navRoleBadge.className = 'role-badge';
+  }
+  if (loginErrorAlert) loginErrorAlert.style.display = 'none';
+  if (loginUsernameInput) loginUsernameInput.value = '';
+  if (loginPasswordInput) loginPasswordInput.value = '';
   const adminSection = document.getElementById('sidebar-admin-section');
   if (adminSection) adminSection.style.display = 'none';
   if (btnOpenUsers) btnOpenUsers.style.display = 'none';
@@ -448,14 +499,15 @@ function switchView(viewName) {
 window.switchView = switchView;
 
 async function handleLoginSubmit(e) {
-  e.preventDefault();
-  const username = loginUsernameInput.value.trim();
-  const password = loginPasswordInput.value.trim();
+  if (e && e.preventDefault) e.preventDefault();
+
+  const username = loginUsernameInput ? loginUsernameInput.value.trim() : '';
+  const password = loginPasswordInput ? loginPasswordInput.value.trim() : '';
 
   if (!username || !password) return;
 
-  btnLoginSubmit.disabled = true;
-  loginErrorAlert.style.display = 'none';
+  if (btnLoginSubmit) btnLoginSubmit.disabled = true;
+  if (loginErrorAlert) loginErrorAlert.style.display = 'none';
 
   try {
     const res = await fetch('/api/v1/auth/login', {
@@ -470,27 +522,54 @@ async function handleLoginSubmit(e) {
       throw new Error(data.error || 'Falha ao autenticar');
     }
 
+    if (data.token) {
+      authToken = data.token;
+      try {
+        localStorage.setItem('noc_token', data.token);
+        sessionStorage.setItem('noc_token', data.token);
+      } catch (storageErr) {
+        console.warn('Falha ao salvar token no storage:', storageErr);
+      }
+    }
+
     setAuthenticatedUser(data.user);
     showToast(`Bem-vindo, ${data.user.username}!`, 'toast-success');
-    await loadDashboardData();
-    startAutoRefresh();
+
+    // Carrega dados de forma protegida para não quebrar o login caso a renderização falhe
+    try {
+      await loadDashboardData();
+      startAutoRefresh();
+    } catch (dashErr) {
+      console.warn('[AUTH] Aviso ao carregar dashboard pós-login:', dashErr);
+    }
   } catch (err) {
-    loginErrorText.textContent = err.message || 'Usuário ou senha incorretos';
-    loginErrorAlert.style.display = 'flex';
+    if (loginErrorText) {
+      loginErrorText.textContent = err.message || 'Usuário ou senha incorretos';
+    }
+    if (loginErrorAlert) {
+      loginErrorAlert.style.display = 'flex';
+    }
   } finally {
-    btnLoginSubmit.disabled = false;
+    if (btnLoginSubmit) btnLoginSubmit.disabled = false;
   }
 }
+window.handleLoginSubmit = handleLoginSubmit;
 
 async function handleLogout() {
+  authToken = '';
   try {
-    await fetch('/api/v1/auth/logout', { method: 'POST' });
+    localStorage.removeItem('noc_token');
+    sessionStorage.removeItem('noc_token');
+  } catch {}
+  try {
+    await apiFetch('/api/v1/auth/logout', { method: 'POST' });
   } catch (err) {
     console.error('Erro ao sair:', err);
   }
   showToast('Sessão encerrada com sucesso', 'toast-info');
   showLoginModal();
 }
+window.handleLogout = handleLogout;
 
 /* ==========================================================================
    Tema Claro / Escuro
@@ -525,8 +604,8 @@ function applyTheme(theme, notify = false) {
    ========================================================================== */
 
 function setupEventListeners() {
-  loginForm.addEventListener('submit', handleLoginSubmit);
-  btnLogout.addEventListener('click', handleLogout);
+  if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
+  if (btnLogout) btnLogout.addEventListener('click', handleLogout);
 
   if (selectNode) {
     selectNode.addEventListener('change', () => {
@@ -539,30 +618,38 @@ function setupEventListeners() {
 
   setupSegmentedControl();
 
-  btnRefresh.addEventListener('click', () => {
-    refreshCountdown = 15;
-    loadDashboardData();
-  });
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', () => {
+      refreshCountdown = 15;
+      loadDashboardData();
+    });
+  }
 
   // Fechamento do Modal de PC
-  modalPcClose.addEventListener('click', closePCModal);
-  modalBtnCloseBottom.addEventListener('click', closePCModal);
-  pcModal.addEventListener('click', (e) => {
-    if (e.target === pcModal) closePCModal();
-  });
+  if (modalPcClose) modalPcClose.addEventListener('click', closePCModal);
+  if (modalBtnCloseBottom) modalBtnCloseBottom.addEventListener('click', closePCModal);
+  if (pcModal) {
+    pcModal.addEventListener('click', (e) => {
+      if (e.target === pcModal) closePCModal();
+    });
+  }
 
   // Botão de Excluir dentro do Modal de PC
-  modalBtnDeletePc.addEventListener('click', () => {
-    const nodeId = modalBtnDeletePc.getAttribute('data-node-id');
-    if (nodeId) promptDeleteNode(nodeId);
-  });
+  if (modalBtnDeletePc) {
+    modalBtnDeletePc.addEventListener('click', () => {
+      const nodeId = modalBtnDeletePc.getAttribute('data-node-id');
+      if (nodeId) promptDeleteNode(nodeId);
+    });
+  }
 
   // Confirmação de Exclusão
-  btnCancelDelete.addEventListener('click', closeDeleteModal);
-  deleteConfirmModal.addEventListener('click', (e) => {
-    if (e.target === deleteConfirmModal) closeDeleteModal();
-  });
-  btnConfirmDelete.addEventListener('click', executeDeleteNode);
+  if (btnCancelDelete) btnCancelDelete.addEventListener('click', closeDeleteModal);
+  if (deleteConfirmModal) {
+    deleteConfirmModal.addEventListener('click', (e) => {
+      if (e.target === deleteConfirmModal) closeDeleteModal();
+    });
+  }
+  if (btnConfirmDelete) btnConfirmDelete.addEventListener('click', executeDeleteNode);
 
   // Alternância de Visualização de Senha
   initPasswordToggle('login-password', 'btn-toggle-login-password');
@@ -923,7 +1010,7 @@ async function loadUsersList() {
   usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando usuários...</td></tr>`;
 
   try {
-    const res = await fetch('/api/v1/users');
+    const res = await apiFetch('/api/v1/users');
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.error || 'Falha ao carregar lista de usuários');
@@ -1026,7 +1113,7 @@ async function handleCreateUserSubmit(e) {
   if (btnSubmitCreateUser) btnSubmitCreateUser.disabled = true;
 
   try {
-    const res = await fetch('/api/v1/users', {
+    const res = await apiFetch('/api/v1/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1064,7 +1151,7 @@ async function handleToggleRole(username, newRole) {
   }
 
   try {
-    const res = await fetch('/api/v1/users', {
+    const res = await apiFetch('/api/v1/users', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, role: newRole })
@@ -1088,7 +1175,7 @@ async function handleDeleteUser(username) {
   }
 
   try {
-    const res = await fetch(`/api/v1/users?username=${encodeURIComponent(username)}`, {
+    const res = await apiFetch(`/api/v1/users?username=${encodeURIComponent(username)}`, {
       method: 'DELETE'
     });
     const data = await res.json();
@@ -1161,7 +1248,7 @@ async function loadGroupsList() {
   groupsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando grupos...</td></tr>`;
 
   try {
-    const res = await fetch('/api/v1/groups');
+    const res = await apiFetch('/api/v1/groups');
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || 'Falha ao buscar grupos');
@@ -1345,7 +1432,7 @@ async function handleSaveGroupSubmit(e) {
   const method = editingId ? 'PUT' : 'POST';
 
   try {
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -1371,7 +1458,7 @@ async function handleDeleteGroup(groupId, groupName) {
   if (!confirm(`Tem certeza que deseja excluir o grupo "${groupName}"?`)) return;
 
   try {
-    const res = await fetch(`/api/v1/groups/${encodeURIComponent(groupId)}`, {
+    const res = await apiFetch(`/api/v1/groups/${encodeURIComponent(groupId)}`, {
       method: 'DELETE'
     });
     const data = await res.json();
@@ -1413,7 +1500,7 @@ async function loadDashboardData() {
   }
 
   try {
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (res.status === 401) {
       showLoginModal();
       return;
@@ -1844,7 +1931,7 @@ async function executeDeleteNode() {
   btnConfirmDelete.innerHTML = '<span>Excluindo...</span>';
 
   try {
-    const res = await fetch(`/api/v1/nodes?node_id=${encodeURIComponent(nodeId)}`, {
+    const res = await apiFetch(`/api/v1/nodes?node_id=${encodeURIComponent(nodeId)}`, {
       method: 'DELETE'
     });
 
@@ -1933,6 +2020,11 @@ function createFillGradient(ctx, colorTop, colorBottom, height = 280) {
 }
 
 function initCharts() {
+  if (typeof Chart === 'undefined') {
+    console.warn('[CHARTS] Chart.js ainda não disponível. Inicialização postergada.');
+    return;
+  }
+
   const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
   const colors = getChartThemeColors(currentTheme);
 
@@ -1979,55 +2071,69 @@ function initCharts() {
     }
   };
 
-  const ctxBandwidth = document.getElementById('centralBandwidthChart').getContext('2d');
-  bandwidthChart = new Chart(ctxBandwidth, {
-    type: 'line',
-    data: { labels: [], datasets: [] },
-    options: {
-      ...chartOpts,
-      plugins: {
-        ...chartOpts.plugins,
-        tooltip: {
-          ...chartOpts.plugins.tooltip,
-          callbacks: {
-            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + ' Mbps' : '--'}`
+  const canvasBandwidth = document.getElementById('centralBandwidthChart');
+  if (canvasBandwidth && !bandwidthChart) {
+    try {
+      const ctxBandwidth = canvasBandwidth.getContext('2d');
+      bandwidthChart = new Chart(ctxBandwidth, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: {
+          ...chartOpts,
+          plugins: {
+            ...chartOpts.plugins,
+            tooltip: {
+              ...chartOpts.plugins.tooltip,
+              callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + ' Mbps' : '--'}`
+              }
+            }
+          },
+          scales: {
+            ...chartOpts.scales,
+            y: {
+              ...chartOpts.scales.y,
+              title: { display: true, text: 'Mbps', color: colors.textColor, font: { size: 11, weight: '600' } }
+            }
           }
         }
-      },
-      scales: {
-        ...chartOpts.scales,
-        y: {
-          ...chartOpts.scales.y,
-          title: { display: true, text: 'Mbps', color: colors.textColor, font: { size: 11, weight: '600' } }
-        }
-      }
+      });
+    } catch (chartErr) {
+      console.warn('Erro ao criar bandwidthChart:', chartErr);
     }
-  });
+  }
 
-  const ctxLatency = document.getElementById('centralLatencyChart').getContext('2d');
-  latencyChart = new Chart(ctxLatency, {
-    type: 'line',
-    data: { labels: [], datasets: [] },
-    options: {
-      ...chartOpts,
-      plugins: {
-        ...chartOpts.plugins,
-        tooltip: {
-          ...chartOpts.plugins.tooltip,
-          callbacks: {
-            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + ' ms' : '--'}`
+  const canvasLatency = document.getElementById('centralLatencyChart');
+  if (canvasLatency && !latencyChart) {
+    try {
+      const ctxLatency = canvasLatency.getContext('2d');
+      latencyChart = new Chart(ctxLatency, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: {
+          ...chartOpts,
+          plugins: {
+            ...chartOpts.plugins,
+            tooltip: {
+              ...chartOpts.plugins.tooltip,
+              callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + ' ms' : '--'}`
+              }
+            }
+          },
+          scales: {
+            ...chartOpts.scales,
+            y: {
+              ...chartOpts.scales.y,
+              title: { display: true, text: 'ms', color: colors.textColor, font: { size: 11, weight: '600' } }
+            }
           }
         }
-      },
-      scales: {
-        ...chartOpts.scales,
-        y: {
-          ...chartOpts.scales.y,
-          title: { display: true, text: 'ms', color: colors.textColor, font: { size: 11, weight: '600' } }
-        }
-      }
+      });
+    } catch (chartErr) {
+      console.warn('Erro ao criar latencyChart:', chartErr);
     }
-  });
+  }
 }
 
 function renderComparativeCharts(series, nodesList) {
@@ -2035,6 +2141,13 @@ function renderComparativeCharts(series, nodesList) {
   cachedNodesList = nodesList || [];
 
   updateMetricToggleVisibility();
+
+  if (!bandwidthChart || !latencyChart) {
+    try {
+      initCharts();
+    } catch {}
+    if (!bandwidthChart || !latencyChart) return;
+  }
 
   const bandwidthLegendEl = document.getElementById('bandwidth-legend-container');
   const latencyLegendEl = document.getElementById('latency-legend-container');
@@ -2389,10 +2502,10 @@ async function loadAdminMachines() {
 
   try {
     const [machRes, grpRes, modRes, dashRes] = await Promise.all([
-      fetch('/api/v1/admin/machines'),
-      fetch('/api/v1/admin/groups'),
-      fetch('/api/v1/admin/modules'),
-      fetch('/api/v1/dashboard/metrics')
+      apiFetch('/api/v1/admin/machines'),
+      apiFetch('/api/v1/admin/groups'),
+      apiFetch('/api/v1/admin/modules'),
+      apiFetch('/api/v1/dashboard/metrics')
     ]);
 
     if (dashRes.ok) {
@@ -2663,7 +2776,7 @@ async function handleQuickChangeGroup(hostname, newGroupId) {
     return;
   }
   try {
-    const res = await fetch(`/api/v1/admin/machines/${encodeURIComponent(hostname)}`, {
+    const res = await apiFetch(`/api/v1/admin/machines/${encodeURIComponent(hostname)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2725,7 +2838,7 @@ async function openMachineMetricsModal(hostname) {
   machineMetricsModal.style.display = 'flex';
 
   try {
-    const res = await fetch(`/api/v1/dashboard/metrics?node_id=${encodeURIComponent(hostname)}`);
+    const res = await apiFetch(`/api/v1/dashboard/metrics?node_id=${encodeURIComponent(hostname)}`);
     if (res.ok) {
       const data = await res.json();
       renderMachineMetricsCharts(data.metrics_series || []);
@@ -2743,6 +2856,7 @@ function closeMachineMetricsModal() {
 }
 
 function renderMachineMetricsCharts(metricsSeries) {
+  if (typeof Chart === 'undefined') return;
   const ctxLatency = document.getElementById('mmLatencyChart');
   const ctxThroughput = document.getElementById('mmThroughputChart');
   if (!ctxLatency || !ctxThroughput) return;
@@ -3118,7 +3232,7 @@ async function handleSaveMachineConfigSubmit(e) {
   if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerHTML = '<span>Salvando...</span>'; }
 
   try {
-    const res = await fetch(`/api/v1/admin/machines/${encodeURIComponent(hostname)}`, {
+    const res = await apiFetch(`/api/v1/admin/machines/${encodeURIComponent(hostname)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3150,7 +3264,7 @@ async function loadModulesCatalog() {
   modulesCardsGrid.innerHTML = '<div class="module-skeleton-loader">Carregando catálogo de módulos...</div>';
 
   try {
-    const res = await fetch('/api/v1/admin/modules');
+    const res = await apiFetch('/api/v1/admin/modules');
     if (!res.ok) throw new Error('Falha ao carregar catálogo');
     const modules = await res.json() || [];
     allCatalogModules = modules;
@@ -3242,7 +3356,7 @@ window.downloadModuleJson = downloadModuleJson;
 async function handleDeleteModule(moduleId) {
   if (!confirm(`Deseja realmente remover o módulo "${moduleId}" do catálogo?`)) return;
   try {
-    const res = await fetch(`/api/v1/admin/modules/${encodeURIComponent(moduleId)}`, {
+    const res = await apiFetch(`/api/v1/admin/modules/${encodeURIComponent(moduleId)}`, {
       method: 'DELETE'
     });
     const data = await res.json();
@@ -3319,7 +3433,7 @@ async function handleSaveModuleUploadSubmit() {
   if (btnSubmitUploadMod) { btnSubmitUploadMod.disabled = true; btnSubmitUploadMod.innerHTML = '<span>Salvando...</span>'; }
 
   try {
-    const res = await fetch('/api/v1/admin/modules', {
+    const res = await apiFetch('/api/v1/admin/modules', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(parsedMod)
