@@ -25,6 +25,26 @@ const nextRunText = document.getElementById('next-run-text');
 const metricsTableBody = document.getElementById('metrics-table-body');
 const lastUpdatedText = document.getElementById('last-updated-text');
 
+// Elementos de Paginação e Filtro por Data da Tabela (15 itens por página)
+const historyDateFilter = document.getElementById('history-date-filter');
+const btnFilterToday = document.getElementById('btn-filter-today');
+const btnFilterAll = document.getElementById('btn-filter-all');
+const historyTotalBadge = document.getElementById('history-total-badge');
+const paginationRangeText = document.getElementById('pagination-range-text');
+const btnPrevPage = document.getElementById('btn-prev-page');
+const btnNextPage = document.getElementById('btn-next-page');
+const currentPageDisplay = document.getElementById('current-page-display');
+const totalPagesDisplay = document.getElementById('total-pages-display');
+
+// Estado de Paginação
+const historyPagination = {
+  currentPage: 1,
+  pageSize: 15,
+  dayFilter: '',
+  totalCount: 0,
+  totalPages: 1
+};
+
 // Modal Settings Elements
 const modalSettings = document.getElementById('settings-modal');
 const btnOpenSettings = document.getElementById('btn-open-settings');
@@ -61,6 +81,14 @@ const WailsApp = {
     }
     // Mock para desenvolvimento/preview no navegador
     return generateMockHistory(24);
+  },
+
+  async getHistoryPage(dayFilter = '', page = 1, pageSize = 15) {
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.GetHistoryPage) {
+      return await window.go.main.App.GetHistoryPage(dayFilter, page, pageSize);
+    }
+    // Mock para desenvolvimento/preview no navegador
+    return generateMockHistoryPage(dayFilter, page, pageSize);
   },
 
   async runTestNow() {
@@ -132,6 +160,57 @@ function setupEventListeners() {
   btnCloseSettings.addEventListener('click', closeSettingsModal);
   btnCancelSettings.addEventListener('click', closeSettingsModal);
   settingsForm.addEventListener('submit', onSaveSettings);
+
+  // Paginação e Filtro por Data
+  if (historyDateFilter) {
+    historyDateFilter.addEventListener('change', async (e) => {
+      historyPagination.dayFilter = (e.target.value || '').trim();
+      historyPagination.currentPage = 1;
+      await loadHistoryTablePage();
+    });
+  }
+
+  if (btnFilterToday) {
+    btnFilterToday.addEventListener('click', async () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+
+      if (historyDateFilter) historyDateFilter.value = todayStr;
+      historyPagination.dayFilter = todayStr;
+      historyPagination.currentPage = 1;
+      await loadHistoryTablePage();
+    });
+  }
+
+  if (btnFilterAll) {
+    btnFilterAll.addEventListener('click', async () => {
+      if (historyDateFilter) historyDateFilter.value = '';
+      historyPagination.dayFilter = '';
+      historyPagination.currentPage = 1;
+      await loadHistoryTablePage();
+    });
+  }
+
+  if (btnPrevPage) {
+    btnPrevPage.addEventListener('click', async () => {
+      if (historyPagination.currentPage > 1) {
+        historyPagination.currentPage--;
+        await loadHistoryTablePage();
+      }
+    });
+  }
+
+  if (btnNextPage) {
+    btnNextPage.addEventListener('click', async () => {
+      if (historyPagination.currentPage < historyPagination.totalPages) {
+        historyPagination.currentPage++;
+        await loadHistoryTablePage();
+      }
+    });
+  }
 }
 
 // Handler do botão "Rodar Teste Agora" com estado visual de loading
@@ -638,14 +717,60 @@ async function refreshDashboard() {
       latencyChart.update();
     }
 
-    // Renderiza tabela de log recente (apenas colunas ativas)
-    renderTable([...history].reverse(), capabilities);
     lastUpdatedText.textContent = `Última leitura: ${new Date(latest.timestamp).toLocaleTimeString()}`;
   } else {
     statDownload.textContent = '--';
     statUpload.textContent = '--';
     statPing.textContent = '--';
-    renderTable([], capabilities);
+  }
+
+  // Carrega a página da tabela de execuções com o filtro atual
+  await loadHistoryTablePage();
+}
+
+// Carrega página específica da tabela de execuções recentes (15 itens por página com filtro de data)
+async function loadHistoryTablePage() {
+  try {
+    const res = await WailsApp.getHistoryPage(
+      historyPagination.dayFilter,
+      historyPagination.currentPage,
+      historyPagination.pageSize
+    );
+
+    const records = (res && res.records) ? res.records : [];
+    historyPagination.totalCount = (res && typeof res.total_count === 'number') ? res.total_count : 0;
+    historyPagination.totalPages = Math.max(1, (res && typeof res.total_pages === 'number') ? res.total_pages : 1);
+    historyPagination.currentPage = Math.min(Math.max(1, (res && typeof res.page === 'number') ? res.page : 1), historyPagination.totalPages);
+
+    renderTable(records, currentCapabilities);
+    updatePaginationUI();
+  } catch (err) {
+    console.error('Erro ao carregar página de histórico:', err);
+    metricsTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Erro ao carregar histórico: ${err.message || err}</td></tr>`;
+  }
+}
+
+function updatePaginationUI() {
+  if (currentPageDisplay) currentPageDisplay.textContent = historyPagination.currentPage;
+  if (totalPagesDisplay) totalPagesDisplay.textContent = historyPagination.totalPages;
+
+  if (btnPrevPage) {
+    btnPrevPage.disabled = (historyPagination.currentPage <= 1);
+  }
+  if (btnNextPage) {
+    btnNextPage.disabled = (historyPagination.currentPage >= historyPagination.totalPages);
+  }
+
+  const start = historyPagination.totalCount === 0 ? 0 : (historyPagination.currentPage - 1) * historyPagination.pageSize + 1;
+  const end = Math.min(historyPagination.currentPage * historyPagination.pageSize, historyPagination.totalCount);
+
+  if (paginationRangeText) {
+    paginationRangeText.textContent = `Exibindo ${start} a ${end} de ${historyPagination.totalCount}`;
+  }
+
+  if (historyTotalBadge) {
+    const dayLabel = historyPagination.dayFilter ? ` (${historyPagination.dayFilter})` : '';
+    historyTotalBadge.textContent = `${historyPagination.totalCount} execuções${dayLabel}`;
   }
 }
 
@@ -656,7 +781,10 @@ function renderTable(records, caps = currentCapabilities) {
   if (caps.hasPing) colSpan++;
 
   if (!records || records.length === 0) {
-    metricsTableBody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted">Nenhum teste registrado ainda.</td></tr>`;
+    const emptyMsg = historyPagination.dayFilter
+      ? `Nenhuma execução encontrada para a data ${historyPagination.dayFilter}.`
+      : 'Nenhum teste registrado ainda.';
+    metricsTableBody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted">${emptyMsg}</td></tr>`;
     return;
   }
 
@@ -766,3 +894,44 @@ function generateMockHistory(count) {
   }
   return list;
 }
+
+function generateMockHistoryPage(dayFilter, page, pageSize) {
+  const all = [];
+  const now = Date.now();
+  for (let i = 44; i >= 0; i--) {
+    const time = new Date(now - i * 3600000 * 2);
+    all.push({
+      id: 45 - i,
+      node_id: 'minipc-dc-01',
+      location: 'Guarapuava-DC1',
+      timestamp: time.toISOString(),
+      download_mbps: +(810 + Math.sin(i) * 60 + Math.random() * 20).toFixed(2),
+      upload_mbps: +(715 + Math.cos(i) * 45 + Math.random() * 15).toFixed(2),
+      ping_gateway: +(1.2 + Math.random() * 0.7).toFixed(2),
+      synced: true
+    });
+  }
+
+  let filtered = all;
+  if (dayFilter && dayFilter.trim() !== '') {
+    filtered = all.filter(r => r.timestamp.startsWith(dayFilter.trim()));
+  }
+
+  // Mais recentes primeiro
+  filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  const totalCount = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const validPage = Math.min(Math.max(1, page), totalPages);
+  const start = (validPage - 1) * pageSize;
+  const records = filtered.slice(start, start + pageSize);
+
+  return {
+    records,
+    total_count: totalCount,
+    page: validPage,
+    page_size: pageSize,
+    total_pages: totalPages
+  };
+}
+

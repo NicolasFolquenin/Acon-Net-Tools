@@ -335,6 +335,15 @@ type LocalMetricRecord struct {
 	ModularResults *ModularResults        `json:"modular_results,omitempty"`
 }
 
+// HistoryPageResult representa os dados paginados e filtrados de execuções
+type HistoryPageResult struct {
+	Records    []LocalMetricRecord `json:"records"`
+	TotalCount int                 `json:"total_count"`
+	Page       int                 `json:"page"`
+	PageSize   int                 `json:"page_size"`
+	TotalPages int                 `json:"total_pages"`
+}
+
 // Config representa as configurações carregadas de config.json / .env
 type Config struct {
 	NodeID          string `json:"node_id"`

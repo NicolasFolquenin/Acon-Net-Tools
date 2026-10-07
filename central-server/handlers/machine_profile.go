@@ -288,6 +288,14 @@ func (h *MachineProfileHandler) HandleAdminGroups(w http.ResponseWriter, r *http
 			return
 		}
 
+		if grp.CreatedAt.IsZero() {
+			grp.CreatedAt = time.Now().UTC()
+		}
+		grp.UpdatedAt = time.Now().UTC()
+		if grp.Profile.Version == "" {
+			grp.Profile.Version = time.Now().Format("2006.01.02.150405")
+		}
+
 		if h.mongoClient != nil {
 			if err := h.mongoClient.SaveMachineGroup(ctx, &grp); err != nil {
 				w.Header().Set("Content-Type", "application/json")
@@ -301,6 +309,33 @@ func (h *MachineProfileHandler) HandleAdminGroups(w http.ResponseWriter, r *http
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(grp)
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		prefix := "/api/v1/admin/groups/"
+		groupID := strings.TrimPrefix(r.URL.Path, prefix)
+		groupID = strings.TrimSpace(groupID)
+		if groupID == "" || groupID == "default" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "o grupo padrão não pode ser excluído"})
+			return
+		}
+
+		if h.mongoClient != nil {
+			if err := h.mongoClient.DeleteMachineGroup(ctx, groupID); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+				return
+			}
+		}
+
+		log.Printf("[MACHINE-PROFILE] Grupo '%s' excluído com sucesso.", groupID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "grupo excluído com sucesso"})
 		return
 	}
 

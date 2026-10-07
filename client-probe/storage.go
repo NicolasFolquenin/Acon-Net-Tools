@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -236,6 +237,126 @@ func (s *StorageService) GetRecentMetrics(limit int) ([]LocalMetricRecord, error
 
 	return ascList, nil
 }
+
+// GetHistoryPage retorna as medições paginadas (15 por página padrão) com filtro opcional por data (YYYY-MM-DD).
+func (s *StorageService) GetHistoryPage(dayFilter string, page int, pageSize int) (HistoryPageResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if pageSize <= 0 {
+		pageSize = 15
+	}
+	if page <= 0 {
+		page = 1
+	}
+
+	whereClause := ""
+	var countArgs []interface{}
+	var queryArgs []interface{}
+
+	dayFilter = strings.TrimSpace(dayFilter)
+	if dayFilter != "" {
+		whereClause = "WHERE (DATE(timestamp) = ? OR timestamp LIKE ?)"
+		countArgs = append(countArgs, dayFilter, dayFilter+"%")
+		queryArgs = append(queryArgs, dayFilter, dayFilter+"%")
+	}
+
+	// 1. Total de registros para o filtro
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM metrics %s", whereClause)
+	var totalCount int
+	errCount := s.db.QueryRow(countQuery, countArgs...).Scan(&totalCount)
+	if errCount != nil {
+		return HistoryPageResult{Page: page, PageSize: pageSize, TotalPages: 1}, fmt.Errorf("erro ao contar registros: %w", errCount)
+	}
+
+	totalPages := 1
+	if totalCount > 0 {
+		totalPages = int(math.Ceil(float64(totalCount) / float64(pageSize)))
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+
+	offset := (page - 1) * pageSize
+	if offset < 0 {
+		offset = 0
+	}
+
+	queryArgs = append(queryArgs, pageSize, offset)
+
+	// 2. Consulta paginada ordenada do mais recente para o mais antigo
+	selectQuery := fmt.Sprintf(`
+	SELECT id, node_id, location, COALESCE(group_name, ''), COALESCE(vlan, 0), timestamp, download_mbps, upload_mbps, ping_gateway, synced, 
+	       COALESCE(error_message, ''), COALESCE(system_info_json, ''), COALESCE(switch_info_json, ''),
+	       COALESCE(profile_version, ''), COALESCE(metrics_json, ''), COALESCE(modular_json, '')
+	FROM metrics
+	%s
+	ORDER BY timestamp DESC
+	LIMIT ? OFFSET ?
+	`, whereClause)
+
+	rows, err := s.db.Query(selectQuery, queryArgs...)
+	if err != nil {
+		return HistoryPageResult{Page: page, PageSize: pageSize, TotalPages: totalPages, TotalCount: totalCount}, fmt.Errorf("erro ao consultar página: %w", err)
+	}
+	defer rows.Close()
+
+	var records []LocalMetricRecord
+	for rows.Next() {
+		var r LocalMetricRecord
+		var timeStr string
+		var syncedInt int
+		var sysJson, switchJson, profileVer, metricsJson, modularJson string
+		if err := rows.Scan(&r.ID, &r.NodeID, &r.Location, &r.GroupName, &r.VLAN, &timeStr, &r.DownloadMbps, &r.UploadMbps, &r.PingGateway, &syncedInt, &r.ErrorMessage, &sysJson, &switchJson, &profileVer, &metricsJson, &modularJson); err != nil {
+			log.Printf("[STORAGE] Erro scan página: %v", err)
+			continue
+		}
+		t, _ := time.Parse(time.RFC3339, timeStr)
+		r.Timestamp = t
+		r.Synced = (syncedInt == 1)
+		r.ProfileVersion = profileVer
+
+		if sysJson != "" {
+			var si SystemInfo
+			if errU := json.Unmarshal([]byte(sysJson), &si); errU == nil {
+				r.SystemInfo = &si
+			}
+		}
+		if switchJson != "" {
+			var sw SwitchInfo
+			if errU := json.Unmarshal([]byte(switchJson), &sw); errU == nil {
+				r.SwitchInfo = &sw
+			}
+		}
+		if metricsJson != "" {
+			var m map[string]interface{}
+			if errU := json.Unmarshal([]byte(metricsJson), &m); errU == nil {
+				r.Metrics = m
+			}
+		}
+		if modularJson != "" {
+			var mr ModularResults
+			if errU := json.Unmarshal([]byte(modularJson), &mr); errU == nil {
+				r.ModularResults = &mr
+			}
+		}
+
+		records = append(records, r)
+	}
+
+	if records == nil {
+		records = []LocalMetricRecord{}
+	}
+
+	return HistoryPageResult{
+		Records:    records,
+		TotalCount: totalCount,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	}, nil
+}
+
 
 // GetLastValidSwitchInfo procura nas últimas medições pelo switch válido mais recente gravado, priorizando switches reais
 func (s *StorageService) GetLastValidSwitchInfo() *SwitchInfo {
