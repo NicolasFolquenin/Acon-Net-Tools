@@ -762,6 +762,16 @@ func (m *MongoDBClient) SaveMachineGroup(ctx context.Context, grp *models.Machin
 	return err
 }
 
+// DeleteMachineGroup remove um grupo de máquinas pelo ID
+func (m *MongoDBClient) DeleteMachineGroup(ctx context.Context, id string) error {
+	if m.MachineGroupsCollection == nil {
+		return fmt.Errorf("colecao de grupos de maquinas nao inicializada")
+	}
+	_, err := m.MachineGroupsCollection.DeleteOne(ctx, bson.M{"_id": id})
+	return err
+}
+
+
 // GetMachine busca o registro de uma máquina pelo hostname
 func (m *MongoDBClient) GetMachine(ctx context.Context, hostname string) (*models.MachineRegistration, error) {
 	if m.MachinesCollection == nil {

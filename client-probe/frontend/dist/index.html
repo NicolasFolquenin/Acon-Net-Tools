@@ -275,12 +275,26 @@
         </div>
       </section>
 
-      <!-- Recent Executions Table -->
+      <!-- Recent Executions Table (15 por página e filtro por dia) -->
       <section class="table-section">
-        <div class="section-header">
-          <h3>Log de Execuções Recentes</h3>
-          <span class="text-muted" id="last-updated-text">Atualizado há poucos instantes</span>
+        <div class="section-header" style="flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3>Log de Execuções Recentes</h3>
+            <span class="text-muted" id="last-updated-text">Atualizado há poucos instantes</span>
+          </div>
+
+          <!-- Barra de Filtro por Data -->
+          <div class="table-toolbar">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <label for="history-date-filter" class="text-xs text-muted" style="font-weight: 500;">Filtrar Dia:</label>
+              <input type="date" id="history-date-filter" class="date-input-ctrl" title="Selecione um dia específico para filtrar as medições" />
+            </div>
+            <button type="button" id="btn-filter-today" class="pagination-btn" title="Filtrar medições de hoje">Hoje</button>
+            <button type="button" id="btn-filter-all" class="pagination-btn" title="Exibir todas as medições">Todas as Datas</button>
+            <span id="history-total-badge" class="count-badge">0 execuções</span>
+          </div>
         </div>
+
         <div class="table-responsive">
           <table class="data-table">
             <thead>
@@ -298,6 +312,24 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Rodapé de Paginação (15 itens por página) -->
+        <div class="table-pagination-footer">
+          <div class="text-xs text-muted">
+            <span id="pagination-range-text">Exibindo 0 a 0 de 0</span> • 15 por página
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" id="btn-prev-page" class="pagination-btn" disabled title="Página Anterior">
+              &larr; Anterior
+            </button>
+            <span class="text-xs font-mono" style="padding: 0 4px; color: var(--text-secondary);">
+              Página <strong id="current-page-display" style="color: var(--text-primary);">1</strong> de <strong id="total-pages-display" style="color: var(--text-primary);">1</strong>
+            </span>
+            <button type="button" id="btn-next-page" class="pagination-btn" disabled title="Próxima Página">
+              Próxima &rarr;
+            </button>
+          </div>
         </div>
       </section>
     </main>

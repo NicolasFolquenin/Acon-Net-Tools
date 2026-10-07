@@ -356,6 +356,15 @@ func (a *App) GetHistory() ([]LocalMetricRecord, error) {
 	return a.storage.GetRecentMetrics(24)
 }
 
+// GetHistoryPage retorna as medições paginadas (15 itens por página) com filtro por dia para a tabela
+func (a *App) GetHistoryPage(dayFilter string, page int, pageSize int) (HistoryPageResult, error) {
+	if a.storage == nil {
+		return HistoryPageResult{Records: []LocalMetricRecord{}, Page: 1, PageSize: 15, TotalPages: 1}, nil
+	}
+	return a.storage.GetHistoryPage(dayFilter, page, pageSize)
+}
+
+
 // GetStatus retorna o estado geral da sonda
 func (a *App) GetStatus() ProbeStatus {
 	a.mu.Lock()

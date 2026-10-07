@@ -3946,5 +3946,97 @@ body {
   }
 }
 
+/* ==========================================================================
+   Full Width Groups List & Details/Create Modal Styles
+   ========================================================================== */
+
+.groups-full-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: var(--shadow-card);
+}
+
+.modal-window-lg {
+  max-width: 680px;
+  width: 95%;
+}
+
+.modal-window-xl {
+  max-width: 960px;
+  width: 95%;
+}
+
+.group-modal-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-glass);
+  padding: 0 20px;
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.group-tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  padding: 12px 16px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.group-tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.group-tab-btn.active {
+  color: #38bdf8;
+  border-bottom-color: #38bdf8;
+}
+
+.gd-tab-pane {
+  padding: 4px 0;
+}
+
+.badge-counter-clickable {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.badge-counter-clickable:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.2);
+}
+
+.badge-machines {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.badge-modules {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
 
 

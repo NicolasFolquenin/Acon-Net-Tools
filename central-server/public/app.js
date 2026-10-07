@@ -145,44 +145,73 @@ const usersCountTag = document.getElementById('users-count-tag');
 
 // Elementos de Gerenciamento de Grupos & VLANs (Admin)
 const btnOpenGroups = document.getElementById('btn-open-groups');
-const groupsModal = document.getElementById('groups-modal');
-const modalBtnCloseGroups = document.getElementById('modal-btn-close-groups');
-const modalBtnCloseGroupsBottom = document.getElementById('modal-btn-close-groups-bottom');
-const groupForm = document.getElementById('group-form');
-const groupFormTitle = document.getElementById('group-form-title');
-const btnCancelEditGroup = document.getElementById('btn-cancel-edit-group');
-const groupIdInput = document.getElementById('group-id');
-const groupNameInput = document.getElementById('group-name');
-const groupVlansInput = document.getElementById('group-vlans');
-const groupIntervalInput = document.getElementById('group-interval');
-const groupDescriptionInput = document.getElementById('group-description');
-const groupIsDefaultInput = document.getElementById('group-is-default');
-const groupErrorAlert = document.getElementById('group-error-alert');
-const groupErrorText = document.getElementById('group-error-text');
 const groupsTableBody = document.getElementById('groups-table-body');
 const groupsCountTag = document.getElementById('groups-count-tag');
-const btnSubmitGroupText = document.getElementById('btn-submit-group-text');
+const groupsSearchInput = document.getElementById('groups-search-input');
+const btnOpenCreateGroup = document.getElementById('btn-open-create-group');
 
-// Elementos dos Módulos de Testes
-const modPingEnabled = document.getElementById('mod-ping-enabled');
-const modPingTarget = document.getElementById('mod-ping-target');
-const modPingCount = document.getElementById('mod-ping-count');
-const modPacketlossEnabled = document.getElementById('mod-packetloss-enabled');
-const modPacketlossTarget = document.getElementById('mod-packetloss-target');
-const modPacketlossCount = document.getElementById('mod-packetloss-count');
-const modDownloadEnabled = document.getElementById('mod-download-enabled');
-const modDownloadBytes = document.getElementById('mod-download-bytes');
-const modUploadEnabled = document.getElementById('mod-upload-enabled');
-const modUploadBytes = document.getElementById('mod-upload-bytes');
-const modDnsEnabled = document.getElementById('mod-dns-enabled');
-const modDnsDomains = document.getElementById('mod-dns-domains');
-const modHttpEnabled = document.getElementById('mod-http-enabled');
-const modHttpUrl = document.getElementById('mod-http-url');
-const modHttpStatus = document.getElementById('mod-http-status');
-const modTraceEnabled = document.getElementById('mod-trace-enabled');
-const modTraceTarget = document.getElementById('mod-trace-target');
-const modTraceHops = document.getElementById('mod-trace-hops');
-const modLldpEnabled = document.getElementById('mod-lldp-enabled');
+// Elementos do Modal de Criar Grupo
+const groupCreateModal = document.getElementById('group-create-modal');
+const modalBtnCloseCreateGroup = document.getElementById('modal-btn-close-create-group');
+const btnCancelCreateGroup = document.getElementById('btn-cancel-create-group');
+const createGroupForm = document.getElementById('create-group-form');
+const createGroupNameInput = document.getElementById('create-group-name');
+const createGroupIdInput = document.getElementById('create-group-id');
+const createGroupVlansInput = document.getElementById('create-group-vlans');
+const createGroupSubnetsInput = document.getElementById('create-group-subnets');
+const createGroupIntervalInput = document.getElementById('create-group-interval');
+const createGroupDescriptionInput = document.getElementById('create-group-description');
+const createGroupModulesList = document.getElementById('create-group-modules-list');
+const createGroupModulesCount = document.getElementById('create-group-modules-count');
+const createGroupErrorAlert = document.getElementById('create-group-error-alert');
+const createGroupErrorText = document.getElementById('create-group-error-text');
+
+// Elementos do Modal de Detalhes do Grupo
+const groupDetailsModal = document.getElementById('group-details-modal');
+const modalBtnCloseGroupDetails = document.getElementById('modal-btn-close-group-details');
+const gdModalTitle = document.getElementById('gd-modal-title');
+const gdModalBadge = document.getElementById('gd-modal-badge');
+const gdCountMachines = document.getElementById('gd-count-machines');
+const gdCountModules = document.getElementById('gd-count-modules');
+const gdMachinesTableBody = document.getElementById('gd-machines-table-body');
+const gdModulesCardsGrid = document.getElementById('gd-modules-cards-grid');
+const editGroupForm = document.getElementById('edit-group-form');
+const egGroupId = document.getElementById('eg-group-id');
+const egGroupName = document.getElementById('eg-group-name');
+const egGroupVlans = document.getElementById('eg-group-vlans');
+const egGroupSubnets = document.getElementById('eg-group-subnets');
+const egGroupInterval = document.getElementById('eg-group-interval');
+const egGroupDescription = document.getElementById('eg-group-description');
+const egModulesCheckboxesList = document.getElementById('eg-modules-checkboxes-list');
+const egModulesCountTag = document.getElementById('eg-modules-count-tag');
+const egErrorAlert = document.getElementById('eg-error-alert');
+const egErrorText = document.getElementById('eg-error-text');
+const btnEgDeleteGroup = document.getElementById('btn-eg-delete-group');
+
+// Elementos do Modal de Edição de Módulo
+const moduleEditModal = document.getElementById('module-edit-modal');
+const modalBtnCloseEditMod = document.getElementById('modal-btn-close-edit-mod');
+const btnCancelEditMod = document.getElementById('btn-cancel-edit-mod');
+const moduleEditForm = document.getElementById('module-edit-form');
+const modEditId = document.getElementById('mod-edit-id');
+const modEditType = document.getElementById('mod-edit-type');
+const modEditName = document.getElementById('mod-edit-name');
+const modEditTarget = document.getElementById('mod-edit-target');
+const labelEditTarget = document.getElementById('label-edit-target');
+const hintEditTarget = document.getElementById('hint-edit-target');
+const groupEditTarget = document.getElementById('group-edit-target');
+const groupEditCount = document.getElementById('group-edit-count');
+const modEditCount = document.getElementById('mod-edit-count');
+const groupEditSizeMb = document.getElementById('group-edit-size-mb');
+const modEditSizeMb = document.getElementById('mod-edit-size-mb');
+const groupEditTimeout = document.getElementById('group-edit-timeout');
+const modEditTimeout = document.getElementById('mod-edit-timeout');
+const groupEditProtocol = document.getElementById('group-edit-protocol');
+const modEditProtocol = document.getElementById('mod-edit-protocol');
+const modEditEnabled = document.getElementById('mod-edit-enabled');
+const modEditErrorAlert = document.getElementById('mod-edit-error-alert');
+const modEditErrorText = document.getElementById('mod-edit-error-text');
+
 
 // Elementos OIDC / Keycloak
 const oidcSSOWrapper = document.getElementById('oidc-sso-wrapper');
@@ -684,23 +713,56 @@ function setupEventListeners() {
   if (btnOpenGroups) {
     btnOpenGroups.addEventListener('click', () => switchView('groups'));
   }
-  if (modalBtnCloseGroups) {
-    modalBtnCloseGroups.addEventListener('click', closeGroupsModal);
+  if (groupsSearchInput) {
+    groupsSearchInput.addEventListener('input', renderGroupsList);
   }
-  if (modalBtnCloseGroupsBottom) {
-    modalBtnCloseGroupsBottom.addEventListener('click', closeGroupsModal);
+  if (btnOpenCreateGroup) {
+    btnOpenCreateGroup.addEventListener('click', openCreateGroupModal);
   }
-  if (groupsModal) {
-    groupsModal.addEventListener('click', (e) => {
-      if (e.target === groupsModal) closeGroupsModal();
+  if (modalBtnCloseCreateGroup) {
+    modalBtnCloseCreateGroup.addEventListener('click', closeCreateGroupModal);
+  }
+  if (btnCancelCreateGroup) {
+    btnCancelCreateGroup.addEventListener('click', closeCreateGroupModal);
+  }
+  if (groupCreateModal) {
+    groupCreateModal.addEventListener('click', (e) => {
+      if (e.target === groupCreateModal) closeCreateGroupModal();
     });
   }
-  if (groupForm) {
-    groupForm.addEventListener('submit', handleSaveGroupSubmit);
+  if (createGroupForm) {
+    createGroupForm.addEventListener('submit', handleCreateGroupSubmit);
   }
-  if (btnCancelEditGroup) {
-    btnCancelEditGroup.addEventListener('click', resetGroupForm);
+  if (createGroupNameInput && createGroupIdInput) {
+    createGroupNameInput.addEventListener('input', (e) => {
+      if (!createGroupIdInput.dataset.manual) {
+        createGroupIdInput.value = e.target.value.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+      }
+    });
+    createGroupIdInput.addEventListener('input', () => {
+      createGroupIdInput.dataset.manual = 'true';
+    });
   }
+  if (modalBtnCloseGroupDetails) {
+    modalBtnCloseGroupDetails.addEventListener('click', closeGroupDetailsModal);
+  }
+  if (groupDetailsModal) {
+    groupDetailsModal.addEventListener('click', (e) => {
+      if (e.target === groupDetailsModal) closeGroupDetailsModal();
+    });
+  }
+  if (editGroupForm) {
+    editGroupForm.addEventListener('submit', handleSaveGroupEditSubmit);
+  }
+  if (btnEgDeleteGroup) {
+    btnEgDeleteGroup.addEventListener('click', () => {
+      if (currentViewingGroupId) {
+        const g = currentGroups.find(item => item.id === currentViewingGroupId);
+        handleDeleteGroup(currentViewingGroupId, g ? g.name : currentViewingGroupId);
+      }
+    });
+  }
+
 
   // Filtros em Tempo Real da Tabela de Nós
   if (nodesSearchInput) {
@@ -865,6 +927,17 @@ function setupEventListeners() {
     });
   }
   if (btnSubmitUploadMod) btnSubmitUploadMod.addEventListener('click', handleSaveModuleUploadSubmit);
+
+  // Modal de Edição de Módulo
+  if (modalBtnCloseEditMod) modalBtnCloseEditMod.addEventListener('click', closeEditModuleModal);
+  if (btnCancelEditMod) btnCancelEditMod.addEventListener('click', closeEditModuleModal);
+  if (moduleEditModal) {
+    moduleEditModal.addEventListener('click', (e) => {
+      if (e.target === moduleEditModal) closeEditModuleModal();
+    });
+  }
+  if (moduleEditForm) moduleEditForm.addEventListener('submit', handleSaveModuleEditSubmit);
+
 
   // Dropzone de Arquivos JSON
   if (jsonDropzone && modFileInput) {
@@ -1243,236 +1316,559 @@ function resetGroupForm() {
   if (modLldpEnabled) modLldpEnabled.checked = true;
 }
 
+// ==========================================================================
+// 2. Gerenciamento de Grupos & VLANs (Visão Limpa, Inspeção e Edição Completa)
+// ==========================================================================
+
+let currentGroups = [];
+let currentViewingGroupId = null;
+
 async function loadGroupsList() {
   if (!groupsTableBody) return;
-  groupsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando grupos...</td></tr>`;
+  groupsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando grupos e associações...</td></tr>`;
 
   try {
-    const res = await apiFetch('/api/v1/groups');
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || 'Falha ao buscar grupos');
+    const [grpRes, machRes, modRes] = await Promise.all([
+      apiFetch('/api/v1/admin/groups'),
+      allAdminMachines.length > 0 ? Promise.resolve(null) : apiFetch('/api/v1/admin/machines').catch(() => null),
+      allCatalogModules.length > 0 ? Promise.resolve(null) : apiFetch('/api/v1/admin/modules').catch(() => null)
+    ]);
+
+    if (grpRes.ok) {
+      currentGroups = await grpRes.json() || [];
+    } else {
+      const fallbackRes = await apiFetch('/api/v1/groups');
+      currentGroups = fallbackRes.ok ? await fallbackRes.json() : [];
     }
 
-    const groups = await res.json() || [];
-    currentGroups = groups;
-
-    if (groupsCountTag) {
-      groupsCountTag.textContent = `${groups.length} grupo${groups.length !== 1 ? 's' : ''}`;
+    if (machRes && machRes.ok) {
+      allAdminMachines = await machRes.json() || [];
+    }
+    if (modRes && modRes.ok) {
+      allCatalogModules = await modRes.json() || [];
     }
 
-    if (groups.length === 0) {
-      groupsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);">Nenhum grupo cadastrado.</td></tr>`;
-      return;
-    }
-
-    groupsTableBody.innerHTML = groups.map(g => {
-      const vlanTags = (g.vlans && g.vlans.length > 0)
-        ? g.vlans.map(v => `<span class="vlan-pill">VLAN ${v}</span>`).join('')
-        : '<span style="color: var(--text-muted); font-size: 0.78rem;">Todas / Nenhuma</span>';
-
-      const m = g.modules || {};
-      const activeMods = [];
-      if (m.ping && m.ping.enabled) activeMods.push('<span class="module-pill active">Ping</span>');
-      if (m.packet_loss && m.packet_loss.enabled) activeMods.push('<span class="module-pill active">Perda</span>');
-      if (m.download && m.download.enabled) activeMods.push('<span class="module-pill active">Down</span>');
-      if (m.upload && m.upload.enabled) activeMods.push('<span class="module-pill active">Up</span>');
-      if (m.dns && m.dns.enabled) activeMods.push('<span class="module-pill active">DNS</span>');
-      if (m.http_check && m.http_check.enabled) activeMods.push('<span class="module-pill active">HTTP</span>');
-      if (m.traceroute && m.traceroute.enabled) activeMods.push('<span class="module-pill active">Trace</span>');
-      if (m.lldp && m.lldp.enabled) activeMods.push('<span class="module-pill active">LLDP</span>');
-
-      return `
-        <tr>
-          <td>
-            <strong>${escapeHtml(g.name)}</strong>
-            ${g.is_default ? '<span class="default-group-badge">Padrão</span>' : ''}
-            ${g.description ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${escapeHtml(g.description)}</div>` : ''}
-          </td>
-          <td>${vlanTags}</td>
-          <td>${activeMods.join('')}</td>
-          <td><span style="font-family: monospace; font-size: 0.8rem;">${g.interval_minutes || 60}m</span></td>
-          <td style="text-align: right; white-space: nowrap;">
-            <button type="button" class="btn-group-action" onclick="editGroup('${escapeHtml(g.id)}')">
-              Editar
-            </button>
-            ${!g.is_default ? `
-            <button type="button" class="btn-group-action btn-delete" onclick="handleDeleteGroup('${escapeHtml(g.id)}', '${escapeHtml(g.name)}')">
-              Excluir
-            </button>` : ''}
-          </td>
-        </tr>
-      `;
-    }).join('');
+    renderGroupsList();
   } catch (err) {
-    groupsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: #f87171;">Erro: ${escapeHtml(err.message)}</td></tr>`;
+    if (groupsTableBody) {
+      groupsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-rose">Erro ao carregar grupos: ${escapeHtml(err.message)}</td></tr>`;
+    }
   }
 }
+window.loadGroupsList = loadGroupsList;
 
-function editGroup(groupId) {
-  const g = currentGroups.find(item => item.id === groupId);
-  if (!g) return;
+function renderGroupsList() {
+  if (!groupsTableBody) return;
 
-  if (groupIdInput) groupIdInput.value = g.id;
-  if (groupNameInput) groupNameInput.value = g.name || '';
-  if (groupDescriptionInput) groupDescriptionInput.value = g.description || '';
-  if (groupVlansInput) groupVlansInput.value = (g.vlans || []).join(', ');
-  if (groupIntervalInput) groupIntervalInput.value = g.interval_minutes || 60;
-  if (groupIsDefaultInput) groupIsDefaultInput.checked = !!g.is_default;
+  const query = groupsSearchInput ? groupsSearchInput.value.toLowerCase().trim() : '';
+  const filtered = currentGroups.filter(g => {
+    if (!query) return true;
+    const nameMatch = (g.name || '').toLowerCase().includes(query);
+    const idMatch = (g.id || '').toLowerCase().includes(query);
+    const descMatch = (g.description || '').toLowerCase().includes(query);
+    return nameMatch || idMatch || descMatch;
+  });
 
-  const m = g.modules || {};
-  if (modPingEnabled) modPingEnabled.checked = !!(m.ping && m.ping.enabled);
-  if (modPingTarget) modPingTarget.value = (m.ping && m.ping.target) || '1.1.1.1';
-  if (modPingCount) modPingCount.value = (m.ping && m.ping.count) || 4;
+  if (groupsCountTag) {
+    groupsCountTag.textContent = `${filtered.length} grupo${filtered.length !== 1 ? 's' : ''}`;
+  }
 
-  if (modPacketlossEnabled) modPacketlossEnabled.checked = !!(m.packet_loss && m.packet_loss.enabled);
-  if (modPacketlossTarget) modPacketlossTarget.value = (m.packet_loss && m.packet_loss.target) || '1.1.1.1';
-  if (modPacketlossCount) modPacketlossCount.value = (m.packet_loss && m.packet_loss.count) || 10;
+  if (filtered.length === 0) {
+    groupsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4" style="color: var(--text-muted);">${query ? 'Nenhum grupo encontrado para a busca.' : 'Nenhum grupo cadastrado.'}</td></tr>`;
+    return;
+  }
 
-  if (modDownloadEnabled) modDownloadEnabled.checked = !!(m.download && m.download.enabled);
-  if (modDownloadBytes) modDownloadBytes.value = (m.download && m.download.max_bytes) || 10485760;
+  groupsTableBody.innerHTML = filtered.map(g => {
+    const isDefault = g.id === 'default' || !!g.is_default;
+    const vlans = (g.rules && g.rules.vlans) ? g.rules.vlans : (g.vlans || []);
+    const vlanTags = vlans.length > 0
+      ? vlans.map(v => `<span class="vlan-pill">VLAN ${v}</span>`).join('')
+      : '<span class="text-subtle font-mono text-xs">Padrão / Todas</span>';
 
-  if (modUploadEnabled) modUploadEnabled.checked = !!(m.upload && m.upload.enabled);
-  if (modUploadBytes) modUploadBytes.value = (m.upload && m.upload.max_bytes) || 5242880;
+    // Máquinas vinculadas a este grupo
+    const machinesInGroup = allAdminMachines.filter(m => m.group_id === g.id);
 
-  if (modDnsEnabled) modDnsEnabled.checked = !!(m.dns && m.dns.enabled);
-  if (modDnsDomains) modDnsDomains.value = (m.dns && m.dns.domains) ? m.dns.domains.join(', ') : 'google.com, cloudflare.com';
+    // Módulos configurados
+    let activeTestsCount = 0;
+    if (g.profile && Array.isArray(g.profile.tests)) {
+      activeTestsCount = g.profile.tests.filter(t => t.enabled !== false).length;
+    } else if (g.modules) {
+      activeTestsCount = Object.values(g.modules).filter(m => m && m.enabled).length;
+    }
 
-  if (modHttpEnabled) modHttpEnabled.checked = !!(m.http_check && m.http_check.enabled);
-  if (modHttpUrl) modHttpUrl.value = (m.http_check && m.http_check.url) || 'https://www.google.com';
-  if (modHttpStatus) modHttpStatus.value = (m.http_check && m.http_check.expected_status) || 200;
+    const intervalMinutes = (g.profile && g.profile.interval_minutes) || g.interval_minutes || 30;
 
-  if (modTraceEnabled) modTraceEnabled.checked = !!(m.traceroute && m.traceroute.enabled);
-  if (modTraceTarget) modTraceTarget.value = (m.traceroute && m.traceroute.target) || '1.1.1.1';
-  if (modTraceHops) modTraceHops.value = (m.traceroute && m.traceroute.max_hops) || 15;
-
-  if (modLldpEnabled) modLldpEnabled.checked = !(m.lldp && m.lldp.enabled === false);
-
-  if (groupFormTitle) groupFormTitle.textContent = `Editar Grupo: ${g.name}`;
-  if (btnSubmitGroupText) btnSubmitGroupText.textContent = 'Salvar Alterações';
-  if (btnCancelEditGroup) btnCancelEditGroup.style.display = 'inline-block';
-  if (groupErrorAlert) groupErrorAlert.style.display = 'none';
-
-  groupForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return `
+      <tr>
+        <td>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <strong class="cursor-pointer" style="color: #f8fafc;" onclick="openGroupDetailsModal('${escapeHtml(g.id)}', 'machines')">${escapeHtml(g.name || g.id)}</strong>
+            ${isDefault ? '<span class="default-group-badge">Padrão</span>' : ''}
+          </div>
+          <div class="text-subtle font-mono text-xs mt-1">ID: ${escapeHtml(g.id)}</div>
+          ${g.description ? `<div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">${escapeHtml(g.description)}</div>` : ''}
+        </td>
+        <td>${vlanTags}</td>
+        <td>
+          <span class="badge-counter-clickable badge-machines" title="Ver máquinas deste grupo" onclick="openGroupDetailsModal('${escapeHtml(g.id)}', 'machines')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            ${machinesInGroup.length} Máquina${machinesInGroup.length !== 1 ? 's' : ''}
+          </span>
+        </td>
+        <td>
+          <span class="badge-counter-clickable badge-modules" title="Ver módulos ativos do grupo" onclick="openGroupDetailsModal('${escapeHtml(g.id)}', 'modules')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+            ${activeTestsCount} Módulo${activeTestsCount !== 1 ? 's' : ''}
+          </span>
+        </td>
+        <td><span class="font-mono text-xs">${intervalMinutes}m</span></td>
+        <td style="text-align: right; white-space: nowrap;">
+          <button type="button" class="btn btn-glass btn-sm" onclick="openGroupDetailsModal('${escapeHtml(g.id)}', 'machines')" title="Inspecionar Máquinas">
+            Inspecionar
+          </button>
+          <button type="button" class="btn btn-glass btn-sm" onclick="openGroupDetailsModal('${escapeHtml(g.id)}', 'edit')" title="Editar Grupo">
+            Editar
+          </button>
+          ${!isDefault ? `
+          <button type="button" class="btn btn-outline-danger btn-sm" onclick="handleDeleteGroup('${escapeHtml(g.id)}', '${escapeHtml(g.name || g.id)}')" title="Excluir Grupo">
+            Excluir
+          </button>` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
-window.editGroup = editGroup;
 
-async function handleSaveGroupSubmit(e) {
+function openCreateGroupModal() {
+  if (!groupCreateModal) return;
+  if (createGroupErrorAlert) createGroupErrorAlert.style.display = 'none';
+  if (createGroupForm) createGroupForm.reset();
+  if (createGroupIdInput) createGroupIdInput.value = '';
+  if (createGroupIntervalInput) createGroupIntervalInput.value = '30';
+
+  renderCreateGroupModulesCheckboxes();
+  groupCreateModal.style.display = 'flex';
+}
+window.openCreateGroupModal = openCreateGroupModal;
+
+function closeCreateGroupModal() {
+  if (groupCreateModal) groupCreateModal.style.display = 'none';
+}
+window.closeCreateGroupModal = closeCreateGroupModal;
+
+function renderCreateGroupModulesCheckboxes() {
+  if (!createGroupModulesList) return;
+  const allModules = getAllAvailableModules();
+  if (allModules.length === 0) {
+    createGroupModulesList.innerHTML = '<div class="text-subtle text-xs p-2">Nenhum módulo no catálogo.</div>';
+    return;
+  }
+
+  createGroupModulesList.innerHTML = allModules.map(mod => {
+    const checked = mod.id.includes('ping') || mod.id.includes('discovery');
+    return `
+      <label class="mc-module-check-item">
+        <div class="mc-module-check-left">
+          <input type="checkbox" class="cg-module-cb" value="${escapeHtml(mod.id)}" ${checked ? 'checked' : ''} />
+          <div>
+            <div class="mc-module-title">${escapeHtml(mod.name || mod.id)}</div>
+            <div class="mc-module-sub">${escapeHtml(mod.id)} • ${escapeHtml(mod.type)}</div>
+          </div>
+        </div>
+      </label>
+    `;
+  }).join('');
+
+  updateCreateGroupModulesCount();
+  createGroupModulesList.querySelectorAll('.cg-module-cb').forEach(cb => {
+    cb.addEventListener('change', updateCreateGroupModulesCount);
+  });
+}
+
+function updateCreateGroupModulesCount() {
+  if (!createGroupModulesCount || !createGroupModulesList) return;
+  const count = createGroupModulesList.querySelectorAll('.cg-module-cb:checked').length;
+  createGroupModulesCount.textContent = `${count} selecionado${count !== 1 ? 's' : ''}`;
+}
+
+async function handleCreateGroupSubmit(e) {
   e.preventDefault();
-  if (groupErrorAlert) groupErrorAlert.style.display = 'none';
+  if (createGroupErrorAlert) createGroupErrorAlert.style.display = 'none';
 
-  const name = groupNameInput.value.trim();
-  if (!name) {
-    if (groupErrorAlert) {
-      groupErrorAlert.style.display = 'flex';
-      groupErrorText.textContent = 'Informe o nome do grupo.';
+  const name = createGroupNameInput.value.trim();
+  let id = createGroupIdInput.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  if (!id) id = name.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+
+  if (!name || !id) {
+    if (createGroupErrorAlert) {
+      createGroupErrorAlert.style.display = 'flex';
+      createGroupErrorText.textContent = 'Informe o nome e o ID do grupo.';
     }
     return;
   }
 
-  // Parse VLANs
-  const rawVlans = groupVlansInput.value.split(',')
+  const rawVlans = createGroupVlansInput.value.split(',')
     .map(v => parseInt(v.trim(), 10))
     .filter(v => !isNaN(v) && v > 0);
 
-  // Parse DNS Domains
-  const dnsDomains = modDnsDomains.value.split(',')
-    .map(d => d.trim())
-    .filter(d => d.length > 0);
+  const rawSubnets = createGroupSubnetsInput.value.split(',')
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+
+  const interval = parseInt(createGroupIntervalInput.value, 10) || 30;
+  const description = createGroupDescriptionInput.value.trim();
+
+  // Módulos selecionados
+  const allModules = getAllAvailableModules();
+  const selectedModuleIds = new Set(
+    Array.from(createGroupModulesList.querySelectorAll('.cg-module-cb:checked')).map(cb => cb.value)
+  );
+  const selectedTests = allModules.filter(m => selectedModuleIds.has(m.id));
 
   const payload = {
+    id: id,
     name: name,
-    description: groupDescriptionInput.value.trim(),
-    vlans: rawVlans,
-    interval_minutes: parseInt(groupIntervalInput.value, 10) || 60,
-    is_default: groupIsDefaultInput.checked,
-    modules: {
-      ping: {
-        enabled: modPingEnabled.checked,
-        target: modPingTarget.value.trim() || '1.1.1.1',
-        count: parseInt(modPingCount.value, 10) || 4,
-        timeout_ms: 1000
-      },
-      packet_loss: {
-        enabled: modPacketlossEnabled.checked,
-        target: modPacketlossTarget.value.trim() || '1.1.1.1',
-        count: parseInt(modPacketlossCount.value, 10) || 10,
-        timeout_ms: 1000
-      },
-      download: {
-        enabled: modDownloadEnabled.checked,
-        max_bytes: parseInt(modDownloadBytes.value, 10) || 10485760
-      },
-      upload: {
-        enabled: modUploadEnabled.checked,
-        max_bytes: parseInt(modUploadBytes.value, 10) || 5242880
-      },
-      dns: {
-        enabled: modDnsEnabled.checked,
-        domains: dnsDomains.length > 0 ? dnsDomains : ['google.com']
-      },
-      http_check: {
-        enabled: modHttpEnabled.checked,
-        url: modHttpUrl.value.trim() || 'https://www.google.com',
-        expected_status: parseInt(modHttpStatus.value, 10) || 200
-      },
-      traceroute: {
-        enabled: modTraceEnabled.checked,
-        target: modTraceTarget.value.trim() || '1.1.1.1',
-        max_hops: parseInt(modTraceHops.value, 10) || 15
-      },
-      lldp: {
-        enabled: modLldpEnabled.checked
-      }
+    description: description,
+    rules: {
+      vlans: rawVlans,
+      ip_subnets: rawSubnets
+    },
+    profile: {
+      version: new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14),
+      updated_at: new Date().toISOString(),
+      interval_minutes: interval,
+      sync_schedule: "fixed_half_hour",
+      description: `Perfil do grupo ${name}`,
+      tests: selectedTests
     }
   };
 
-  const editingId = groupIdInput.value.trim();
-  const url = editingId ? `/api/v1/groups/${encodeURIComponent(editingId)}` : '/api/v1/groups';
-  const method = editingId ? 'PUT' : 'POST';
-
   try {
-    const res = await apiFetch(url, {
-      method: method,
+    const res = await apiFetch('/api/v1/admin/groups', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-
     const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Falha ao salvar grupo');
-    }
+    if (!res.ok) throw new Error(data.error || 'Falha ao criar grupo');
 
-    showToast(editingId ? 'Grupo atualizado com sucesso!' : 'Grupo cadastrado com sucesso!', 'toast-success');
-    resetGroupForm();
+    showToast(`Grupo "${name}" cadastrado com sucesso!`, 'toast-success');
+    closeCreateGroupModal();
     await loadGroupsList();
   } catch (err) {
-    if (groupErrorAlert) {
-      groupErrorAlert.style.display = 'flex';
-      groupErrorText.textContent = err.message || 'Erro ao salvar grupo';
+    if (createGroupErrorAlert) {
+      createGroupErrorAlert.style.display = 'flex';
+      createGroupErrorText.textContent = err.message || 'Erro ao criar grupo';
+    }
+  }
+}
+
+function openGroupDetailsModal(groupId, tab = 'machines') {
+  const g = currentGroups.find(item => item.id === groupId);
+  if (!g || !groupDetailsModal) return;
+
+  currentViewingGroupId = groupId;
+
+  if (gdModalTitle) gdModalTitle.textContent = g.name || g.id;
+  if (gdModalBadge) gdModalBadge.textContent = g.id + (g.id === 'default' ? ' (Padrão)' : '');
+
+  // 1. Popula Aba Máquinas
+  renderGroupMachinesTab(g);
+
+  // 2. Popula Aba Módulos
+  renderGroupModulesTab(g);
+
+  // 3. Popula Aba Edição
+  populateGroupEditForm(g);
+
+  // Ativa a aba inicial
+  switchGroupDetailsTab(tab);
+
+  groupDetailsModal.style.display = 'flex';
+}
+window.openGroupDetailsModal = openGroupDetailsModal;
+
+function closeGroupDetailsModal() {
+  if (groupDetailsModal) groupDetailsModal.style.display = 'none';
+  currentViewingGroupId = null;
+}
+window.closeGroupDetailsModal = closeGroupDetailsModal;
+
+function switchGroupDetailsTab(tabName) {
+  const tabs = {
+    machines: { btn: document.getElementById('tab-gd-machines'), pane: document.getElementById('gd-pane-machines') },
+    modules: { btn: document.getElementById('tab-gd-modules'), pane: document.getElementById('gd-pane-modules') },
+    edit: { btn: document.getElementById('tab-gd-edit'), pane: document.getElementById('gd-pane-edit') }
+  };
+
+  Object.keys(tabs).forEach(k => {
+    if (tabs[k].btn) tabs[k].btn.classList.toggle('active', k === tabName);
+    if (tabs[k].pane) tabs[k].pane.style.display = (k === tabName) ? 'block' : 'none';
+  });
+}
+window.switchGroupDetailsTab = switchGroupDetailsTab;
+
+function renderGroupMachinesTab(g) {
+  if (!gdMachinesTableBody) return;
+  const machines = allAdminMachines.filter(m => m.group_id === g.id);
+
+  if (gdCountMachines) gdCountMachines.textContent = machines.length;
+
+  if (machines.length === 0) {
+    gdMachinesTableBody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center py-4 text-muted">
+          Nenhuma máquina vinculada ao grupo <strong>${escapeHtml(g.name || g.id)}</strong> no momento.<br/>
+          <span class="text-xs">Sondas detectadas nas VLANs deste grupo ou configuradas manualmente na aba Máquinas aparecerão aqui.</span>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  gdMachinesTableBody.innerHTML = machines.map(m => {
+    const isOnline = isNodeOnline(m.last_seen);
+    const statusBadge = isOnline
+      ? '<span class="status-badge-inline online"><span class="status-dot-sm online"></span> Online</span>'
+      : '<span class="status-badge-inline offline"><span class="status-dot-sm offline"></span> Offline</span>';
+
+    const customBadge = m.is_custom
+      ? '<span class="mc-module-tag-state state-added">Customizado</span>'
+      : '<span class="mc-module-tag-state state-default">Padrão do Grupo</span>';
+
+    return `
+      <tr>
+        <td>
+          <strong class="text-cyan font-mono">${escapeHtml(m.hostname)}</strong>
+        </td>
+        <td><span class="font-mono text-xs">${escapeHtml(m.ip_address || '--')}</span></td>
+        <td>
+          <div style="font-weight: 500;">${escapeHtml(m.switch_name || 'Desconhecido')}</div>
+          <div class="text-subtle font-mono text-xs">Porta: ${escapeHtml(m.switch_port || '--')}</div>
+        </td>
+        <td><span class="vlan-pill">${m.vlan ? `VLAN ${m.vlan}` : '--'}</span></td>
+        <td>${statusBadge}</td>
+        <td>${customBadge}</td>
+        <td style="text-align: right;">
+          <button type="button" class="btn btn-glass btn-sm" onclick="closeGroupDetailsModal(); openMachineConfigModal('${escapeHtml(m.hostname)}');" title="Configurar Módulos da Máquina">
+            Configurar
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderGroupModulesTab(g) {
+  if (!gdModulesCardsGrid) return;
+
+  const tests = (g.profile && Array.isArray(g.profile.tests)) ? g.profile.tests : [];
+  if (gdCountModules) gdCountModules.textContent = tests.length;
+
+  if (tests.length === 0) {
+    gdModulesCardsGrid.innerHTML = `
+      <div class="text-subtle text-center py-4 col-span-full">
+        Nenhum módulo de teste configurado para este grupo.<br/>
+        <button type="button" class="btn btn-glass btn-sm mt-2" onclick="switchGroupDetailsTab('edit')">Configurar Módulos</button>
+      </div>
+    `;
+    return;
+  }
+
+  gdModulesCardsGrid.innerHTML = tests.map(t => {
+    let target = t.target || t.domain || t.endpoint || t.protocol || '--';
+    let extra = '';
+    if (t.size_mb) extra = `${t.size_mb} MB`;
+    else if (t.count) extra = `${t.count} pacotes`;
+
+    return `
+      <div class="module-card">
+        <div class="module-card-top">
+          <div class="module-card-title">${escapeHtml(t.name || t.id)}</div>
+          <span class="module-type-badge ${escapeHtml(t.type || '')}">${escapeHtml(t.type || 'teste')}</span>
+        </div>
+        <div class="module-card-id">${escapeHtml(t.id)}</div>
+        <div class="module-card-details">
+          <div class="module-card-details-row">
+            <span>Alvo:</span>
+            <span class="font-semibold text-white font-mono text-xs">${escapeHtml(target)}</span>
+          </div>
+          ${extra ? `
+          <div class="module-card-details-row">
+            <span>Parâmetro:</span>
+            <span class="font-mono">${escapeHtml(extra)}</span>
+          </div>` : ''}
+          <div class="module-card-details-row">
+            <span>Timeout:</span>
+            <span class="font-mono">${t.timeout_seconds || 15}s</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function populateGroupEditForm(g) {
+  if (egErrorAlert) egErrorAlert.style.display = 'none';
+  if (egGroupId) egGroupId.value = g.id;
+  if (egGroupName) egGroupName.value = g.name || '';
+  if (egGroupDescription) egGroupDescription.value = g.description || '';
+
+  const vlans = (g.rules && g.rules.vlans) ? g.rules.vlans : (g.vlans || []);
+  if (egGroupVlans) egGroupVlans.value = vlans.join(', ');
+
+  const subnets = (g.rules && g.rules.ip_subnets) ? g.rules.ip_subnets : [];
+  if (egGroupSubnets) egGroupSubnets.value = subnets.join(', ');
+
+  const interval = (g.profile && g.profile.interval_minutes) || g.interval_minutes || 30;
+  if (egGroupInterval) egGroupInterval.value = interval;
+
+  // Botão excluir oculto para o grupo padrão
+  if (btnEgDeleteGroup) {
+    btnEgDeleteGroup.style.display = (g.id === 'default') ? 'none' : 'inline-flex';
+  }
+
+  // Renderiza checklist de módulos do catálogo
+  if (egModulesCheckboxesList) {
+    const allModules = getAllAvailableModules();
+    const existingTestIds = new Set(
+      (g.profile && Array.isArray(g.profile.tests)) ? g.profile.tests.map(t => t.id) : []
+    );
+
+    egModulesCheckboxesList.innerHTML = allModules.map(mod => {
+      const isChecked = existingTestIds.has(mod.id);
+      return `
+        <label class="mc-module-check-item">
+          <div class="mc-module-check-left">
+            <input type="checkbox" class="eg-module-cb" value="${escapeHtml(mod.id)}" ${isChecked ? 'checked' : ''} />
+            <div>
+              <div class="mc-module-title">${escapeHtml(mod.name || mod.id)}</div>
+              <div class="mc-module-sub">${escapeHtml(mod.id)} • ${escapeHtml(mod.type)}</div>
+            </div>
+          </div>
+          <span class="mc-module-tag-state ${isChecked ? 'state-default' : 'state-removed'}">
+            ${isChecked ? 'Ativo' : 'Desativado'}
+          </span>
+        </label>
+      `;
+    }).join('');
+
+    updateEditGroupModulesCount();
+    egModulesCheckboxesList.querySelectorAll('.eg-module-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const item = cb.closest('.mc-module-check-item');
+        const tag = item.querySelector('.mc-module-tag-state');
+        if (tag) {
+          tag.className = `mc-module-tag-state ${cb.checked ? 'state-default' : 'state-removed'}`;
+          tag.textContent = cb.checked ? 'Ativo' : 'Desativado';
+        }
+        updateEditGroupModulesCount();
+      });
+    });
+  }
+}
+
+function updateEditGroupModulesCount() {
+  if (!egModulesCountTag || !egModulesCheckboxesList) return;
+  const count = egModulesCheckboxesList.querySelectorAll('.eg-module-cb:checked').length;
+  egModulesCountTag.textContent = `${count} ativo${count !== 1 ? 's' : ''}`;
+}
+
+async function handleSaveGroupEditSubmit(e) {
+  e.preventDefault();
+  if (egErrorAlert) egErrorAlert.style.display = 'none';
+
+  const groupId = egGroupId.value.trim();
+  const name = egGroupName.value.trim();
+  if (!groupId || !name) {
+    if (egErrorAlert) {
+      egErrorAlert.style.display = 'flex';
+      egErrorText.textContent = 'Nome do grupo é obrigatório.';
+    }
+    return;
+  }
+
+  const rawVlans = egGroupVlans.value.split(',')
+    .map(v => parseInt(v.trim(), 10))
+    .filter(v => !isNaN(v) && v > 0);
+
+  const rawSubnets = egGroupSubnets.value.split(',')
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+
+  const interval = parseInt(egGroupInterval.value, 10) || 30;
+  const description = egGroupDescription.value.trim();
+
+  // Módulos selecionados
+  const allModules = getAllAvailableModules();
+  const selectedModuleIds = new Set(
+    Array.from(egModulesCheckboxesList.querySelectorAll('.eg-module-cb:checked')).map(cb => cb.value)
+  );
+  const selectedTests = allModules.filter(m => selectedModuleIds.has(m.id));
+
+  const existing = currentGroups.find(g => g.id === groupId) || {};
+
+  const payload = {
+    id: groupId,
+    name: name,
+    description: description,
+    rules: {
+      vlans: rawVlans,
+      ip_subnets: rawSubnets
+    },
+    profile: {
+      version: new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14),
+      updated_at: new Date().toISOString(),
+      interval_minutes: interval,
+      sync_schedule: (existing.profile && existing.profile.sync_schedule) || "fixed_half_hour",
+      description: `Perfil do grupo ${name}`,
+      tests: selectedTests
+    }
+  };
+
+  try {
+    const res = await apiFetch('/api/v1/admin/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Falha ao atualizar grupo');
+
+    showToast(`Grupo "${name}" atualizado com sucesso!`, 'toast-success');
+    closeGroupDetailsModal();
+    await loadGroupsList();
+  } catch (err) {
+    if (egErrorAlert) {
+      egErrorAlert.style.display = 'flex';
+      egErrorText.textContent = err.message || 'Erro ao atualizar grupo';
     }
   }
 }
 
 async function handleDeleteGroup(groupId, groupName) {
-  if (!confirm(`Tem certeza que deseja excluir o grupo "${groupName}"?`)) return;
+  if (groupId === 'default') {
+    alert('O grupo padrão (default) não pode ser excluído.');
+    return;
+  }
+  if (!confirm(`Deseja realmente excluir o grupo "${groupName || groupId}"?\nAs máquinas deste grupo serão reatribuídas para o grupo padrão.`)) return;
 
   try {
-    const res = await apiFetch(`/api/v1/groups/${encodeURIComponent(groupId)}`, {
+    const res = await apiFetch(`/api/v1/admin/groups/${encodeURIComponent(groupId)}`, {
       method: 'DELETE'
     });
     const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Falha ao excluir grupo');
-    }
+    if (!res.ok) throw new Error(data.error || 'Falha ao excluir grupo');
 
-    showToast(`Grupo "${groupName}" excluído com sucesso!`, 'toast-info');
+    showToast(`Grupo "${groupName || groupId}" excluído com sucesso!`, 'toast-info');
+    closeGroupDetailsModal();
     await loadGroupsList();
   } catch (err) {
-    showToast(err.message || 'Erro ao excluir grupo', 'toast-error');
+    showToast(`Erro ao excluir: ${err.message}`, 'toast-error');
   }
 }
 window.handleDeleteGroup = handleDeleteGroup;
+
 
 function startAutoRefresh() {
   if (refreshInterval) clearInterval(refreshInterval);
@@ -3312,6 +3708,10 @@ function renderModulesCards(modules) {
           </div>
         </div>
         <div class="module-card-footer">
+          <button type="button" class="btn btn-glass btn-sm" onclick="openEditModuleModal('${escapeHtml(mod.id)}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            <span>Editar</span>
+          </button>
           <button type="button" class="btn btn-glass btn-sm" onclick="downloadModuleJson('${escapeHtml(mod.id)}')">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Baixar .json</span>
@@ -3324,6 +3724,166 @@ function renderModulesCards(modules) {
       </div>
     `;
   }).join('');
+}
+
+let currentEditingModuleId = null;
+
+function openEditModuleModal(moduleId) {
+  const mod = allCatalogModules.find(m => m.id === moduleId);
+  if (!mod || !moduleEditModal) return;
+
+  currentEditingModuleId = moduleId;
+  if (modEditErrorAlert) modEditErrorAlert.style.display = 'none';
+
+  if (modEditId) modEditId.value = mod.id;
+  if (modEditType) modEditType.value = mod.type || '';
+  if (modEditName) modEditName.value = mod.name || mod.id;
+  if (modEditTimeout) modEditTimeout.value = mod.timeout_seconds || 15;
+  if (modEditEnabled) modEditEnabled.checked = mod.enabled !== false;
+
+  const type = (mod.type || '').toLowerCase();
+
+  if (type === 'ping' || type === 'packet_loss') {
+    if (groupEditTarget) groupEditTarget.style.display = 'block';
+    if (labelEditTarget) labelEditTarget.textContent = 'Alvo / IP do Destino';
+    if (hintEditTarget) hintEditTarget.textContent = 'Endereço IP (ex: 1.1.1.1, auto_gateway) ou hostname';
+    if (modEditTarget) modEditTarget.value = mod.target || '';
+
+    if (groupEditCount) groupEditCount.style.display = 'block';
+    if (modEditCount) modEditCount.value = mod.count || (type === 'packet_loss' ? 10 : 4);
+
+    if (groupEditSizeMb) groupEditSizeMb.style.display = 'none';
+    if (groupEditProtocol) groupEditProtocol.style.display = 'none';
+  } else if (type === 'throughput_download' || type === 'throughput_upload') {
+    if (groupEditTarget) groupEditTarget.style.display = 'block';
+    if (labelEditTarget) labelEditTarget.textContent = 'Endpoint da API';
+    if (hintEditTarget) hintEditTarget.textContent = 'Caminho HTTP do teste (ex: /api/v1/speedtest/download)';
+    if (modEditTarget) modEditTarget.value = mod.endpoint || mod.target || '';
+
+    if (groupEditCount) groupEditCount.style.display = 'none';
+    if (groupEditSizeMb) groupEditSizeMb.style.display = 'block';
+    if (modEditSizeMb) modEditSizeMb.value = mod.size_mb || 5;
+    if (groupEditProtocol) groupEditProtocol.style.display = 'none';
+  } else if (type === 'dns_lookup') {
+    if (groupEditTarget) groupEditTarget.style.display = 'block';
+    if (labelEditTarget) labelEditTarget.textContent = 'Domínio para Resolução';
+    if (hintEditTarget) hintEditTarget.textContent = 'FQDN (ex: uepg.br, google.com)';
+    if (modEditTarget) modEditTarget.value = mod.domain || mod.target || '';
+
+    if (groupEditCount) groupEditCount.style.display = 'none';
+    if (groupEditSizeMb) groupEditSizeMb.style.display = 'none';
+    if (groupEditProtocol) groupEditProtocol.style.display = 'none';
+  } else if (type === 'http_check') {
+    if (groupEditTarget) groupEditTarget.style.display = 'block';
+    if (labelEditTarget) labelEditTarget.textContent = 'URL Completa de Destino';
+    if (hintEditTarget) hintEditTarget.textContent = 'URL HTTP/HTTPS (ex: https://portal.uepg.br)';
+    if (modEditTarget) modEditTarget.value = mod.target || mod.url || '';
+
+    if (groupEditCount) groupEditCount.style.display = 'none';
+    if (groupEditSizeMb) groupEditSizeMb.style.display = 'none';
+    if (groupEditProtocol) groupEditProtocol.style.display = 'none';
+  } else if (type === 'traceroute') {
+    if (groupEditTarget) groupEditTarget.style.display = 'block';
+    if (labelEditTarget) labelEditTarget.textContent = 'Destino do Traceroute';
+    if (hintEditTarget) hintEditTarget.textContent = 'Endereço IP ou hostname de destino';
+    if (modEditTarget) modEditTarget.value = mod.target || '';
+
+    if (groupEditCount) groupEditCount.style.display = 'block';
+    if (modEditCount) modEditCount.value = mod.max_hops || mod.count || 15;
+    if (groupEditSizeMb) groupEditSizeMb.style.display = 'none';
+    if (groupEditProtocol) groupEditProtocol.style.display = 'none';
+  } else if (type === 'discovery_protocol') {
+    if (groupEditTarget) groupEditTarget.style.display = 'none';
+    if (groupEditCount) groupEditCount.style.display = 'none';
+    if (groupEditSizeMb) groupEditSizeMb.style.display = 'none';
+    if (groupEditProtocol) groupEditProtocol.style.display = 'block';
+    if (modEditProtocol) modEditProtocol.value = mod.protocol || 'LLDP_CDP';
+  } else {
+    if (groupEditTarget) groupEditTarget.style.display = 'block';
+    if (labelEditTarget) labelEditTarget.textContent = 'Alvo / Destino';
+    if (modEditTarget) modEditTarget.value = mod.target || mod.endpoint || mod.domain || '';
+    if (groupEditCount) groupEditCount.style.display = 'none';
+    if (groupEditSizeMb) groupEditSizeMb.style.display = 'none';
+    if (groupEditProtocol) groupEditProtocol.style.display = 'none';
+  }
+
+  moduleEditModal.style.display = 'flex';
+}
+window.openEditModuleModal = openEditModuleModal;
+
+function closeEditModuleModal() {
+  if (moduleEditModal) moduleEditModal.style.display = 'none';
+  currentEditingModuleId = null;
+}
+window.closeEditModuleModal = closeEditModuleModal;
+
+async function handleSaveModuleEditSubmit(e) {
+  e.preventDefault();
+  if (!currentEditingModuleId) return;
+
+  const originalMod = allCatalogModules.find(m => m.id === currentEditingModuleId);
+  if (!originalMod) return;
+
+  const type = (originalMod.type || '').toLowerCase();
+  const name = modEditName ? modEditName.value.trim() : originalMod.name;
+  const timeout = modEditTimeout ? (parseInt(modEditTimeout.value, 10) || 15) : 15;
+  const enabled = modEditEnabled ? modEditEnabled.checked : true;
+
+  const updatedMod = {
+    ...originalMod,
+    id: currentEditingModuleId,
+    type: originalMod.type,
+    name: name || currentEditingModuleId,
+    timeout_seconds: timeout,
+    enabled: enabled
+  };
+
+  if (modEditTarget && groupEditTarget && groupEditTarget.style.display !== 'none') {
+    const val = modEditTarget.value.trim();
+    if (type === 'dns_lookup') {
+      updatedMod.domain = val;
+    } else if (type === 'throughput_download' || type === 'throughput_upload') {
+      updatedMod.endpoint = val;
+    } else {
+      updatedMod.target = val;
+    }
+  }
+
+  if (modEditCount && groupEditCount && groupEditCount.style.display !== 'none') {
+    const countVal = parseInt(modEditCount.value, 10) || 4;
+    if (type === 'traceroute') {
+      updatedMod.max_hops = countVal;
+    } else {
+      updatedMod.count = countVal;
+    }
+  }
+
+  if (modEditSizeMb && groupEditSizeMb && groupEditSizeMb.style.display !== 'none') {
+    updatedMod.size_mb = parseInt(modEditSizeMb.value, 10) || 5;
+  }
+
+  if (modEditProtocol && groupEditProtocol && groupEditProtocol.style.display !== 'none') {
+    updatedMod.protocol = modEditProtocol.value.trim() || 'LLDP_CDP';
+  }
+
+  try {
+    const res = await apiFetch(`/api/v1/admin/modules/${encodeURIComponent(currentEditingModuleId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedMod)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Falha ao atualizar módulo');
+
+    showToast(`Módulo "${updatedMod.name}" atualizado com sucesso!`, 'toast-success');
+    closeEditModuleModal();
+    await loadModulesCatalog();
+  } catch (err) {
+    if (modEditErrorAlert) {
+      modEditErrorAlert.style.display = 'flex';
+      modEditErrorText.textContent = err.message || 'Erro ao atualizar módulo';
+    }
+  }
 }
 
 function downloadModuleJson(moduleId) {
@@ -3357,6 +3917,7 @@ async function handleDeleteModule(moduleId) {
   }
 }
 window.handleDeleteModule = handleDeleteModule;
+
 
 function openModuleUploadModal() {
   if (!moduleUploadModal) return;

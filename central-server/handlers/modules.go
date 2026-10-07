@@ -274,7 +274,78 @@ func (h *ModulesHandler) HandleModules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. DELETE /api/v1/admin/modules/{id}
+	// 3. PUT /api/v1/admin/modules/{id} ou PUT /api/v1/admin/modules -> Atualiza módulo existente
+	if r.Method == http.MethodPut {
+		prefix := "/api/v1/admin/modules/"
+		moduleID := strings.TrimPrefix(r.URL.Path, prefix)
+		moduleID = strings.TrimSpace(moduleID)
+		moduleID = strings.TrimSuffix(moduleID, ".json")
+
+		var mod models.TestTaskConfig
+		if err := json.NewDecoder(r.Body).Decode(&mod); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error":   "payload JSON inválido",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		if mod.ID == "" {
+			mod.ID = moduleID
+		}
+		mod.ID = strings.TrimSpace(mod.ID)
+		mod.Name = strings.TrimSpace(mod.Name)
+
+		if mod.ID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "o campo 'id' do módulo é obrigatório"})
+			return
+		}
+		if mod.Name == "" {
+			mod.Name = mod.ID
+		}
+
+		if !ValidTaskTypes[mod.Type] {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"error": fmt.Sprintf("tipo de tarefa '%s' não suportado pela sonda Go", mod.Type),
+			})
+			return
+		}
+
+		if mod.TimeoutSeconds <= 0 {
+			mod.TimeoutSeconds = 15
+		}
+
+		h.mu.Lock()
+		data, errMarshal := json.MarshalIndent(mod, "", "  ")
+		if errMarshal != nil {
+			h.mu.Unlock()
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "falha ao serializar módulo"})
+			return
+		}
+
+		filePath := filepath.Join(h.modulesDir, mod.ID+".json")
+		if errWrite := os.WriteFile(filePath, data, 0644); errWrite != nil {
+			h.mu.Unlock()
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "falha ao salvar arquivo no disco"})
+			return
+		}
+		h.mu.Unlock()
+
+		log.Printf("[MODULES] Módulo '%s' atualizado com sucesso", mod.ID)
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "módulo atualizado com sucesso",
+			"module":  mod,
+		})
+		return
+	}
+
+	// 4. DELETE /api/v1/admin/modules/{id}
 	if r.Method == http.MethodDelete {
 		prefix := "/api/v1/admin/modules/"
 		moduleID := strings.TrimPrefix(r.URL.Path, prefix)
