@@ -533,9 +533,24 @@ async function handleLoginSubmit(e) {
   const username = loginUsernameInput ? loginUsernameInput.value.trim() : '';
   const password = loginPasswordInput ? loginPasswordInput.value.trim() : '';
 
-  if (!username || !password) return;
+  if (!username) {
+    if (loginErrorText) loginErrorText.textContent = 'Informe o usuário para autenticar';
+    if (loginErrorAlert) loginErrorAlert.style.display = 'flex';
+    if (loginUsernameInput) loginUsernameInput.focus();
+    return;
+  }
 
-  if (btnLoginSubmit) btnLoginSubmit.disabled = true;
+  if (!password) {
+    if (loginErrorText) loginErrorText.textContent = 'Informe a senha para autenticar';
+    if (loginErrorAlert) loginErrorAlert.style.display = 'flex';
+    if (loginPasswordInput) loginPasswordInput.focus();
+    return;
+  }
+
+  if (btnLoginSubmit) {
+    btnLoginSubmit.disabled = true;
+    btnLoginSubmit.classList.add('loading');
+  }
   if (loginErrorAlert) loginErrorAlert.style.display = 'none';
 
   try {
@@ -545,10 +560,15 @@ async function handleLoginSubmit(e) {
       body: JSON.stringify({ username, password })
     });
 
-    const data = await res.json();
+    let data = {};
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
 
     if (!res.ok) {
-      throw new Error(data.error || 'Falha ao autenticar');
+      throw new Error(data.error || 'Usuário ou senha incorretos');
     }
 
     if (data.token) {
@@ -572,6 +592,7 @@ async function handleLoginSubmit(e) {
       console.warn('[AUTH] Aviso ao carregar dashboard pós-login:', dashErr);
     }
   } catch (err) {
+    console.error('[AUTH] Falha ao autenticar:', err);
     if (loginErrorText) {
       loginErrorText.textContent = err.message || 'Usuário ou senha incorretos';
     }
@@ -579,7 +600,10 @@ async function handleLoginSubmit(e) {
       loginErrorAlert.style.display = 'flex';
     }
   } finally {
-    if (btnLoginSubmit) btnLoginSubmit.disabled = false;
+    if (btnLoginSubmit) {
+      btnLoginSubmit.disabled = false;
+      btnLoginSubmit.classList.remove('loading');
+    }
   }
 }
 window.handleLoginSubmit = handleLoginSubmit;
@@ -634,6 +658,7 @@ function applyTheme(theme, notify = false) {
 
 function setupEventListeners() {
   if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
+  if (btnLoginSubmit) btnLoginSubmit.addEventListener('click', handleLoginSubmit);
   if (btnLogout) btnLogout.addEventListener('click', handleLogout);
 
   if (selectNode) {
@@ -1267,8 +1292,6 @@ window.handleDeleteUser = handleDeleteUser;
 /* ==========================================================================
    Gerenciamento de Grupos de Testes & VLANs (Admin)
    ========================================================================== */
-
-let currentGroups = [];
 
 async function openGroupsModal() {
   switchView('groups');
@@ -2860,16 +2883,6 @@ function formatTimeAgo(date) {
   if (minutes < 60) return `há ${minutes} min`;
   const hours = Math.floor(minutes / 60);
   return `há ${hours}h`;
-}
-
-function escapeHtml(text) {
-  if (!text) return '';
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }
 
 function showToast(message, type = 'toast-info') {
