@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UEPG Net Tools - Monitoramento de Rede</title>
-  <link rel="stylesheet" href="style.css?v=2.5.3" />
+  <link rel="stylesheet" href="style.css?v=2.5.4" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -847,7 +847,7 @@
         <p>Acesse o painel de telemetria e gestão de computadores</p>
       </div>
 
-      <form id="login-form" class="login-form" onsubmit="window.handleLoginSubmit(event); return false;">
+      <form id="login-form" class="login-form" action="javascript:void(0);" onsubmit="event.preventDefault(); window.handleLoginSubmit(event); return false;">
         <div id="login-error-alert" class="login-error-alert" style="display: none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
@@ -879,7 +879,7 @@
           </div>
         </div>
 
-        <button type="submit" id="btn-login-submit" class="btn btn-primary-submit">
+        <button type="button" id="btn-login-submit" class="btn btn-primary-submit" onclick="window.handleLoginSubmit(event)">
           <span>Entrar no Sistema</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -1521,6 +1521,6 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="app.js?v=2.5.3"></script>
+  <script src="app.js?v=2.5.4"></script>
 </body>
 </html>

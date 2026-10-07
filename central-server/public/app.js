@@ -2643,17 +2643,6 @@ function renderMachinesTable(machines) {
     const statusClass = isOnline ? 'online' : 'stale';
     const statusText = isOnline ? 'Online' : 'Sem sinal';
 
-    // Módulos Ativos Efetivos
-    let effectiveTests = [];
-    if (m.is_custom && m.custom_tests && m.custom_tests.length > 0) {
-      effectiveTests = m.custom_tests;
-    } else {
-      const grp = currentGroups.find(g => g.id === m.group_id);
-      if (grp && grp.profile && grp.profile.tests) {
-        effectiveTests = grp.profile.tests;
-      }
-    }
-
     // Grupo e Módulos vinculados
     const grp = currentGroups.find(g => g.id === m.group_id);
     const grpName = grp ? grp.name : (m.group_id || 'default');
