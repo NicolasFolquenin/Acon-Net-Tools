@@ -404,76 +404,108 @@ func (s *StorageService) GetCounts() (synced int, pending int) {
 	return synced, pending
 }
 
-// SyncPendingMetrics busca leituras pendentes (synced = 0) e tenta reenviá-las ao servidor
+// SyncPendingMetrics busca leituras pendentes (synced = 0) e tenta reenviá-las ao servidor em lotes até esgotar a fila
 func (s *StorageService) SyncPendingMetrics(ctx context.Context, serverURL, apiToken string) int {
-	s.mu.Lock()
-	rows, err := s.db.Query(`
-		SELECT id, node_id, location, COALESCE(group_name, ''), COALESCE(vlan, 0), timestamp, download_mbps, upload_mbps, ping_gateway, 
-		       COALESCE(system_info_json, ''), COALESCE(switch_info_json, ''),
-		       COALESCE(profile_version, ''), COALESCE(metrics_json, ''), COALESCE(modular_json, '')
-		FROM metrics WHERE synced = 0 ORDER BY id ASC LIMIT 20
-	`)
-	if err != nil {
-		s.mu.Unlock()
-		return 0
-	}
-	defer rows.Close()
+	totalSynced := 0
 
-	type pendingItem struct {
-		id int64
-		p  MetricPayload
-	}
-	var list []pendingItem
-	for rows.Next() {
-		var item pendingItem
-		var timeStr, sysJson, swJson, profileVer, metricsJson, modularJson string
-		if err := rows.Scan(&item.id, &item.p.NodeID, &item.p.Location, &item.p.GroupName, &item.p.VLAN, &timeStr, &item.p.DownloadMbps, &item.p.UploadMbps, &item.p.PingGateway, &sysJson, &swJson, &profileVer, &metricsJson, &modularJson); err != nil {
-			continue
+	for {
+		select {
+		case <-ctx.Done():
+			if totalSynced > 0 {
+				log.Printf("[STORAGE][SYNC] Sincronizacao de pendencias finalizada pelo timeout (%d enviadas).", totalSynced)
+			}
+			return totalSynced
+		default:
 		}
-		item.p.Timestamp, _ = time.Parse(time.RFC3339, timeStr)
-		item.p.ProfileVersion = profileVer
 
-		if sysJson != "" {
-			var si SystemInfo
-			if errU := json.Unmarshal([]byte(sysJson), &si); errU == nil {
-				item.p.SystemInfo = &si
-			}
-		}
-		if swJson != "" {
-			var sw SwitchInfo
-			if errU := json.Unmarshal([]byte(swJson), &sw); errU == nil {
-				item.p.SwitchInfo = &sw
-			}
-		}
-		if metricsJson != "" {
-			var m map[string]interface{}
-			if errU := json.Unmarshal([]byte(metricsJson), &m); errU == nil {
-				item.p.Metrics = m
-			}
-		}
-		if modularJson != "" {
-			var mr ModularResults
-			if errU := json.Unmarshal([]byte(modularJson), &mr); errU == nil {
-				item.p.ModularResults = &mr
-			}
-		}
-		list = append(list, item)
-	}
-	s.mu.Unlock()
-
-	syncedCount := 0
-	for _, item := range list {
-		if err := s.SendToServer(ctx, &item.p, serverURL, apiToken); err == nil {
-			s.mu.Lock()
-			_, _ = s.db.Exec("UPDATE metrics SET synced = 1, error_message = '' WHERE id = ?", item.id)
+		s.mu.Lock()
+		rows, err := s.db.Query(`
+			SELECT id, node_id, location, COALESCE(group_name, ''), COALESCE(vlan, 0), timestamp, download_mbps, upload_mbps, ping_gateway, 
+			       COALESCE(system_info_json, ''), COALESCE(switch_info_json, ''),
+			       COALESCE(profile_version, ''), COALESCE(metrics_json, ''), COALESCE(modular_json, '')
+			FROM metrics WHERE synced = 0 ORDER BY id ASC LIMIT 50
+		`)
+		if err != nil {
 			s.mu.Unlock()
-			syncedCount++
+			break
+		}
+
+		type pendingItem struct {
+			id int64
+			p  MetricPayload
+		}
+		var list []pendingItem
+		for rows.Next() {
+			var item pendingItem
+			var timeStr, sysJson, swJson, profileVer, metricsJson, modularJson string
+			if err := rows.Scan(&item.id, &item.p.NodeID, &item.p.Location, &item.p.GroupName, &item.p.VLAN, &timeStr, &item.p.DownloadMbps, &item.p.UploadMbps, &item.p.PingGateway, &sysJson, &swJson, &profileVer, &metricsJson, &modularJson); err != nil {
+				continue
+			}
+			item.p.Timestamp, _ = time.Parse(time.RFC3339, timeStr)
+			item.p.ProfileVersion = profileVer
+
+			if sysJson != "" {
+				var si SystemInfo
+				if errU := json.Unmarshal([]byte(sysJson), &si); errU == nil {
+					item.p.SystemInfo = &si
+				}
+			}
+			if swJson != "" {
+				var sw SwitchInfo
+				if errU := json.Unmarshal([]byte(swJson), &sw); errU == nil {
+					item.p.SwitchInfo = &sw
+				}
+			}
+			if metricsJson != "" {
+				var m map[string]interface{}
+				if errU := json.Unmarshal([]byte(metricsJson), &m); errU == nil {
+					item.p.Metrics = m
+				}
+			}
+			if modularJson != "" {
+				var mr ModularResults
+				if errU := json.Unmarshal([]byte(modularJson), &mr); errU == nil {
+					item.p.ModularResults = &mr
+				}
+			}
+			list = append(list, item)
+		}
+		rows.Close()
+		s.mu.Unlock()
+
+		if len(list) == 0 {
+			break // Fila zerada com sucesso!
+		}
+
+		batchSuccess := 0
+		for _, item := range list {
+			select {
+			case <-ctx.Done():
+				return totalSynced
+			default:
+			}
+
+			if err := s.SendToServer(ctx, &item.p, serverURL, apiToken); err == nil {
+				s.mu.Lock()
+				_, _ = s.db.Exec("UPDATE metrics SET synced = 1, error_message = '' WHERE id = ?", item.id)
+				s.mu.Unlock()
+				batchSuccess++
+				totalSynced++
+			} else {
+				log.Printf("[STORAGE][SYNC] Falha ao reenviar lote pendente (%v). Interrompendo sincronizacao.", err)
+				return totalSynced
+			}
+		}
+
+		if batchSuccess == 0 {
+			break
 		}
 	}
-	if syncedCount > 0 {
-		log.Printf("[STORAGE][SYNC] %d metricas pendentes foram sincronizadas com sucesso!", syncedCount)
+
+	if totalSynced > 0 {
+		log.Printf("[STORAGE][SYNC] %d metricas pendentes foram sincronizadas com sucesso com o servidor central!", totalSynced)
 	}
-	return syncedCount
+	return totalSynced
 }
 
 // SendToServer envia a medição via POST HTTPS para o servidor central.
