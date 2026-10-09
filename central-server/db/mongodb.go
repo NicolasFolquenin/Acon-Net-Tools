@@ -209,6 +209,88 @@ func (m *MongoDBClient) GetMetricsLast24Hours(ctx context.Context, nodeIDFilter 
 	return results, nil
 }
 
+// GetLatestMetricForNode busca a leitura mais recente de um nó específico sem restrição de 24h
+func (m *MongoDBClient) GetLatestMetricForNode(ctx context.Context, nodeID string) (*models.FlattenedMetricItem, error) {
+	if m.Collection == nil {
+		return nil, fmt.Errorf("colecao mongodb nao inicializada")
+	}
+
+	filter := bson.M{"metadata.node_id": nodeID}
+	findOpts := options.FindOne().SetSort(bson.D{{Key: "timestamp", Value: -1}})
+
+	var doc models.TimeSeriesMetricDocument
+	err := m.Collection.FindOne(ctx, filter, findOpts).Decode(&doc)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.FlattenedMetricItem{
+		NodeID:         doc.Metadata.NodeID,
+		Location:       doc.Metadata.Location,
+		GroupName:      doc.Metadata.GroupName,
+		VLAN:           doc.Metadata.VLAN,
+		Timestamp:      doc.Timestamp,
+		DownloadMbps:   doc.DownloadMbps,
+		UploadMbps:     doc.UploadMbps,
+		PingGateway:    doc.PingGateway,
+		ProfileVersion: doc.ProfileVersion,
+		Metrics:        doc.Metrics,
+		SystemInfo:     doc.SystemInfo,
+		SwitchInfo:     doc.SwitchInfo,
+		ModularResults: doc.ModularResults,
+	}, nil
+}
+
+// GetHistoricalMetricsForNode busca as últimas N leituras históricas de um nó ordenadas cronologicamente
+func (m *MongoDBClient) GetHistoricalMetricsForNode(ctx context.Context, nodeID string, limit int) ([]models.FlattenedMetricItem, error) {
+	if m.Collection == nil {
+		return nil, fmt.Errorf("colecao mongodb nao inicializada")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
+	filter := bson.M{"metadata.node_id": nodeID}
+	findOpts := options.Find().SetSort(bson.D{{Key: "timestamp", Value: -1}}).SetLimit(int64(limit))
+
+	cursor, err := m.Collection.Find(ctx, filter, findOpts)
+	if err != nil {
+		return nil, fmt.Errorf("falha ao consultar metricas historicas: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var reversed []models.FlattenedMetricItem
+	for cursor.Next(ctx) {
+		var doc models.TimeSeriesMetricDocument
+		if err := cursor.Decode(&doc); err != nil {
+			continue
+		}
+		reversed = append(reversed, models.FlattenedMetricItem{
+			NodeID:         doc.Metadata.NodeID,
+			Location:       doc.Metadata.Location,
+			GroupName:      doc.Metadata.GroupName,
+			VLAN:           doc.Metadata.VLAN,
+			Timestamp:      doc.Timestamp,
+			DownloadMbps:   doc.DownloadMbps,
+			UploadMbps:     doc.UploadMbps,
+			PingGateway:    doc.PingGateway,
+			ProfileVersion: doc.ProfileVersion,
+			Metrics:        doc.Metrics,
+			SystemInfo:     doc.SystemInfo,
+			SwitchInfo:     doc.SwitchInfo,
+			ModularResults: doc.ModularResults,
+		})
+	}
+
+	// Inverte para retornar em ordem cronológica (ascendente por timestamp) para os gráficos
+	results := make([]models.FlattenedMetricItem, len(reversed))
+	for i, item := range reversed {
+		results[len(reversed)-1-i] = item
+	}
+
+	return results, nil
+}
+
 // GetDistinctNodes retorna a lista de todos os nós registrados
 func (m *MongoDBClient) GetDistinctNodes(ctx context.Context) ([]string, error) {
 	res := m.Collection.Distinct(ctx, "metadata.node_id", bson.M{})

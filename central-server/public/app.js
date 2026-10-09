@@ -814,9 +814,23 @@ function setupEventListeners() {
   if (resetChartBtn) {
     resetChartBtn.addEventListener('click', () => {
       selectedChartNode = 'all';
+      if (selectNode) selectNode.value = 'all';
       updateChartFocusUI();
       updateMetricToggleVisibility();
       loadDashboardData();
+    });
+  }
+
+  // Botão de Sair da Visão de Máquina Única
+  const btnExitSm = document.getElementById('btn-exit-single-machine');
+  if (btnExitSm) {
+    btnExitSm.addEventListener('click', () => {
+      selectedChartNode = 'all';
+      if (selectNode) selectNode.value = 'all';
+      updateChartFocusUI();
+      updateMetricToggleVisibility();
+      loadDashboardData();
+      showToast('Exibindo gráficos consolidados de todas as sondas', 'toast-info');
     });
   }
 
@@ -1932,8 +1946,9 @@ async function loadDashboardData() {
     updateNodeSelector(data.nodes_list || []);
     renderSummaryCards(currentSummaries);
     renderComparativeCharts(data.metrics_series || [], data.nodes_list || []);
-    renderTelemetryTable(data.metrics_series || []);
+    renderTelemetryTable(data.metrics_series || [], data.node_diagnostic);
     updateChartFocusUI();
+    renderSingleMachineHeaderAndAlert(data.node_diagnostic, currentSummaries);
 
     activeNodesCount.textContent = data.total_nodes || 0;
     if (data.generated_at) {
@@ -1978,6 +1993,13 @@ function selectNodeForCharts(nodeId) {
   } else {
     selectedChartNode = nodeId;
     showToast(`Gráficos focados na sonda: ${nodeId}`, 'toast-info');
+    // Rola suavemente para o topo do dashboard para exibir o cabeçalho e diagnóstico
+    setTimeout(() => {
+      const topTarget = document.getElementById('single-machine-header') || document.getElementById('view-dashboard');
+      if (topTarget) {
+        topTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 80);
   }
 
   updateChartFocusUI();
@@ -2009,6 +2031,142 @@ function updateChartFocusUI() {
       const isSel = (selectedChartNode !== 'all' && rowNodeId === selectedChartNode);
       row.classList.toggle('selected-chart-node', isSel);
     });
+  }
+}
+
+function renderSingleMachineHeaderAndAlert(diagnostic, summaries) {
+  const smHeader = document.getElementById('single-machine-header');
+  const smAlert = document.getElementById('sm-offline-alert');
+  const chartHistBadge = document.getElementById('chart-historical-badge');
+
+  if (!smHeader || !smAlert) return;
+
+  const isSingleNode = (selectedChartNode && selectedChartNode !== 'all');
+
+  if (!isSingleNode) {
+    smHeader.style.display = 'none';
+    smAlert.style.display = 'none';
+    if (chartHistBadge) chartHistBadge.style.display = 'none';
+    return;
+  }
+
+  // 1. Preenche o Cabeçalho Superior de Máquina Única
+  smHeader.style.display = 'block';
+
+  const nameEl = document.getElementById('sm-machine-name');
+  const statusBadge = document.getElementById('sm-status-badge');
+  const ipEl = document.getElementById('sm-ip');
+  const groupEl = document.getElementById('sm-group');
+  const vlanEl = document.getElementById('sm-vlan');
+  const switchEl = document.getElementById('sm-switch');
+  const portEl = document.getElementById('sm-port');
+  const histTag = document.getElementById('sm-historical-tag');
+
+  const nodeName = (diagnostic && diagnostic.node_id) || selectedChartNode;
+  if (nameEl) nameEl.textContent = nodeName;
+
+  // Busca resumo correspondente em memória se houver
+  const summary = (summaries || []).find(s => s.node_id === selectedChartNode);
+
+  const isOnline = diagnostic ? !!diagnostic.is_online : (summary ? !!summary.is_healthy : false);
+  if (statusBadge) {
+    statusBadge.className = `dc-health-badge ${isOnline ? 'online' : 'stale'}`;
+    statusBadge.textContent = isOnline ? 'Online na Rede' : 'Desconectada';
+  }
+
+  // IP
+  let ipStr = '--';
+  if (diagnostic && diagnostic.system_info && (diagnostic.system_info.ip_address || diagnostic.system_info.IPAddress)) {
+    ipStr = diagnostic.system_info.ip_address || diagnostic.system_info.IPAddress;
+  } else if (summary && summary.system_info && (summary.system_info.ip_address || summary.system_info.IPAddress)) {
+    ipStr = summary.system_info.ip_address || summary.system_info.IPAddress;
+  }
+  if (ipEl) ipEl.textContent = ipStr;
+
+  // Grupo
+  const groupStr = (diagnostic && diagnostic.group_name) || (summary && summary.group_name) || 'Padrão / Desconhecido';
+  if (groupEl) groupEl.textContent = groupStr;
+
+  // VLAN
+  let vlanVal = (diagnostic && diagnostic.vlan) || (summary && summary.vlan) || 0;
+  if (!vlanVal && diagnostic && diagnostic.switch_info && diagnostic.switch_info.vlan) {
+    vlanVal = diagnostic.switch_info.vlan;
+  } else if (!vlanVal && summary && summary.switch_info && summary.switch_info.vlan) {
+    vlanVal = summary.switch_info.vlan;
+  }
+  if (vlanEl) vlanEl.textContent = vlanVal > 0 ? `VLAN ${vlanVal}` : '--';
+
+  // Switch & Porta (LLDP)
+  let swName = '--';
+  let swPort = '--';
+  const swInfo = (diagnostic && diagnostic.switch_info) || (summary && summary.switch_info);
+  if (swInfo && swInfo.switch_name) {
+    swName = swInfo.switch_name;
+    swPort = swInfo.switch_port || '--';
+  }
+  if (switchEl) switchEl.textContent = swName;
+  if (portEl) portEl.textContent = swPort;
+
+  // Modo Histórico
+  const isHistorical = diagnostic ? !!diagnostic.is_historical_fallback : false;
+  if (histTag) histTag.style.display = isHistorical ? 'inline-flex' : 'none';
+  if (chartHistBadge) chartHistBadge.style.display = isHistorical ? 'inline-flex' : 'none';
+
+  // 2. Painel de Alerta de Desconexão
+  if (!isOnline) {
+    smAlert.style.display = 'flex';
+
+    const downtimeCounter = document.getElementById('sm-downtime-counter');
+    const lastMetricTime = document.getElementById('sm-last-metric-time');
+    const lastMetricAgo = document.getElementById('sm-last-metric-ago');
+    const lostConnectionTime = document.getElementById('sm-lost-connection-time');
+    const lostConnectionDetail = document.getElementById('sm-lost-connection-detail');
+    const totalOfflineDuration = document.getElementById('sm-total-offline-duration');
+
+    const dtDuration = (diagnostic && diagnostic.downtime_duration) || (summary && summary.last_seen ? formatTimeAgo(new Date(summary.last_seen)) : 'poucos instantes');
+    if (downtimeCounter) downtimeCounter.textContent = `Offline há ${dtDuration}`;
+    if (totalOfflineDuration) totalOfflineDuration.textContent = dtDuration;
+
+    // Última Métrica Enviada
+    const lastTs = (diagnostic && diagnostic.last_metric_timestamp) || (summary && summary.last_seen);
+    if (lastTs) {
+      const dLast = new Date(lastTs);
+      if (lastMetricTime) {
+        lastMetricTime.textContent = `${dLast.toLocaleDateString('pt-BR')} às ${dLast.toLocaleTimeString('pt-BR')}`;
+      }
+      if (lastMetricAgo) {
+        lastMetricAgo.textContent = `(${formatTimeAgo(dLast)})`;
+      }
+    } else {
+      if (lastMetricTime) lastMetricTime.textContent = 'Nenhuma medição registrada';
+      if (lastMetricAgo) lastMetricAgo.textContent = '--';
+    }
+
+    // Horário de Perda de Conexão
+    if (diagnostic && diagnostic.lost_connection_at) {
+      const dLost = new Date(diagnostic.lost_connection_at);
+      if (lostConnectionTime) {
+        lostConnectionTime.textContent = `${dLost.toLocaleDateString('pt-BR')} às ${dLost.toLocaleTimeString('pt-BR')}`;
+      }
+      if (lostConnectionDetail) {
+        const interval = diagnostic.expected_interval_minutes || 30;
+        lostConnectionDetail.textContent = `Falha no ciclo agendado (+${interval} min)`;
+      }
+    } else if (lastTs) {
+      // Fallback: Última medição + 30 minutos
+      const dLostFallback = new Date(new Date(lastTs).getTime() + 30 * 60 * 1000);
+      if (lostConnectionTime) {
+        lostConnectionTime.textContent = `${dLostFallback.toLocaleDateString('pt-BR')} às ${dLostFallback.toLocaleTimeString('pt-BR')}`;
+      }
+      if (lostConnectionDetail) {
+        lostConnectionDetail.textContent = 'Falha no ciclo agendado (+30 min)';
+      }
+    } else {
+      if (lostConnectionTime) lostConnectionTime.textContent = '--';
+      if (lostConnectionDetail) lostConnectionDetail.textContent = 'Aguardando primeira medição';
+    }
+  } else {
+    smAlert.style.display = 'none';
   }
 }
 
@@ -2597,9 +2755,18 @@ function renderComparativeCharts(series, nodesList) {
     // Limita estritamente aos últimos 20 testes
     const nodeItems = allNodeItems.slice(-20);
 
+    const isDifferentDay = nodeItems.some(item => {
+      const d = new Date(item.timestamp);
+      const today = new Date();
+      return d.toDateString() !== today.toDateString();
+    });
+
     const nodeLabels = nodeItems.map(item => {
       const d = new Date(item.timestamp);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (isDifferentDay) {
+        return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+      }
+      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     });
 
     const downData = nodeItems.map(item => item.download_mbps);
@@ -2845,18 +3012,24 @@ function renderComparativeCharts(series, nodesList) {
    8. Tabela de Feed de Telemetria
    ========================================================================== */
 
-function renderTelemetryTable(series) {
+function renderTelemetryTable(series, diagnostic) {
   if (!series || series.length === 0) {
     telemetryTableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhuma telemetria recebida até o momento.</td></tr>';
     return;
   }
 
+  const isHistorical = diagnostic ? !!diagnostic.is_historical_fallback : false;
   const recent = [...series].reverse().slice(0, 15);
 
   telemetryTableBody.innerHTML = recent.map(item => {
     const d = new Date(item.timestamp);
-    const dateFormatted = `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+    const dateFormatted = `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR')}`;
     const id = item.node_id || item.NodeID;
+    const isOld = isHistorical || (Date.now() - d.getTime() > 3 * 3600 * 1000);
+
+    const badgeHtml = isOld
+      ? '<span class="dc-health-badge stale" style="display:inline-flex;">● Histórico</span>'
+      : '<span class="dc-health-badge online" style="display:inline-flex;">● Sincronizado</span>';
 
     return `
       <tr>
@@ -2866,7 +3039,7 @@ function renderTelemetryTable(series) {
         <td>${item.download_mbps > 0 ? `<strong style="color: var(--accent-cyan);">${item.download_mbps.toFixed(1)}</strong> Mbps` : `<span class="text-subtle font-mono">--</span>`}</td>
         <td>${item.upload_mbps > 0 ? `<strong style="color: #c084fc;">${item.upload_mbps.toFixed(1)}</strong> Mbps` : `<span class="text-subtle font-mono">--</span>`}</td>
         <td><strong style="color: #34d399;">${item.ping_gateway.toFixed(1)}</strong> ms</td>
-        <td><span class="dc-health-badge online" style="display:inline-flex;">● Sincronizado</span></td>
+        <td>${badgeHtml}</td>
       </tr>
     `;
   }).join('');

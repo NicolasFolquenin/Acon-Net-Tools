@@ -108,8 +108,25 @@ func (h *MetricsHandler) GetDashboardMetrics(w http.ResponseWriter, r *http.Requ
 	series, err := h.db.GetMetricsLast24Hours(ctx, nodeFilter, hoursLimit)
 	if err != nil {
 		log.Printf("[API][ERRO] Falha na consulta de dashboard: %v", err)
-		// Se banco estiver vazio ou off, retorna payload estruturado vazio
 		series = []models.FlattenedMetricItem{}
+	}
+
+	var isHistoricalFallback bool
+	var diagnostic *models.NodeDiagnosticInfo
+
+	// Se estiver filtrando por um nó específico
+	if nodeFilter != "" && nodeFilter != "all" {
+		// Se não houver medições nas últimas 24h, busca as últimas medições históricas gravadas
+		if len(series) == 0 {
+			historical, errHist := h.db.GetHistoricalMetricsForNode(ctx, nodeFilter, 20)
+			if errHist == nil && len(historical) > 0 {
+				series = historical
+				isHistoricalFallback = true
+			}
+		}
+
+		// Constrói diagnóstico detalhado da sonda
+		diagnostic = h.buildNodeDiagnostic(ctx, nodeFilter, series, isHistoricalFallback)
 	}
 
 	// Lista de nós distintos
@@ -129,16 +146,198 @@ func (h *MetricsHandler) GetDashboardMetrics(w http.ResponseWriter, r *http.Requ
 	// Agrega resumos de cada nó (última leitura, taxa de sucesso, etc.)
 	summaries := computeNodeSummaries(series)
 
+	// Ajusta status de saúde do resumo com base no diagnóstico preciso
+	if diagnostic != nil {
+		foundSummary := false
+		for i := range summaries {
+			if summaries[i].NodeID == diagnostic.NodeID {
+				summaries[i].IsHealthy = diagnostic.IsOnline
+				foundSummary = true
+				break
+			}
+		}
+		if !foundSummary && len(series) > 0 {
+			latestItem := series[len(series)-1]
+			vlan := latestItem.VLAN
+			if vlan == 0 && diagnostic.SwitchInfo != nil && diagnostic.SwitchInfo.VLAN > 0 {
+				vlan = diagnostic.SwitchInfo.VLAN
+			}
+			summaries = append(summaries, models.NodeSummaryCard{
+				NodeID:          diagnostic.NodeID,
+				Location:        diagnostic.Location,
+				GroupName:       diagnostic.GroupName,
+				VLAN:            vlan,
+				LastSeen:        latestItem.Timestamp,
+				LastDownload:    latestItem.DownloadMbps,
+				LastUpload:      latestItem.UploadMbps,
+				LastPing:        latestItem.PingGateway,
+				ProfileVersion:  latestItem.ProfileVersion,
+				Metrics:         latestItem.Metrics,
+				IsHealthy:       diagnostic.IsOnline,
+				TotalReadings24: len(series),
+				SystemInfo:      diagnostic.SystemInfo,
+				SwitchInfo:      diagnostic.SwitchInfo,
+				ModularResults:  latestItem.ModularResults,
+			})
+		}
+	}
+
 	resp := models.DashboardResponse{
-		TotalNodes:    len(nodesList),
-		NodesList:     nodesList,
-		Summaries:     summaries,
-		MetricsSeries: series,
-		GeneratedAt:   time.Now().UTC(),
+		TotalNodes:     len(nodesList),
+		NodesList:      nodesList,
+		Summaries:      summaries,
+		MetricsSeries:  series,
+		GeneratedAt:    time.Now().UTC(),
+		NodeDiagnostic: diagnostic,
 	}
 
 	_ = json.NewEncoder(w).Encode(resp)
 }
+
+// buildNodeDiagnostic calcula detalhadamente o estado de conexão e perda de sinal de uma máquina
+func (h *MetricsHandler) buildNodeDiagnostic(ctx context.Context, nodeID string, series []models.FlattenedMetricItem, isHistorical bool) *models.NodeDiagnosticInfo {
+	if nodeID == "" || nodeID == "all" {
+		return nil
+	}
+
+	diag := &models.NodeDiagnosticInfo{
+		NodeID:               nodeID,
+		IsHistoricalFallback: isHistorical,
+		ExpectedIntervalMin:  30,
+	}
+
+	// Consulta metadados da máquina cadastrada
+	mach, _ := h.db.GetMachine(ctx, nodeID)
+	if mach != nil {
+		if mach.GroupID != "" {
+			grp, _ := h.db.GetMachineGroup(ctx, mach.GroupID)
+			if grp != nil {
+				diag.GroupName = grp.Name
+				if grp.Profile.IntervalMinutes > 0 {
+					diag.ExpectedIntervalMin = grp.Profile.IntervalMinutes
+				}
+			}
+		}
+	}
+
+	// Localiza última leitura gravada
+	var latest *models.FlattenedMetricItem
+	if len(series) > 0 {
+		latest = &series[len(series)-1]
+	} else {
+		latestFromDB, errLatest := h.db.GetLatestMetricForNode(ctx, nodeID)
+		if errLatest == nil && latestFromDB != nil {
+			latest = latestFromDB
+		}
+	}
+
+	if latest != nil {
+		diag.Location = latest.Location
+		if diag.GroupName == "" {
+			diag.GroupName = latest.GroupName
+		}
+		diag.VLAN = latest.VLAN
+		if diag.VLAN == 0 && latest.SwitchInfo != nil && latest.SwitchInfo.VLAN > 0 {
+			diag.VLAN = latest.SwitchInfo.VLAN
+		}
+		diag.SystemInfo = latest.SystemInfo
+		if diag.SystemInfo == nil && mach != nil && mach.IPAddress != "" {
+			diag.SystemInfo = &models.SystemInfo{
+				Hostname:   mach.Hostname,
+				IPAddress:  mach.IPAddress,
+				MACAddress: mach.MACAddress,
+			}
+		}
+		diag.SwitchInfo = latest.SwitchInfo
+		if (diag.SwitchInfo == nil || !diag.SwitchInfo.IsValid()) && mach != nil && mach.SwitchName != "" {
+			diag.SwitchInfo = &models.SwitchInfo{
+				SwitchName: mach.SwitchName,
+				SwitchPort: mach.SwitchPort,
+				VLAN:       mach.VLAN,
+			}
+		}
+
+		lastTs := latest.Timestamp.UTC()
+		diag.LastMetricTimestamp = &lastTs
+
+		// O ciclo subsequente esperado era lastTs + ExpectedIntervalMin
+		lostAt := lastTs.Add(time.Duration(diag.ExpectedIntervalMin) * time.Minute)
+		now := time.Now().UTC()
+
+		// Tolerância de 5 minutos antes de classificar como offline
+		graceLimit := lostAt.Add(5 * time.Minute)
+		if now.After(graceLimit) {
+			diag.IsOnline = false
+			diag.LostConnectionAt = &lostAt
+			downtime := now.Sub(lostAt)
+			if downtime < 0 {
+				downtime = 0
+			}
+			diag.DowntimeSeconds = int64(downtime.Seconds())
+			diag.DowntimeDuration = formatDowntime(downtime)
+		} else {
+			diag.IsOnline = true
+			diag.LostConnectionAt = nil
+			diag.DowntimeSeconds = 0
+			diag.DowntimeDuration = ""
+		}
+	} else {
+		// Nenhuma leitura jamais recebida
+		diag.IsOnline = false
+		diag.DowntimeDuration = "Sem telemetria registrada"
+		if mach != nil {
+			diag.VLAN = mach.VLAN
+			if mach.IPAddress != "" {
+				diag.SystemInfo = &models.SystemInfo{
+					Hostname:   mach.Hostname,
+					IPAddress:  mach.IPAddress,
+					MACAddress: mach.MACAddress,
+				}
+			}
+			if mach.SwitchName != "" {
+				diag.SwitchInfo = &models.SwitchInfo{
+					SwitchName: mach.SwitchName,
+					SwitchPort: mach.SwitchPort,
+					VLAN:       mach.VLAN,
+				}
+			}
+		}
+	}
+
+	return diag
+}
+
+// formatDowntime formata a duração do tempo offline de forma amigável em português
+func formatDowntime(d time.Duration) string {
+	if d <= 0 {
+		return "poucos instantes"
+	}
+	totalMinutes := int64(d.Minutes())
+	if totalMinutes < 60 {
+		return fmt.Sprintf("%d min", totalMinutes)
+	}
+	totalHours := totalMinutes / 60
+	remMinutes := totalMinutes % 60
+	if totalHours < 24 {
+		if remMinutes == 0 {
+			return fmt.Sprintf("%d h", totalHours)
+		}
+		return fmt.Sprintf("%d h e %d min", totalHours, remMinutes)
+	}
+	days := totalHours / 24
+	remHours := totalHours % 24
+	if remHours == 0 {
+		if days == 1 {
+			return "1 dia"
+		}
+		return fmt.Sprintf("%d dias", days)
+	}
+	if days == 1 {
+		return fmt.Sprintf("1 dia e %d h", remHours)
+	}
+	return fmt.Sprintf("%d dias e %d h", days, remHours)
+}
+
 
 // DeleteNode lida com DELETE /api/v1/nodes?node_id={id} para remover um computador do sistema
 func (h *MetricsHandler) DeleteNode(w http.ResponseWriter, r *http.Request) {

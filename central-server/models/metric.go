@@ -197,11 +197,29 @@ type NodeSummaryCard struct {
 	ModularResults  *ModularResults        `json:"modular_results,omitempty"`
 }
 
+// NodeDiagnosticInfo traz detalhes sobre o estado de conexão e perda de sinal de uma máquina específica
+type NodeDiagnosticInfo struct {
+	NodeID               string      `json:"node_id"`
+	IsOnline             bool        `json:"is_online"`
+	LastMetricTimestamp  *time.Time  `json:"last_metric_timestamp,omitempty"`
+	LostConnectionAt     *time.Time  `json:"lost_connection_at,omitempty"`
+	DowntimeDuration     string      `json:"downtime_duration,omitempty"`
+	DowntimeSeconds      int64       `json:"downtime_seconds,omitempty"`
+	ExpectedIntervalMin  int         `json:"expected_interval_minutes,omitempty"`
+	IsHistoricalFallback bool        `json:"is_historical_fallback"`
+	Location             string      `json:"location,omitempty"`
+	GroupName            string      `json:"group_name,omitempty"`
+	VLAN                 int         `json:"vlan,omitempty"`
+	SystemInfo           *SystemInfo `json:"system_info,omitempty"`
+	SwitchInfo           *SwitchInfo `json:"switch_info,omitempty"`
+}
+
 // DashboardResponse resposta agregada do endpoint GET /api/v1/dashboard/metrics
 type DashboardResponse struct {
-	TotalNodes    int                   `json:"total_nodes"`
-	NodesList     []string              `json:"nodes_list"`
-	Summaries     []NodeSummaryCard     `json:"summaries"`
-	MetricsSeries []FlattenedMetricItem `json:"metrics_series"`
-	GeneratedAt   time.Time             `json:"generated_at"`
+	TotalNodes     int                   `json:"total_nodes"`
+	NodesList      []string              `json:"nodes_list"`
+	Summaries      []NodeSummaryCard     `json:"summaries"`
+	MetricsSeries  []FlattenedMetricItem `json:"metrics_series"`
+	GeneratedAt    time.Time             `json:"generated_at"`
+	NodeDiagnostic *NodeDiagnosticInfo   `json:"node_diagnostic,omitempty"`
 }
