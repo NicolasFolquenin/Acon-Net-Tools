@@ -135,7 +135,7 @@ func (a *App) startup(ctx context.Context) {
 	// Sincroniza medições que porventura ficaram pendentes offline
 	go func() {
 		time.Sleep(2 * time.Second)
-		syncCtx, syncCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		syncCtx, syncCancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer syncCancel()
 		if count := a.storage.SyncPendingMetrics(syncCtx, cfg.ServerURL, cfg.APIToken); count > 0 {
 			a.emitStatus()
@@ -326,7 +326,7 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 	// Se esta leitura sincronizou e há leituras pendentes antigas, sincroniza-as em background
 	if synced {
 		go func() {
-			syncCtx, syncCancel := context.WithTimeout(context.Background(), 20*time.Second)
+			syncCtx, syncCancel := context.WithTimeout(context.Background(), 3*time.Minute)
 			defer syncCancel()
 			if count := a.storage.SyncPendingMetrics(syncCtx, cfg.ServerURL, cfg.APIToken); count > 0 {
 				a.emitStatus()
