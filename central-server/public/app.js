@@ -95,10 +95,13 @@ const machinesPaginationState = {
   itemsPerPage: 15
 };
 
-const telemetryPaginationState = {
+let allTelemetrySeries = [];
+const telemetryPageState = {
   page: 1,
-  itemsPerPage: 15
+  itemsPerPage: 15,
+  date: ''
 };
+const telemetryPaginationState = telemetryPageState;
 
 let currentPingTarget = {
   hostname: '',
@@ -837,40 +840,43 @@ function setupEventListeners() {
 
   if (telemetryDateFilter) {
     telemetryDateFilter.addEventListener('change', (e) => {
-      nodeFilterState.date = e.target.value;
-      telemetryPaginationState.page = 1;
-      applyNodeFilters();
+      telemetryPageState.date = e.target.value;
+      telemetryPageState.page = 1;
+      applyTelemetryFilters();
+      loadDashboardData(telemetryPageState.date);
     });
   }
   if (btnTelemetryFilterToday) {
     btnTelemetryFilterToday.addEventListener('click', () => {
       const todayStr = new Date().toLocaleDateString('en-CA');
-      nodeFilterState.date = todayStr;
+      telemetryPageState.date = todayStr;
       if (telemetryDateFilter) telemetryDateFilter.value = todayStr;
-      telemetryPaginationState.page = 1;
-      applyNodeFilters();
+      telemetryPageState.page = 1;
+      applyTelemetryFilters();
+      loadDashboardData(todayStr);
     });
   }
   if (btnTelemetryFilterAll) {
     btnTelemetryFilterAll.addEventListener('click', () => {
-      nodeFilterState.date = '';
+      telemetryPageState.date = '';
       if (telemetryDateFilter) telemetryDateFilter.value = '';
-      telemetryPaginationState.page = 1;
-      applyNodeFilters();
+      telemetryPageState.page = 1;
+      applyTelemetryFilters();
+      loadDashboardData('');
     });
   }
   if (btnTelemetryPrev) {
     btnTelemetryPrev.addEventListener('click', () => {
-      if (telemetryPaginationState.page > 1) {
-        telemetryPaginationState.page--;
-        applyNodeFilters();
+      if (telemetryPageState.page > 1) {
+        telemetryPageState.page--;
+        applyTelemetryFilters();
       }
     });
   }
   if (btnTelemetryNext) {
     btnTelemetryNext.addEventListener('click', () => {
-      telemetryPaginationState.page++;
-      applyNodeFilters();
+      telemetryPageState.page++;
+      applyTelemetryFilters();
     });
   }
 
@@ -2063,13 +2069,21 @@ function startAutoRefresh() {
    3. Carregamento de Métricas do Dashboard
    ========================================================================== */
 
-async function loadDashboardData() {
+async function loadDashboardData(requestedDate) {
   if (!currentUser) return;
 
   const selected = selectedChartNode || (selectNode && selectNode.value) || 'all';
   let url = '/api/v1/dashboard/metrics';
+  const params = [];
   if (selected !== 'all') {
-    url += `?node_id=${encodeURIComponent(selected)}`;
+    params.push(`node_id=${encodeURIComponent(selected)}`);
+  }
+  const dateParam = (typeof requestedDate === 'string' ? requestedDate : telemetryPageState.date).trim();
+  if (dateParam) {
+    params.push(`date=${encodeURIComponent(dateParam)}`);
+  }
+  if (params.length > 0) {
+    url += '?' + params.join('&');
   }
 
   try {
@@ -2365,16 +2379,7 @@ function applyNodeFilters() {
       if ((s.group_name || '') !== groupFilter) return false;
     }
 
-    // 3. Filtro por Dia
-    if (nodeFilterState.date) {
-      if (!s.last_seen) return false;
-      const d = new Date(s.last_seen);
-      if (isNaN(d.getTime())) return false;
-      const dStr = d.toLocaleDateString('en-CA');
-      if (dStr !== nodeFilterState.date) return false;
-    }
-
-    // 4. Filtro de Texto (hostname, local, ip, switch, vlan)
+    // 3. Filtro de Texto (hostname, local, ip, switch, vlan)
     if (query) {
       const matchNodeId = (s.node_id || '').toLowerCase().includes(query);
       const matchLoc = (s.location || '').toLowerCase().includes(query);
@@ -2391,41 +2396,11 @@ function applyNodeFilters() {
     return true;
   });
 
-  const total = filtered.length;
-  const totalPages = Math.ceil(total / telemetryPaginationState.itemsPerPage) || 1;
-  if (telemetryPaginationState.page > totalPages) {
-    telemetryPaginationState.page = totalPages;
-  }
-  if (telemetryPaginationState.page < 1) {
-    telemetryPaginationState.page = 1;
-  }
-
-  const startIdx = (telemetryPaginationState.page - 1) * telemetryPaginationState.itemsPerPage;
-  const endIdx = Math.min(startIdx + telemetryPaginationState.itemsPerPage, total);
-  const pagedSummaries = filtered.slice(startIdx, endIdx);
-
-  // Elementos do Footer de Paginação de Telemetria
-  const rangeEl = document.getElementById('telemetry-pagination-range');
-  const pageDisplayEl = document.getElementById('telemetry-page-display');
-  const totalPagesEl = document.getElementById('telemetry-total-pages-display');
-  const btnPrev = document.getElementById('btn-telemetry-prev');
-  const btnNext = document.getElementById('btn-telemetry-next');
-  const totalBadge = document.getElementById('telemetry-total-badge');
-
-  if (rangeEl) {
-    rangeEl.textContent = total > 0 ? `Exibindo ${startIdx + 1} a ${endIdx} de ${total}` : 'Exibindo 0 a 0 de 0';
-  }
-  if (pageDisplayEl) pageDisplayEl.textContent = String(telemetryPaginationState.page);
-  if (totalPagesEl) totalPagesEl.textContent = String(totalPages);
-  if (btnPrev) btnPrev.disabled = telemetryPaginationState.page <= 1;
-  if (btnNext) btnNext.disabled = telemetryPaginationState.page >= totalPages;
-  if (totalBadge) totalBadge.textContent = `${total} sondas`;
-
   if (nodesFilterCount) {
-    nodesFilterCount.textContent = `${total} de ${currentSummaries.length}`;
+    nodesFilterCount.textContent = `${filtered.length} de ${currentSummaries.length} sondas`;
   }
 
-  renderNodesTable(pagedSummaries);
+  renderNodesTable(filtered);
 }
 
 function renderSummaryCards(summaries) {
@@ -3199,23 +3174,77 @@ function renderComparativeCharts(series, nodesList) {
 }
 
 /* ==========================================================================
-   8. Tabela de Feed de Telemetria
+   8. Tabela de Feed de Telemetria com Paginação e Filtro por Dia
    ========================================================================== */
 
 function renderTelemetryTable(series, diagnostic) {
-  if (!series || series.length === 0) {
-    telemetryTableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhuma telemetria recebida até o momento.</td></tr>';
+  allTelemetrySeries = series || [];
+  applyTelemetryFilters();
+}
+
+function applyTelemetryFilters() {
+  if (!telemetryTableBody) return;
+
+  let filtered = allTelemetrySeries || [];
+
+  // 1. Filtro por Dia
+  if (telemetryPageState.date) {
+    filtered = filtered.filter(item => {
+      if (!item.timestamp) return false;
+      const d = new Date(item.timestamp);
+      if (isNaN(d.getTime())) return false;
+      return d.toLocaleDateString('en-CA') === telemetryPageState.date;
+    });
+  }
+
+  // 2. Ordenação mais recente primeiro
+  const sorted = [...filtered].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  // 3. Paginação (15 itens por página)
+  const total = sorted.length;
+  const totalPages = Math.ceil(total / telemetryPageState.itemsPerPage) || 1;
+  if (telemetryPageState.page > totalPages) telemetryPageState.page = totalPages;
+  if (telemetryPageState.page < 1) telemetryPageState.page = 1;
+
+  const startIdx = (telemetryPageState.page - 1) * telemetryPageState.itemsPerPage;
+  const endIdx = Math.min(startIdx + telemetryPageState.itemsPerPage, total);
+  const pagedItems = sorted.slice(startIdx, endIdx);
+
+  // Atualiza controles visuais da barra e rodapé de telemetria
+  const totalBadge = document.getElementById('telemetry-total-badge');
+  const rangeEl = document.getElementById('telemetry-pagination-range');
+  const pageDisplayEl = document.getElementById('telemetry-page-display');
+  const totalPagesEl = document.getElementById('telemetry-total-pages-display');
+  const btnPrev = document.getElementById('btn-telemetry-prev');
+  const btnNext = document.getElementById('btn-telemetry-next');
+
+  if (totalBadge) {
+    totalBadge.textContent = `${total} mediç${total === 1 ? 'ão' : 'ões'}`;
+  }
+  if (rangeEl) {
+    rangeEl.textContent = total > 0 ? `Exibindo ${startIdx + 1} a ${endIdx} de ${total}` : 'Exibindo 0 a 0 de 0';
+  }
+  if (pageDisplayEl) pageDisplayEl.textContent = String(telemetryPageState.page);
+  if (totalPagesEl) totalPagesEl.textContent = String(totalPages);
+  if (btnPrev) btnPrev.disabled = telemetryPageState.page <= 1;
+  if (btnNext) btnNext.disabled = telemetryPageState.page >= totalPages;
+
+  if (pagedItems.length === 0) {
+    telemetryTableBody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center text-muted py-4">
+          Nenhuma medição encontrada para os filtros selecionados.
+        </td>
+      </tr>
+    `;
     return;
   }
 
-  const isHistorical = diagnostic ? !!diagnostic.is_historical_fallback : false;
-  const recent = [...series].reverse().slice(0, 15);
-
-  telemetryTableBody.innerHTML = recent.map(item => {
+  telemetryTableBody.innerHTML = pagedItems.map(item => {
     const d = new Date(item.timestamp);
     const dateFormatted = `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR')}`;
     const id = item.node_id || item.NodeID;
-    const isOld = isHistorical || (Date.now() - d.getTime() > 3 * 3600 * 1000);
+    const isOld = (Date.now() - d.getTime() > 3 * 3600 * 1000);
 
     const badgeHtml = isOld
       ? '<span class="dc-health-badge stale" style="display:inline-flex;">● Histórico</span>'
@@ -3226,14 +3255,15 @@ function renderTelemetryTable(series, diagnostic) {
         <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${dateFormatted}</td>
         <td><span class="telemetry-node-tag">${escapeHtml(id)}</span></td>
         <td>${escapeHtml(item.location || 'Desconhecido')}</td>
-        <td>${item.download_mbps > 0 ? `<strong style="color: var(--accent-cyan);">${item.download_mbps.toFixed(1)}</strong> Mbps` : `<span class="text-subtle font-mono">--</span>`}</td>
-        <td>${item.upload_mbps > 0 ? `<strong style="color: #c084fc;">${item.upload_mbps.toFixed(1)}</strong> Mbps` : `<span class="text-subtle font-mono">--</span>`}</td>
-        <td><strong style="color: #34d399;">${item.ping_gateway.toFixed(1)}</strong> ms</td>
-        <td>${badgeHtml}</td>
+        <td class="text-right">${item.download_mbps > 0 ? `<strong style="color: var(--accent-cyan);">${item.download_mbps.toFixed(1)}</strong> <small>Mbps</small>` : `<span class="text-subtle font-mono">--</span>`}</td>
+        <td class="text-right">${item.upload_mbps > 0 ? `<strong style="color: #c084fc;">${item.upload_mbps.toFixed(1)}</strong> <small>Mbps</small>` : `<span class="text-subtle font-mono">--</span>`}</td>
+        <td class="text-right"><strong style="color: #34d399;">${item.ping_gateway.toFixed(1)}</strong> <small>ms</small></td>
+        <td class="text-right">${badgeHtml}</td>
       </tr>
     `;
   }).join('');
 }
+window.applyTelemetryFilters = applyTelemetryFilters;
 
 /* ==========================================================================
    9. Utilitários & Toasts (Snappy)
@@ -3369,13 +3399,21 @@ function applyMachineFilters() {
       if (!hasModule) return false;
     }
 
-    // 4. Filtro por Dia (last_seen)
+    // 4. Filtro por Dia (Último Sinal)
     if (machineFilterState.date) {
-      const lastSeenStr = m.last_seen || (summary && summary.last_seen);
-      if (!lastSeenStr) return false;
-      const d = new Date(lastSeenStr);
-      if (isNaN(d.getTime())) return false;
-      const dStr = d.toLocaleDateString('en-CA');
+      let lastDate = null;
+      if (summary && summary.last_seen) {
+        const ds = new Date(summary.last_seen);
+        if (!isNaN(ds.getTime())) lastDate = ds;
+      }
+      if (m.last_seen) {
+        const dm = new Date(m.last_seen);
+        if (!isNaN(dm.getTime()) && (!lastDate || dm > lastDate)) {
+          lastDate = dm;
+        }
+      }
+      if (!lastDate) return false;
+      const dStr = lastDate.toLocaleDateString('en-CA');
       if (dStr !== machineFilterState.date) return false;
     }
 
@@ -3449,7 +3487,19 @@ function renderMachinesTable(machines) {
 
   machinesTableBody.innerHTML = machines.map(m => {
     const summary = currentSummaries.find(s => s.node_id === m.hostname);
-    const isOnline = summary ? summary.is_healthy : (m.last_seen && (Date.now() - new Date(m.last_seen).getTime()) < 15 * 60 * 1000);
+    let effectiveLastDate = null;
+    if (summary && summary.last_seen) {
+      const ds = new Date(summary.last_seen);
+      if (!isNaN(ds.getTime())) effectiveLastDate = ds;
+    }
+    if (m.last_seen) {
+      const dm = new Date(m.last_seen);
+      if (!isNaN(dm.getTime()) && (!effectiveLastDate || dm > effectiveLastDate)) {
+        effectiveLastDate = dm;
+      }
+    }
+
+    const isOnline = summary ? summary.is_healthy : (effectiveLastDate && (Date.now() - effectiveLastDate.getTime()) < 15 * 60 * 1000);
     const statusClass = isOnline ? 'online' : 'stale';
     const statusText = isOnline ? 'Online' : 'Sem sinal';
 
@@ -3504,8 +3554,7 @@ function renderMachinesTable(machines) {
       : '<span class="text-subtle">--</span>';
 
     // Tempo decorrido
-    const lastDate = m.last_seen ? new Date(m.last_seen) : (summary ? new Date(summary.last_seen) : null);
-    const timeAgo = lastDate ? formatTimeAgo(lastDate) : '--';
+    const timeAgo = effectiveLastDate ? formatTimeAgo(effectiveLastDate) : '--';
 
     // Select de troca rápida de grupo (ou badge)
     let groupSelectHtml = `<span class="badge-group-tag">${escapeHtml(grpName)}</span>`;
