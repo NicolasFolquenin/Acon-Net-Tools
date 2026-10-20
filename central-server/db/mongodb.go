@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"central-server/config"
@@ -158,19 +159,32 @@ func (m *MongoDBClient) InsertMetric(ctx context.Context, payload *models.Metric
 	return nil
 }
 
-// GetMetricsLast24Hours busca os dados das últimas 24 horas ordenados por timestamp
-func (m *MongoDBClient) GetMetricsLast24Hours(ctx context.Context, nodeIDFilter string, hoursLimit int) ([]models.FlattenedMetricItem, error) {
-	if hoursLimit <= 0 {
-		hoursLimit = 24
+// GetMetricsByQuery busca as métricas com filtro de nó, intervalo de horas ou data específica (YYYY-MM-DD)
+func (m *MongoDBClient) GetMetricsByQuery(ctx context.Context, nodeIDFilter string, hoursLimit int, dateFilter string) ([]models.FlattenedMetricItem, error) {
+	if m.Collection == nil {
+		return nil, fmt.Errorf("colecao mongodb nao inicializada")
 	}
-	since := time.Now().UTC().Add(-time.Duration(hoursLimit) * time.Hour)
 
-	filter := bson.M{
-		"timestamp": bson.M{"$gte": since},
-	}
+	filter := bson.M{}
 
 	if nodeIDFilter != "" && nodeIDFilter != "all" {
 		filter["metadata.node_id"] = nodeIDFilter
+	}
+
+	if strings.TrimSpace(dateFilter) != "" {
+		tDay, err := time.Parse("2006-01-02", strings.TrimSpace(dateFilter))
+		if err == nil {
+			// Janela do dia cobrindo diferenças de fusos (UTC-4 a UTC+4)
+			start := tDay.Add(-4 * time.Hour)
+			end := tDay.Add(28 * time.Hour)
+			filter["timestamp"] = bson.M{
+				"$gte": start,
+				"$lt":  end,
+			}
+		}
+	} else if hoursLimit > 0 {
+		since := time.Now().UTC().Add(-time.Duration(hoursLimit) * time.Hour)
+		filter["timestamp"] = bson.M{"$gte": since}
 	}
 
 	findOpts := options.Find().SetSort(bson.D{{Key: "timestamp", Value: 1}}) // Ordenação cronológica
@@ -207,6 +221,11 @@ func (m *MongoDBClient) GetMetricsLast24Hours(ctx context.Context, nodeIDFilter 
 	}
 
 	return results, nil
+}
+
+// GetMetricsLast24Hours busca os dados mantendo compatibilidade chamando GetMetricsByQuery
+func (m *MongoDBClient) GetMetricsLast24Hours(ctx context.Context, nodeIDFilter string, hoursLimit int) ([]models.FlattenedMetricItem, error) {
+	return m.GetMetricsByQuery(ctx, nodeIDFilter, hoursLimit, "")
 }
 
 // GetLatestMetricForNode busca a leitura mais recente de um nó específico sem restrição de 24h

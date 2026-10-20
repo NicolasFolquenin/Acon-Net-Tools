@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -99,13 +100,23 @@ func (h *MetricsHandler) GetDashboardMetrics(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 
 	nodeFilter := r.URL.Query().Get("node_id")
-	hoursLimit := h.cfg.QueryHoursLimit
+	dateFilter := r.URL.Query().Get("date")
+	hoursLimit := 720 // Padrão: 30 dias (720h) para garantir que histórico recente e medições anteriores nunca sejam excluídos
+	if hoursParam := r.URL.Query().Get("hours"); hoursParam != "" {
+		if hoursParam == "all" || hoursParam == "0" {
+			hoursLimit = 0 // Sem limite temporal
+		} else if hVal, err := strconv.Atoi(hoursParam); err == nil && hVal > 0 {
+			hoursLimit = hVal
+		}
+	} else if h.cfg.QueryHoursLimit > 0 && h.cfg.QueryHoursLimit != 24 {
+		hoursLimit = h.cfg.QueryHoursLimit
+	}
 
 	ctx, cancel := contextWithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	// Busca séries temporais das últimas 24 horas
-	series, err := h.db.GetMetricsLast24Hours(ctx, nodeFilter, hoursLimit)
+	// Busca séries temporais com suporte a hours e date no MongoDB
+	series, err := h.db.GetMetricsByQuery(ctx, nodeFilter, hoursLimit, dateFilter)
 	if err != nil {
 		log.Printf("[API][ERRO] Falha na consulta de dashboard: %v", err)
 		series = []models.FlattenedMetricItem{}
