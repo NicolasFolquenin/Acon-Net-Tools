@@ -48,6 +48,7 @@ func main() {
 	machineProfileHandler := handlers.NewMachineProfileHandler(cfg, mongoClient)
 	groupsHandler := handlers.NewGroupsHandler(mongoClient, cfg)
 	modulesHandler := handlers.NewModulesHandler(cfg, mongoClient)
+	pingHandler := handlers.NewPingHandler(mongoClient)
 
 	mux := http.NewServeMux()
 
@@ -109,6 +110,7 @@ func main() {
 	mux.HandleFunc("/api/v1/admin/groups/", authHandler.RequireAdmin(machineProfileHandler.HandleAdminGroups))
 	mux.HandleFunc("/api/v1/admin/modules", authHandler.RequireAdmin(modulesHandler.HandleModules))
 	mux.HandleFunc("/api/v1/admin/modules/", authHandler.RequireAdmin(modulesHandler.HandleModules))
+	mux.HandleFunc("/api/v1/admin/ping", authHandler.RequireAdmin(pingHandler.AdminPing))
 
 	// Endpoints de Grupos de Testes e VLANs (compatibilidade com dashboard e sondas legadas)
 	mux.HandleFunc("/api/v1/config/probe", handlers.RequireBearerToken(cfg.APIToken, groupsHandler.GetProbeConfig))

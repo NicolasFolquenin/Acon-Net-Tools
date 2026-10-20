@@ -183,7 +183,13 @@
             </div>
 
             <div class="sm-actions">
-              <button id="btn-exit-single-machine" class="btn btn-sm btn-outline-cyan" title="Retornar à visão de todas as sondas">
+              <button type="button" id="btn-sm-ping" class="btn btn-sm btn-outline-cyan" title="Disparar teste de ping em tempo real para esta máquina">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right: 6px;">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+                Forçar Ping
+              </button>
+              <button id="btn-exit-single-machine" class="btn btn-sm btn-glass" title="Retornar à visão de todas as sondas">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right: 6px;">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -496,17 +502,31 @@
               </button>
             </div>
           </div>
+
+          <!-- Barra de Ferramentas com Filtro por Dia igual ao Aplicativo -->
+          <div class="table-toolbar telemetry-toolbar" style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <label for="telemetry-date-filter" class="text-xs text-muted" style="font-weight: 500;">Filtrar Dia:</label>
+              <input type="date" id="telemetry-date-filter" class="date-input-ctrl" title="Selecione um dia específico para filtrar a telemetria" />
+              <button type="button" id="btn-telemetry-filter-today" class="pagination-btn" title="Filtrar medições de hoje">Hoje</button>
+              <button type="button" id="btn-telemetry-filter-all" class="pagination-btn" title="Exibir todas as medições">Todas as Datas</button>
+            </div>
+            <div>
+              <span id="telemetry-total-badge" class="count-badge">0 medições</span>
+            </div>
+          </div>
+
           <div class="table-container" id="telemetry-table-container">
             <table class="telemetry-table">
               <thead>
                 <tr>
-                  <th>Timestamp (UTC)</th>
+                  <th style="width: 170px;">Timestamp (UTC)</th>
                   <th>Nó (Node ID)</th>
                   <th>Localização</th>
-                  <th style="text-align: right;">Download</th>
-                  <th style="text-align: right;">Upload</th>
-                  <th style="text-align: right;">Ping Gateway</th>
-                  <th>Status</th>
+                  <th style="text-align: right; width: 120px;">Download</th>
+                  <th style="text-align: right; width: 120px;">Upload</th>
+                  <th style="text-align: right; width: 110px;">Ping Gateway</th>
+                  <th style="text-align: right; width: 130px;">Status</th>
                 </tr>
               </thead>
               <tbody id="telemetry-table-body">
@@ -515,6 +535,24 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Rodapé de Paginação (15 itens por página) -->
+          <div class="table-pagination-footer" id="telemetry-pagination-footer" style="margin-top: 12px;">
+            <div class="text-xs text-muted">
+              <span id="telemetry-pagination-range">Exibindo 0 a 0 de 0</span> • 15 por página
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" id="btn-telemetry-prev" class="pagination-btn" disabled title="Página Anterior">
+                &larr; Anterior
+              </button>
+              <span class="text-xs font-mono" style="padding: 0 4px; color: var(--text-secondary);">
+                Página <strong id="telemetry-page-display" style="color: var(--text-primary);">1</strong> de <strong id="telemetry-total-pages-display" style="color: var(--text-primary);">1</strong>
+              </span>
+              <button type="button" id="btn-telemetry-next" class="pagination-btn" disabled title="Próxima Página">
+                Próxima &rarr;
+              </button>
+            </div>
           </div>
         </section>
       </div> <!-- /#view-dashboard -->
@@ -635,6 +673,13 @@
               </select>
             </div>
 
+            <div class="filter-select-group" style="display: flex; align-items: center; gap: 6px;">
+              <label for="machines-date-filter" style="font-size: 0.78rem; font-weight: 500;">Filtrar Dia:</label>
+              <input type="date" id="machines-date-filter" class="date-input-ctrl" title="Filtrar máquinas pela data do último sinal" />
+              <button type="button" id="btn-machines-filter-today" class="pagination-btn" title="Filtrar máquinas com sinal hoje">Hoje</button>
+              <button type="button" id="btn-machines-filter-all" class="pagination-btn" title="Todas as datas">Todas</button>
+            </div>
+
             <div class="filter-count-badge">
               <span id="machines-filter-count">0 máquinas</span>
             </div>
@@ -647,14 +692,14 @@
             <table class="data-table machines-table">
               <thead>
                 <tr>
-                  <th>Status</th>
+                  <th style="width: 110px;">Status</th>
                   <th>Máquina (Hostname)</th>
                   <th>IP / MAC</th>
                   <th>Grupo Vinculado</th>
                   <th>Módulos Ativos</th>
-                  <th>Switch / Porta</th>
-                  <th>Último Sinal</th>
-                  <th style="text-align: right;">Ações</th>
+                  <th style="text-align: right;">Switch / Porta</th>
+                  <th style="text-align: right;">Último Sinal</th>
+                  <th style="text-align: right; width: 170px;">Ações</th>
                 </tr>
               </thead>
               <tbody id="machines-table-body">
@@ -663,6 +708,24 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Rodapé de Paginação de Máquinas (15 itens por página) -->
+          <div class="table-pagination-footer" id="machines-pagination-footer" style="padding: 12px 18px; border-top: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div class="text-xs text-muted">
+              <span id="machines-pagination-range">Exibindo 0 a 0 de 0</span> • 15 por página
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" id="btn-machines-prev" class="pagination-btn" disabled title="Página Anterior">
+                &larr; Anterior
+              </button>
+              <span class="text-xs font-mono" style="padding: 0 4px; color: var(--text-secondary);">
+                Página <strong id="machines-page-display" style="color: var(--text-primary);">1</strong> de <strong id="machines-total-pages-display" style="color: var(--text-primary);">1</strong>
+              </span>
+              <button type="button" id="btn-machines-next" class="pagination-btn" disabled title="Próxima Página">
+                Próxima &rarr;
+              </button>
+            </div>
           </div>
         </div>
       </div> <!-- /#view-machines -->
@@ -1718,6 +1781,84 @@
             </div>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Diagnóstico de Ping Forçado pelo Administrador -->
+  <div id="modal-ping-diagnostic" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog modal-md">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-badge cyan">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+          <div>
+            <h3 class="modal-title">Diagnóstico de Ping ICMP</h3>
+            <p class="modal-subtitle">Teste de conectividade em tempo real a partir do Central Server</p>
+          </div>
+        </div>
+        <button type="button" class="btn-close-modal" id="btn-close-ping-modal" title="Fechar">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="ping-target-banner">
+          <div>
+            <span class="ping-target-label">MÁQUINA ALVO:</span>
+            <strong id="ping-modal-hostname" class="ping-target-name font-mono">--</strong>
+          </div>
+          <div style="text-align: right;">
+            <span class="ping-target-label">IP DE DESTINO:</span>
+            <span id="ping-modal-ip" class="ping-target-ip font-mono text-cyan">--</span>
+          </div>
+        </div>
+
+        <div id="ping-loading-state" class="ping-loading-wrap" style="display: none;">
+          <div class="spinner" style="width: 28px; height: 28px; margin: 0 auto 12px;"></div>
+          <p class="text-white font-bold mb-1">Disparando pacotes ICMP para a sonda...</p>
+          <p class="text-subtle text-xs">Aguardando resposta de 4 amostras (timeout: 10s)</p>
+        </div>
+
+        <div id="ping-result-content" style="display: none;">
+          <div class="ping-stats-grid">
+            <div class="ping-stat-card">
+              <span class="ping-stat-title">Status</span>
+              <span id="ping-stat-status" class="dc-health-badge online">Conectado</span>
+              <span id="ping-stat-sub" class="ping-stat-detail">4 de 4 recebidos</span>
+            </div>
+            <div class="ping-stat-card">
+              <span class="ping-stat-title">Latência Média</span>
+              <div class="ping-stat-val text-cyan font-mono"><span id="ping-stat-avg">--</span> <small>ms</small></div>
+              <span class="ping-stat-detail">Mín: <span id="ping-stat-min">--</span>ms • Máx: <span id="ping-stat-max">--</span>ms</span>
+            </div>
+            <div class="ping-stat-card">
+              <span class="ping-stat-title">Perda de Pacotes</span>
+              <div class="ping-stat-val text-emerald font-mono"><span id="ping-stat-loss">0</span><small>%</small></div>
+              <span id="ping-stat-loss-desc" class="ping-stat-detail">Sem perda de pacotes</span>
+            </div>
+          </div>
+
+          <div class="ping-terminal-wrap">
+            <div class="ping-terminal-header">
+              <span>Terminal Output (ping command)</span>
+              <span id="ping-terminal-time" class="text-xs text-subtle font-mono">--</span>
+            </div>
+            <pre id="ping-terminal-output" class="ping-terminal-body">Aguardando execução...</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-retest-ping" class="btn btn-outline-cyan btn-sm">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right: 6px;">
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Testar Novamente
+        </button>
+        <button type="button" id="btn-close-ping-modal-footer" class="btn btn-glass btn-sm">Fechar</button>
       </div>
     </div>
   </div>

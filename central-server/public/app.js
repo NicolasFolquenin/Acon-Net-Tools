@@ -86,7 +86,23 @@ const machineFilterState = {
   search: '',
   group: 'all',
   module: 'all',
-  status: 'all'
+  status: 'all',
+  date: ''
+};
+
+const machinesPaginationState = {
+  page: 1,
+  itemsPerPage: 15
+};
+
+const telemetryPaginationState = {
+  page: 1,
+  itemsPerPage: 15
+};
+
+let currentPingTarget = {
+  hostname: '',
+  ip: ''
 };
 
 
@@ -789,22 +805,71 @@ function setupEventListeners() {
   }
 
 
-  // Filtros em Tempo Real da Tabela de Nós
+  // Filtros em Tempo Real da Tabela de Nós (Telemetria)
   if (nodesSearchInput) {
     nodesSearchInput.addEventListener('input', (e) => {
       nodeFilterState.search = e.target.value.toLowerCase().trim();
+      telemetryPaginationState.page = 1;
       applyNodeFilters();
     });
   }
   if (nodesStatusFilter) {
     nodesStatusFilter.addEventListener('change', (e) => {
       nodeFilterState.status = e.target.value;
+      telemetryPaginationState.page = 1;
       applyNodeFilters();
     });
   }
   if (nodesGroupFilter) {
     nodesGroupFilter.addEventListener('change', (e) => {
       nodeFilterState.group = e.target.value;
+      telemetryPaginationState.page = 1;
+      applyNodeFilters();
+    });
+  }
+
+  // Filtro de Data e Paginação da Telemetria (Dashboard)
+  const telemetryDateFilter = document.getElementById('telemetry-date-filter');
+  const btnTelemetryFilterToday = document.getElementById('btn-telemetry-filter-today');
+  const btnTelemetryFilterAll = document.getElementById('btn-telemetry-filter-all');
+  const btnTelemetryPrev = document.getElementById('btn-telemetry-prev');
+  const btnTelemetryNext = document.getElementById('btn-telemetry-next');
+
+  if (telemetryDateFilter) {
+    telemetryDateFilter.addEventListener('change', (e) => {
+      nodeFilterState.date = e.target.value;
+      telemetryPaginationState.page = 1;
+      applyNodeFilters();
+    });
+  }
+  if (btnTelemetryFilterToday) {
+    btnTelemetryFilterToday.addEventListener('click', () => {
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      nodeFilterState.date = todayStr;
+      if (telemetryDateFilter) telemetryDateFilter.value = todayStr;
+      telemetryPaginationState.page = 1;
+      applyNodeFilters();
+    });
+  }
+  if (btnTelemetryFilterAll) {
+    btnTelemetryFilterAll.addEventListener('click', () => {
+      nodeFilterState.date = '';
+      if (telemetryDateFilter) telemetryDateFilter.value = '';
+      telemetryPaginationState.page = 1;
+      applyNodeFilters();
+    });
+  }
+  if (btnTelemetryPrev) {
+    btnTelemetryPrev.addEventListener('click', () => {
+      if (telemetryPaginationState.page > 1) {
+        telemetryPaginationState.page--;
+        applyNodeFilters();
+      }
+    });
+  }
+  if (btnTelemetryNext) {
+    btnTelemetryNext.addEventListener('click', () => {
+      telemetryPaginationState.page++;
       applyNodeFilters();
     });
   }
@@ -880,26 +945,101 @@ function setupEventListeners() {
   if (machinesSearchInput) {
     machinesSearchInput.addEventListener('input', (e) => {
       machineFilterState.search = e.target.value.toLowerCase().trim();
+      machinesPaginationState.page = 1;
       applyMachineFilters();
     });
   }
   if (machinesGroupFilter) {
     machinesGroupFilter.addEventListener('change', (e) => {
       machineFilterState.group = e.target.value;
+      machinesPaginationState.page = 1;
       applyMachineFilters();
     });
   }
   if (machinesModuleFilter) {
     machinesModuleFilter.addEventListener('change', (e) => {
       machineFilterState.module = e.target.value;
+      machinesPaginationState.page = 1;
       applyMachineFilters();
     });
   }
   if (machinesStatusFilter) {
     machinesStatusFilter.addEventListener('change', (e) => {
       machineFilterState.status = e.target.value;
+      machinesPaginationState.page = 1;
       applyMachineFilters();
     });
+  }
+
+  // Filtro de Data e Paginação da Tabela de Máquinas
+  const machinesDateFilter = document.getElementById('machines-date-filter');
+  const btnMachinesFilterToday = document.getElementById('btn-machines-filter-today');
+  const btnMachinesFilterAll = document.getElementById('btn-machines-filter-all');
+  const btnMachinesPrev = document.getElementById('btn-machines-prev');
+  const btnMachinesNext = document.getElementById('btn-machines-next');
+
+  if (machinesDateFilter) {
+    machinesDateFilter.addEventListener('change', (e) => {
+      machineFilterState.date = e.target.value;
+      machinesPaginationState.page = 1;
+      applyMachineFilters();
+    });
+  }
+  if (btnMachinesFilterToday) {
+    btnMachinesFilterToday.addEventListener('click', () => {
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      machineFilterState.date = todayStr;
+      if (machinesDateFilter) machinesDateFilter.value = todayStr;
+      machinesPaginationState.page = 1;
+      applyMachineFilters();
+    });
+  }
+  if (btnMachinesFilterAll) {
+    btnMachinesFilterAll.addEventListener('click', () => {
+      machineFilterState.date = '';
+      if (machinesDateFilter) machinesDateFilter.value = '';
+      machinesPaginationState.page = 1;
+      applyMachineFilters();
+    });
+  }
+  if (btnMachinesPrev) {
+    btnMachinesPrev.addEventListener('click', () => {
+      if (machinesPaginationState.page > 1) {
+        machinesPaginationState.page--;
+        applyMachineFilters();
+      }
+    });
+  }
+  if (btnMachinesNext) {
+    btnMachinesNext.addEventListener('click', () => {
+      machinesPaginationState.page++;
+      applyMachineFilters();
+    });
+  }
+
+  // Modal de Diagnóstico de Ping Forçado
+  const btnClosePingModal = document.getElementById('btn-close-ping-modal');
+  const btnClosePingModalFooter = document.getElementById('btn-close-ping-modal-footer');
+  const modalPingDiagnostic = document.getElementById('modal-ping-diagnostic');
+  const btnRetestPing = document.getElementById('btn-retest-ping');
+  const btnSmPing = document.getElementById('btn-sm-ping');
+
+  if (btnClosePingModal) btnClosePingModal.addEventListener('click', closePingModal);
+  if (btnClosePingModalFooter) btnClosePingModalFooter.addEventListener('click', closePingModal);
+  if (modalPingDiagnostic) {
+    modalPingDiagnostic.addEventListener('click', (e) => {
+      if (e.target === modalPingDiagnostic) closePingModal();
+    });
+  }
+  if (btnRetestPing) {
+    btnRetestPing.addEventListener('click', () => {
+      if (currentPingTarget.hostname || currentPingTarget.ip) {
+        executeAdminPing(currentPingTarget.hostname, currentPingTarget.ip);
+      }
+    });
+  }
+  if (btnSmPing) {
+    btnSmPing.addEventListener('click', triggerSingleMachinePing);
   }
 
   // Modal de Métricas da Máquina
@@ -2177,7 +2317,8 @@ function renderSingleMachineHeaderAndAlert(diagnostic, summaries) {
 let nodeFilterState = {
   search: '',
   status: 'all',
-  group: 'all'
+  group: 'all',
+  date: ''
 };
 
 function populateGroupFilter(summaries) {
@@ -2224,7 +2365,16 @@ function applyNodeFilters() {
       if ((s.group_name || '') !== groupFilter) return false;
     }
 
-    // 3. Filtro de Texto (hostname, local, ip, switch, vlan)
+    // 3. Filtro por Dia
+    if (nodeFilterState.date) {
+      if (!s.last_seen) return false;
+      const d = new Date(s.last_seen);
+      if (isNaN(d.getTime())) return false;
+      const dStr = d.toLocaleDateString('en-CA');
+      if (dStr !== nodeFilterState.date) return false;
+    }
+
+    // 4. Filtro de Texto (hostname, local, ip, switch, vlan)
     if (query) {
       const matchNodeId = (s.node_id || '').toLowerCase().includes(query);
       const matchLoc = (s.location || '').toLowerCase().includes(query);
@@ -2241,11 +2391,41 @@ function applyNodeFilters() {
     return true;
   });
 
-  if (nodesFilterCount) {
-    nodesFilterCount.textContent = `${filtered.length} de ${currentSummaries.length}`;
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / telemetryPaginationState.itemsPerPage) || 1;
+  if (telemetryPaginationState.page > totalPages) {
+    telemetryPaginationState.page = totalPages;
+  }
+  if (telemetryPaginationState.page < 1) {
+    telemetryPaginationState.page = 1;
   }
 
-  renderNodesTable(filtered);
+  const startIdx = (telemetryPaginationState.page - 1) * telemetryPaginationState.itemsPerPage;
+  const endIdx = Math.min(startIdx + telemetryPaginationState.itemsPerPage, total);
+  const pagedSummaries = filtered.slice(startIdx, endIdx);
+
+  // Elementos do Footer de Paginação de Telemetria
+  const rangeEl = document.getElementById('telemetry-pagination-range');
+  const pageDisplayEl = document.getElementById('telemetry-page-display');
+  const totalPagesEl = document.getElementById('telemetry-total-pages-display');
+  const btnPrev = document.getElementById('btn-telemetry-prev');
+  const btnNext = document.getElementById('btn-telemetry-next');
+  const totalBadge = document.getElementById('telemetry-total-badge');
+
+  if (rangeEl) {
+    rangeEl.textContent = total > 0 ? `Exibindo ${startIdx + 1} a ${endIdx} de ${total}` : 'Exibindo 0 a 0 de 0';
+  }
+  if (pageDisplayEl) pageDisplayEl.textContent = String(telemetryPaginationState.page);
+  if (totalPagesEl) totalPagesEl.textContent = String(totalPages);
+  if (btnPrev) btnPrev.disabled = telemetryPaginationState.page <= 1;
+  if (btnNext) btnNext.disabled = telemetryPaginationState.page >= totalPages;
+  if (totalBadge) totalBadge.textContent = `${total} sondas`;
+
+  if (nodesFilterCount) {
+    nodesFilterCount.textContent = `${total} de ${currentSummaries.length}`;
+  }
+
+  renderNodesTable(pagedSummaries);
 }
 
 function renderSummaryCards(summaries) {
@@ -2378,7 +2558,9 @@ function renderNodesTable(summaries) {
         </td>
         <td>
           <div class="node-cell-main">
-            <span class="node-name-text">${escapeHtml(s.node_id)}</span>
+            <button type="button" class="btn-node-link font-bold font-mono" onclick="selectNodeForCharts('${escapeHtml(s.node_id)}')">
+              ${escapeHtml(s.node_id)}
+            </button>
             ${ipHtml}
           </div>
         </td>
@@ -2402,11 +2584,19 @@ function renderNodesTable(summaries) {
         <td class="text-right">
           <span class="metric-num emerald">${s.last_ping.toFixed(1)} <small>ms</small></span>
         </td>
-        <td>
+        <td class="text-right">
           <span class="text-subtle font-mono">${timeAgo}</span>
         </td>
-        <td class="text-center">
-          <div class="table-actions">
+        <td class="text-right">
+          <div class="table-actions" style="justify-content: flex-end;">
+            ${isAdmin ? `
+            <button type="button" class="btn-table-action" onclick="openPingModal('${escapeHtml(s.node_id)}', '${escapeHtml((s.system_info && s.system_info.ip_address) || '')}')" title="Forçar teste de Ping ICMP" style="color: var(--accent-cyan);">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              <span>Ping</span>
+            </button>
+            ` : ''}
             <button type="button" class="btn-table-action btn-inspect" data-node-id="${escapeHtml(s.node_id)}" title="Inspecionar detalhes da máquina">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"></circle>
@@ -3179,7 +3369,17 @@ function applyMachineFilters() {
       if (!hasModule) return false;
     }
 
-    // 4. Text Search
+    // 4. Filtro por Dia (last_seen)
+    if (machineFilterState.date) {
+      const lastSeenStr = m.last_seen || (summary && summary.last_seen);
+      if (!lastSeenStr) return false;
+      const d = new Date(lastSeenStr);
+      if (isNaN(d.getTime())) return false;
+      const dStr = d.toLocaleDateString('en-CA');
+      if (dStr !== machineFilterState.date) return false;
+    }
+
+    // 5. Text Search
     if (query) {
       const matchHost = (m.hostname || '').toLowerCase().includes(query);
       const matchIp = (m.ip_address || '').toLowerCase().includes(query);
@@ -3195,11 +3395,39 @@ function applyMachineFilters() {
     return true;
   });
 
-  if (machinesFilterCount) {
-    machinesFilterCount.textContent = `${filtered.length} de ${allAdminMachines.length} máquina${allAdminMachines.length !== 1 ? 's' : ''}`;
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / machinesPaginationState.itemsPerPage) || 1;
+  if (machinesPaginationState.page > totalPages) {
+    machinesPaginationState.page = totalPages;
+  }
+  if (machinesPaginationState.page < 1) {
+    machinesPaginationState.page = 1;
   }
 
-  renderMachinesTable(filtered);
+  const startIdx = (machinesPaginationState.page - 1) * machinesPaginationState.itemsPerPage;
+  const endIdx = Math.min(startIdx + machinesPaginationState.itemsPerPage, total);
+  const pagedMachines = filtered.slice(startIdx, endIdx);
+
+  // Controles de Paginação de Máquinas
+  const rangeEl = document.getElementById('machines-pagination-range');
+  const pageDisplayEl = document.getElementById('machines-page-display');
+  const totalPagesEl = document.getElementById('machines-total-pages-display');
+  const btnPrev = document.getElementById('btn-machines-prev');
+  const btnNext = document.getElementById('btn-machines-next');
+
+  if (rangeEl) {
+    rangeEl.textContent = total > 0 ? `Exibindo ${startIdx + 1} a ${endIdx} de ${total}` : 'Exibindo 0 a 0 de 0';
+  }
+  if (pageDisplayEl) pageDisplayEl.textContent = String(machinesPaginationState.page);
+  if (totalPagesEl) totalPagesEl.textContent = String(totalPages);
+  if (btnPrev) btnPrev.disabled = machinesPaginationState.page <= 1;
+  if (btnNext) btnNext.disabled = machinesPaginationState.page >= totalPages;
+
+  if (machinesFilterCount) {
+    machinesFilterCount.textContent = `${total} de ${allAdminMachines.length} máquina${allAdminMachines.length !== 1 ? 's' : ''}`;
+  }
+
+  renderMachinesTable(pagedMachines);
 }
 
 function renderMachinesTable(machines) {
@@ -3299,7 +3527,9 @@ function renderMachinesTable(machines) {
         </td>
         <td>
           <div class="node-cell-main">
-            <span class="node-name-text font-bold">${escapeHtml(m.hostname)}</span>
+            <button type="button" class="btn-node-link font-bold font-mono" onclick="navigateToMachineDashboard('${escapeHtml(m.hostname)}')">
+              ${escapeHtml(m.hostname)}
+            </button>
             <span class="node-sub-ip">${escapeHtml(m.ip_address || '--')}</span>
           </div>
         </td>
@@ -3317,10 +3547,16 @@ function renderMachinesTable(machines) {
             ${modulesBadgeHtml}
           </div>
         </td>
-        <td>${switchHtml}</td>
-        <td><span class="text-subtle font-mono">${timeAgo}</span></td>
+        <td style="text-align: right;">${switchHtml}</td>
+        <td style="text-align: right;"><span class="text-subtle font-mono">${timeAgo}</span></td>
         <td style="text-align: right;">
           <div class="table-actions" style="justify-content: flex-end;">
+            ${isAdmin ? `
+            <button type="button" class="btn btn-outline-cyan btn-sm" onclick="openPingModal('${escapeHtml(m.hostname)}', '${escapeHtml(m.ip_address || '')}')" title="Forçar Ping ICMP nesta máquina">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              <span>Ping</span>
+            </button>
+            ` : ''}
             <button type="button" class="btn btn-glass btn-sm" onclick="openMachineMetricsModal('${escapeHtml(m.hostname)}')" title="Visualizar gráficos e estatísticas da máquina">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
               <span>Gráficos</span>
@@ -4187,4 +4423,160 @@ async function handleSaveModuleUploadSubmit() {
     if (btnSubmitUploadMod) { btnSubmitUploadMod.disabled = false; btnSubmitUploadMod.innerHTML = '<span>Salvar no Catálogo</span>'; }
   }
 }
+
+/* ==========================================================================
+   14. Navegação para Dashboard da Máquina & Diagnóstico de Ping ICMP
+   ========================================================================== */
+
+function navigateToMachineDashboard(hostname) {
+  if (!hostname) return;
+  // Alterna para a visualização do Dashboard
+  switchView('dashboard');
+
+  // Se a máquina clicada for diferente da atualmente focada, foca nela
+  if (selectedChartNode !== hostname) {
+    selectNodeForCharts(hostname);
+  } else {
+    // Rola suavemente até o cabeçalho da máquina única
+    setTimeout(() => {
+      const topTarget = document.getElementById('single-machine-header') || document.getElementById('view-dashboard');
+      if (topTarget) {
+        topTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 80);
+  }
+}
+window.navigateToMachineDashboard = navigateToMachineDashboard;
+
+function openPingModal(hostname, ipAddress) {
+  const modal = document.getElementById('modal-ping-diagnostic');
+  if (!modal) return;
+
+  // Se não foi passado IP, tenta buscar nos resumos ou lista de máquinas
+  let targetIp = (ipAddress || '').trim();
+  if (!targetIp && hostname) {
+    const summary = currentSummaries.find(s => s.node_id === hostname);
+    if (summary && summary.system_info && summary.system_info.ip_address) {
+      targetIp = summary.system_info.ip_address;
+    } else {
+      const m = allAdminMachines.find(item => item.hostname === hostname);
+      if (m && m.ip_address) targetIp = m.ip_address;
+    }
+  }
+
+  currentPingTarget = {
+    hostname: hostname || '',
+    ip: targetIp || hostname || ''
+  };
+
+  const hostEl = document.getElementById('ping-modal-hostname');
+  const ipEl = document.getElementById('ping-modal-ip');
+  if (hostEl) hostEl.textContent = hostname || '--';
+  if (ipEl) ipEl.textContent = targetIp || hostname || '--';
+
+  modal.style.display = 'flex';
+  executeAdminPing(currentPingTarget.hostname, currentPingTarget.ip);
+}
+window.openPingModal = openPingModal;
+
+function closePingModal() {
+  const modal = document.getElementById('modal-ping-diagnostic');
+  if (modal) modal.style.display = 'none';
+}
+window.closePingModal = closePingModal;
+
+async function executeAdminPing(hostname, target) {
+  const loadingEl = document.getElementById('ping-loading-state');
+  const resultEl = document.getElementById('ping-result-content');
+  const retestBtn = document.getElementById('btn-retest-ping');
+  const terminalOutput = document.getElementById('ping-terminal-output');
+  const terminalTime = document.getElementById('ping-terminal-time');
+
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (resultEl) resultEl.style.display = 'none';
+  if (retestBtn) retestBtn.disabled = true;
+
+  try {
+    const res = await apiFetch('/api/v1/admin/ping', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hostname: hostname || target,
+        target: target || hostname
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Falha ao executar teste de ping');
+    }
+
+    // Atualiza estatísticas do Modal
+    const statStatus = document.getElementById('ping-stat-status');
+    const statSub = document.getElementById('ping-stat-sub');
+    const statAvg = document.getElementById('ping-stat-avg');
+    const statMin = document.getElementById('ping-stat-min');
+    const statMax = document.getElementById('ping-stat-max');
+    const statLoss = document.getElementById('ping-stat-loss');
+    const statLossDesc = document.getElementById('ping-stat-loss-desc');
+
+    const isAlive = !!data.is_alive;
+    if (statStatus) {
+      statStatus.textContent = isAlive ? 'Conectado' : 'Sem Resposta';
+      statStatus.className = `dc-health-badge ${isAlive ? 'online' : 'stale'}`;
+    }
+
+    const loss = typeof data.packet_loss === 'number' ? data.packet_loss : 100;
+    const received = Math.round(4 * (1 - loss / 100));
+    if (statSub) {
+      statSub.textContent = `${received} de 4 pacotes recebidos`;
+    }
+
+    if (statAvg) statAvg.textContent = (data.avg_ms > 0 ? data.avg_ms.toFixed(1) : '--');
+    if (statMin) statMin.textContent = (data.min_ms > 0 ? data.min_ms.toFixed(1) : '--');
+    if (statMax) statMax.textContent = (data.max_ms > 0 ? data.max_ms.toFixed(1) : '--');
+
+    if (statLoss) statLoss.textContent = loss.toFixed(0);
+    if (statLossDesc) {
+      if (loss === 0) statLossDesc.textContent = 'Sem perda de pacotes (100% íntegro)';
+      else if (loss === 100) statLossDesc.textContent = '100% de perda (Host inacessível)';
+      else statLossDesc.textContent = `${loss.toFixed(0)}% de perda intermitente`;
+    }
+
+    if (terminalTime) {
+      terminalTime.textContent = new Date().toLocaleTimeString('pt-BR');
+    }
+    if (terminalOutput) {
+      terminalOutput.textContent = data.raw_output || 'Sem saída de comando retornada.';
+    }
+
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (resultEl) resultEl.style.display = 'block';
+  } catch (err) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (resultEl) resultEl.style.display = 'block';
+    if (terminalOutput) {
+      terminalOutput.textContent = `Erro ao disparar ping: ${err.message}\nCertifique-se de que o Central Server tem privilégios de rede ICMP.`;
+    }
+    const statStatus = document.getElementById('ping-stat-status');
+    if (statStatus) {
+      statStatus.textContent = 'Erro de Execução';
+      statStatus.className = 'dc-health-badge stale';
+    }
+    showToast(`Erro no diagnóstico de ping: ${err.message}`, 'toast-error');
+  } finally {
+    if (retestBtn) retestBtn.disabled = false;
+  }
+}
+window.executeAdminPing = executeAdminPing;
+
+function triggerSingleMachinePing() {
+  if (!selectedChartNode || selectedChartNode === 'all') {
+    showToast('Selecione uma máquina específica no Dashboard para disparar o ping.', 'toast-warning');
+    return;
+  }
+  openPingModal(selectedChartNode, '');
+}
+window.triggerSingleMachinePing = triggerSingleMachinePing;
+
 
