@@ -433,6 +433,7 @@ async function checkOIDCConfig() {
 
 function setAuthenticatedUser(user) {
   currentUser = user;
+  document.body.classList.remove('auth-mode');
   if (loginModalOverlay) loginModalOverlay.style.display = 'none';
 
   if (navUsername) navUsername.textContent = user.username;
@@ -466,6 +467,7 @@ function setAuthenticatedUser(user) {
 
 function showLoginModal(mode = 'gateway') {
   currentUser = null;
+  document.body.classList.add('auth-mode');
   if (loginModalOverlay) loginModalOverlay.style.display = 'flex';
 
   if (mode === 'login') {
