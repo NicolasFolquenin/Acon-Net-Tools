@@ -47,9 +47,22 @@ Write-Host "[OK] Executavel gerado: build\bin\uepg-net-tools.exe" -ForegroundCol
 Copy-Item "config.json" -Destination "build/bin/config.json" -Force
 if (Test-Path ".env.example") { Copy-Item ".env.example" -Destination "build/bin/.env.example" -Force }
 
-# 5. Verificacao do NSIS para gerar instalador
+# 5. Compilando assistente nativo de instalacao (com pop-up, atalhos e selecao de pasta)
+Write-Host "[4/5] Compilando assistente nativo de instalacao (pop-up, atalhos, selecao de pasta)..." -ForegroundColor Yellow
+if (-not (Test-Path "cmd/installer/payload")) { New-Item -ItemType Directory -Path "cmd/installer/payload" | Out-Null }
+Copy-Item "build/bin/uepg-net-tools.exe" -Destination "cmd/installer/payload/uepg-net-tools.exe" -Force
+Copy-Item "config.json" -Destination "cmd/installer/payload/config.json" -Force
+Copy-Item "build/windows/icon.ico" -Destination "cmd/installer/payload/icon.ico" -Force
+if (Test-Path "rsrc_windows_amd64.syso") { Copy-Item "rsrc_windows_amd64.syso" -Destination "cmd/installer/rsrc_windows_amd64.syso" -Force }
+
+& $goCmd build -ldflags "-H windowsgui" -o "build/bin/UEPG-Net-Tools-Instalador.exe" ./cmd/installer
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "[OK] Instalador oficial gerado: build\bin\UEPG-Net-Tools-Instalador.exe" -ForegroundColor Green
+}
+
+# 6. Verificacao do NSIS para gerar instalador adicional (opcional)
 Write-Host ""
-Write-Host "[4/4] Verificando gerador de instalador (NSIS)..." -ForegroundColor Yellow
+Write-Host "[5/5] Verificando gerador adicional NSIS (opcional)..." -ForegroundColor Yellow
 
 $makensis = $null
 if (Get-Command makensis -ErrorAction SilentlyContinue) {
@@ -62,29 +75,13 @@ if (Get-Command makensis -ErrorAction SilentlyContinue) {
 
 if ($makensis) {
     Write-Host "[OK] NSIS detectado: $makensis" -ForegroundColor Green
-    Write-Host "     Gerando assistente oficial de instalacao..." -ForegroundColor Gray
+    Write-Host "     Gerando assistente oficial com NSIS..." -ForegroundColor Gray
     Push-Location "build/windows"
     & $makensis installer.nsi
     Pop-Location
-    if (Test-Path "build/bin/UEPG-Net-Tools-Instalador.exe") {
-        Write-Host ""
-        Write-Host "==============================================================================" -ForegroundColor Green
-        Write-Host "SUCESSO COMPLETO!" -ForegroundColor Green
-        Write-Host "  1. Instalador Oficial: build\bin\UEPG-Net-Tools-Instalador.exe" -ForegroundColor Cyan
-        Write-Host "  2. Executavel Portatil: build\bin\uepg-net-tools.exe" -ForegroundColor Cyan
-        Write-Host "==============================================================================" -ForegroundColor Green
-    }
-} else {
-    Write-Host ""
-    Write-Host "==============================================================================" -ForegroundColor Yellow
-    Write-Host "Executavel portatil com icone gerado com sucesso em: build\bin\uepg-net-tools.exe" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "[INFO] Para gerar o arquivo Instalador com assistente 'Avancar e Concluir':" -ForegroundColor Gray
-    Write-Host "       Execute no PowerShell: winget install NSIS.NSIS" -ForegroundColor Cyan
-    Write-Host "==============================================================================" -ForegroundColor Yellow
 }
 
-# 6. Sincroniza executaveis para o download web no Servidor Central
+# 7. Sincroniza executaveis para o download web no Servidor Central
 $centralDownloads = "..\central-server\public\downloads"
 if (Test-Path "..\central-server\public") {
     if (-not (Test-Path $centralDownloads)) {
@@ -95,8 +92,6 @@ if (Test-Path "..\central-server\public") {
     }
     if (Test-Path "build/bin/UEPG-Net-Tools-Instalador.exe") {
         Copy-Item "build/bin/UEPG-Net-Tools-Instalador.exe" "$centralDownloads\UEPG-Net-Tools-Instalador.exe" -Force
-    } elseif (Test-Path "build/bin/uepg-net-tools.exe") {
-        Copy-Item "build/bin/uepg-net-tools.exe" "$centralDownloads\UEPG-Net-Tools-Instalador.exe" -Force
     }
     Write-Host "[OK] Instalador sincronizado para a central web (pasta public/downloads)" -ForegroundColor Green
 }
