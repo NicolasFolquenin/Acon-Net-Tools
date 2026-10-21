@@ -1,0 +1,2 @@
+# Este arquivo preserva a pasta downloads no repositório Git.
+# Os arquivos executáveis binários (.exe) são gerados em build e ignorados pelo .gitignore.

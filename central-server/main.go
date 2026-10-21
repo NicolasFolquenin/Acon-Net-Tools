@@ -49,6 +49,7 @@ func main() {
 	groupsHandler := handlers.NewGroupsHandler(mongoClient, cfg)
 	modulesHandler := handlers.NewModulesHandler(cfg, mongoClient)
 	pingHandler := handlers.NewPingHandler(mongoClient)
+	downloadHandler := handlers.NewDownloadHandler(cfg)
 
 	mux := http.NewServeMux()
 
@@ -83,6 +84,11 @@ func main() {
 	mux.HandleFunc("/api/v1/auth/oidc/config", oidcHandler.ConfigHandler)
 	mux.HandleFunc("/api/v1/auth/oidc/login", oidcHandler.LoginHandler)
 	mux.HandleFunc("/api/v1/auth/oidc/callback", oidcHandler.CallbackHandler)
+
+	// Download público do Instalador / Executável da Sonda Client
+	mux.HandleFunc("/api/v1/download/client", downloadHandler.HandleDownloadClient)
+	mux.HandleFunc("/api/v1/download/client/info", downloadHandler.HandleClientInfo)
+	mux.HandleFunc("/download/client", downloadHandler.HandleDownloadClient)
 
 	// Endpoints de Gerenciamento de Usuários (Apenas Administrador)
 	mux.HandleFunc("/api/v1/users", authHandler.RequireAdmin(authHandler.HandleUsers))
