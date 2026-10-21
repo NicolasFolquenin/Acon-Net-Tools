@@ -3344,6 +3344,29 @@ async function loadAdminMachines() {
       }
     });
 
+    // Desduplicação inteligente por MAC Address:
+    // Máquinas com o mesmo endereço MAC físico são a mesma máquina; a leitura mais recente prevalece
+    const macMap = new Map();
+    const withoutMac = [];
+    allAdminMachines.forEach(m => {
+      const mac = (m.mac_address || '').trim().toUpperCase().replace(/-/g, ':');
+      if (mac && mac !== '00:00:00:00:00:00' && mac.length >= 17) {
+        if (!macMap.has(mac)) {
+          macMap.set(mac, m);
+        } else {
+          const existing = macMap.get(mac);
+          const timeM = m.last_seen ? new Date(m.last_seen).getTime() : 0;
+          const timeEx = existing.last_seen ? new Date(existing.last_seen).getTime() : 0;
+          if (timeM > timeEx) {
+            macMap.set(mac, m);
+          }
+        }
+      } else {
+        withoutMac.push(m);
+      }
+    });
+    allAdminMachines = [...macMap.values(), ...withoutMac];
+
     populateMachineGroupFilterOptions();
     applyMachineFilters();
   } catch (err) {

@@ -955,4 +955,14 @@ func (m *MongoDBClient) UpdateMachine(ctx context.Context, hostname string, req 
 	return nil
 }
 
+// DeleteMachine remove uma máquina pelo hostname da coleção de máquinas
+func (m *MongoDBClient) DeleteMachine(ctx context.Context, hostname string) error {
+	if m.MachinesCollection == nil {
+		return fmt.Errorf("colecao de maquinas nao inicializada")
+	}
+	_, err := m.MachinesCollection.DeleteOne(ctx, bson.M{"_id": hostname})
+	return err
+}
+
+
 

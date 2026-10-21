@@ -132,7 +132,22 @@ func (h *MachineProfileHandler) HandleRegisterProbe(w http.ResponseWriter, r *ht
 	// 1. Determina grupo através de regras automáticas (VLAN e Sub-rede IP)
 	assignedGroup := h.matchGroupForProbe(ctx, req.VLAN, req.IPAddress)
 
-	// 2. Cria registro da máquina
+	// 2. Se a máquina já foi cadastrada anteriormente com outro hostname mas mesmo MAC físico, remove o registro antigo
+	normMAC := normalizeMAC(req.MACAddress)
+	if isValidMAC(normMAC) && h.mongoClient != nil {
+		if existingList, errList := h.mongoClient.ListMachines(ctx); errList == nil {
+			for _, em := range existingList {
+				if normalizeMAC(em.MACAddress) == normMAC && !strings.EqualFold(em.Hostname, req.Hostname) {
+					log.Printf("[MACHINE-PROFILE] Maquina fisica renomeada detectada: '%s' -> '%s' (MAC: %s). Excluindo registro obsoleto.",
+						em.Hostname, req.Hostname, normMAC)
+					_ = h.mongoClient.DeleteMachine(ctx, em.Hostname)
+					_ = os.Remove(filepath.Join(h.machinesDir, em.Hostname+".json"))
+				}
+			}
+		}
+	}
+
+	// 3. Cria registro da máquina
 	now := time.Now().UTC()
 	mach := &models.MachineRegistration{
 		Hostname:   req.Hostname,
@@ -156,7 +171,7 @@ func (h *MachineProfileHandler) HandleRegisterProbe(w http.ResponseWriter, r *ht
 		}
 	}
 
-	// 3. Constrói o perfil correspondente e grava em disco como {hostname}.json
+	// 4. Constrói o perfil correspondente e grava em disco como {hostname}.json
 	prof := h.buildProfileForMachine(ctx, mach)
 	if err := h.saveMachineFile(mach.Hostname, prof); err != nil {
 		log.Printf("[MACHINE-PROFILE][ERRO] Falha ao gravar %s.json em disco: %v", mach.Hostname, err)
@@ -184,22 +199,50 @@ func (h *MachineProfileHandler) HandleAdminMachines(w http.ResponseWriter, r *ht
 				machines = []models.MachineRegistration{}
 			}
 
-			// Auto-descobre nós que já enviaram métricas mas ainda não possuem cadastro explícito na coleção machines
-			knownMap := make(map[string]bool)
+			// Mapa de hostnames e MACs já conhecidos
+			knownHostnames := make(map[string]bool)
+			knownMACs := make(map[string]string) // mac -> hostname mais recente
+
 			for _, m := range machines {
-				knownMap[strings.ToLower(m.Hostname)] = true
+				knownHostnames[strings.ToLower(m.Hostname)] = true
+				mac := normalizeMAC(m.MACAddress)
+				if isValidMAC(mac) {
+					knownMACs[mac] = m.Hostname
+				}
 			}
 
 			distinctNodes, errNodes := h.mongoClient.GetDistinctNodes(ctx)
 			if errNodes == nil {
 				for _, nodeID := range distinctNodes {
 					trimmed := strings.TrimSpace(nodeID)
-					if trimmed == "" || knownMap[strings.ToLower(trimmed)] {
+					if trimmed == "" || knownHostnames[strings.ToLower(trimmed)] {
 						continue
 					}
-					knownMap[strings.ToLower(trimmed)] = true
 
-					// Sintetiza registro de máquina a partir da última telemetria registrada
+					// Busca a última métrica para inspecionar MAC
+					latest, errLatest := h.mongoClient.GetLatestMetricForNode(ctx, trimmed)
+					if errLatest != nil || latest == nil {
+						continue
+					}
+
+					nodeMAC := ""
+					if latest.SystemInfo != nil {
+						nodeMAC = normalizeMAC(latest.SystemInfo.MACAddress)
+					}
+
+					// Se o MAC já pertence a outra máquina cadastrada, trata-se de um nó renomeado/antigo -> NÃO DUPLICA!
+					if isValidMAC(nodeMAC) {
+						if _, exists := knownMACs[nodeMAC]; exists {
+							log.Printf("[MACHINE-PROFILE] No '%s' ignorado no cadastro pois MAC '%s' ja pertence a maquina ativa", trimmed, nodeMAC)
+							continue
+						}
+					}
+
+					knownHostnames[strings.ToLower(trimmed)] = true
+					if isValidMAC(nodeMAC) {
+						knownMACs[nodeMAC] = trimmed
+					}
+
 					synth := models.MachineRegistration{
 						Hostname:  trimmed,
 						GroupID:   "acon",
@@ -207,22 +250,19 @@ func (h *MachineProfileHandler) HandleAdminMachines(w http.ResponseWriter, r *ht
 						Status:    "active",
 						CreatedAt: time.Now().UTC(),
 						UpdatedAt: time.Now().UTC(),
+						LastSeen:  latest.Timestamp,
 					}
-
-					if latest, errLatest := h.mongoClient.GetLatestMetricForNode(ctx, trimmed); errLatest == nil && latest != nil {
-						synth.LastSeen = latest.Timestamp
-						if latest.SystemInfo != nil {
-							synth.IPAddress = latest.SystemInfo.IPAddress
-							synth.MACAddress = latest.SystemInfo.MACAddress
-						}
-						if latest.SwitchInfo != nil {
-							synth.SwitchName = latest.SwitchInfo.SwitchName
-							synth.SwitchPort = latest.SwitchInfo.SwitchPort
-							synth.VLAN = latest.SwitchInfo.VLAN
-						}
-						if latest.VLAN > 0 && synth.VLAN == 0 {
-							synth.VLAN = latest.VLAN
-						}
+					if latest.SystemInfo != nil {
+						synth.IPAddress = latest.SystemInfo.IPAddress
+						synth.MACAddress = latest.SystemInfo.MACAddress
+					}
+					if latest.SwitchInfo != nil {
+						synth.SwitchName = latest.SwitchInfo.SwitchName
+						synth.SwitchPort = latest.SwitchInfo.SwitchPort
+						synth.VLAN = latest.SwitchInfo.VLAN
+					}
+					if latest.VLAN > 0 && synth.VLAN == 0 {
+						synth.VLAN = latest.VLAN
 					}
 
 					_ = h.mongoClient.SaveMachine(ctx, &synth)
@@ -232,6 +272,44 @@ func (h *MachineProfileHandler) HandleAdminMachines(w http.ResponseWriter, r *ht
 					machines = append(machines, synth)
 				}
 			}
+
+			// Desduplicação estrita de 'machines' por MAC Address físico:
+			// Se houver dois registros com o mesmo MAC, o mais recente permanece e o obsoleto é purgado
+			macMap := make(map[string]models.MachineRegistration)
+			var nonMacMachines []models.MachineRegistration
+			var obsoleteHostnames []string
+
+			for _, m := range machines {
+				mac := normalizeMAC(m.MACAddress)
+				if isValidMAC(mac) {
+					if existing, found := macMap[mac]; !found {
+						macMap[mac] = m
+					} else {
+						// Compara LastSeen para escolher a mais recente
+						if m.LastSeen.After(existing.LastSeen) {
+							obsoleteHostnames = append(obsoleteHostnames, existing.Hostname)
+							macMap[mac] = m
+						} else {
+							obsoleteHostnames = append(obsoleteHostnames, m.Hostname)
+						}
+					}
+				} else {
+					nonMacMachines = append(nonMacMachines, m)
+				}
+			}
+
+			for _, obsHost := range obsoleteHostnames {
+				_ = h.mongoClient.DeleteMachine(ctx, obsHost)
+				_ = os.Remove(filepath.Join(h.machinesDir, obsHost+".json"))
+				log.Printf("[MACHINE-PROFILE] Excluida maquina obsoleta duplicada por MAC: %s", obsHost)
+			}
+
+			deduped := make([]models.MachineRegistration, 0, len(macMap)+len(nonMacMachines))
+			for _, m := range macMap {
+				deduped = append(deduped, m)
+			}
+			deduped = append(deduped, nonMacMachines...)
+			machines = deduped
 		}
 
 		w.Header().Set("Content-Type", "application/json")
