@@ -8,6 +8,10 @@ bin/
 *.so
 *.dylib
 
+# Permite o instalador oficial do client para distribuição no servidor web
+!central-server/public/downloads/*.exe
+!central-server/public/downloads/**/*.exe
+
 # Bancos de dados locais
 *.db
 *.db-journal
