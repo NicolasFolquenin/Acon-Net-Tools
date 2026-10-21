@@ -140,22 +140,15 @@ func (h *MetricsHandler) GetDashboardMetrics(w http.ResponseWriter, r *http.Requ
 		diagnostic = h.buildNodeDiagnostic(ctx, nodeFilter, series, isHistoricalFallback)
 	}
 
-	// Lista de nós distintos
-	nodesList, _ := h.db.GetDistinctNodes(ctx)
-	if len(nodesList) == 0 {
-		// Detecta nós a partir da série em memória se o distinct falhar
-		nodeMap := make(map[string]bool)
-		for _, s := range series {
-			nodeMap[s.NodeID] = true
-		}
-		for n := range nodeMap {
-			nodesList = append(nodesList, n)
-		}
+	// Agrega resumos de cada nó (última leitura, taxa de sucesso, etc.) com desduplicação por MAC
+	summaries := computeNodeSummaries(series)
+
+	// Lista de nós distintos baseada nos nós desduplicados
+	nodesList := make([]string, 0, len(summaries))
+	for _, s := range summaries {
+		nodesList = append(nodesList, s.NodeID)
 	}
 	sort.Strings(nodesList)
-
-	// Agrega resumos de cada nó (última leitura, taxa de sucesso, etc.)
-	summaries := computeNodeSummaries(series)
 
 	// Ajusta status de saúde do resumo com base no diagnóstico preciso
 	if diagnostic != nil {
@@ -478,12 +471,64 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 		})
 	}
 
+	// Desduplicação inteligente por MAC Address:
+	// Máquinas renomeadas possuem o mesmo endereço MAC físico.
+	// O nó com timestamp de telemetria mais recente prevalece como nó ativo.
+	macMap := make(map[string]models.NodeSummaryCard)
+	var nonMacSummaries []models.NodeSummaryCard
+
+	for _, s := range summaries {
+		mac := ""
+		if s.SystemInfo != nil {
+			mac = normalizeMAC(s.SystemInfo.MACAddress)
+		}
+		if isValidMAC(mac) {
+			if existing, found := macMap[mac]; !found {
+				macMap[mac] = s
+			} else {
+				if s.LastSeen.After(existing.LastSeen) {
+					macMap[mac] = s
+				}
+			}
+		} else {
+			nonMacSummaries = append(nonMacSummaries, s)
+		}
+	}
+
+	deduped := nonMacSummaries
+	for _, s := range macMap {
+		deduped = append(deduped, s)
+	}
+
 	// Ordena por NodeID alfabeticamente
-	sort.Slice(summaries, func(i, j int) bool {
-		return summaries[i].NodeID < summaries[j].NodeID
+	sort.Slice(deduped, func(i, j int) bool {
+		return deduped[i].NodeID < deduped[j].NodeID
 	})
 
-	return summaries
+	return deduped
+}
+
+func normalizeMAC(mac string) string {
+	mac = strings.ToUpper(strings.TrimSpace(mac))
+	mac = strings.ReplaceAll(mac, "-", ":")
+	return mac
+}
+
+func isValidMAC(mac string) bool {
+	norm := normalizeMAC(mac)
+	if norm == "" || norm == "00:00:00:00:00:00" || norm == "FF:FF:FF:FF:FF:FF" {
+		return false
+	}
+	parts := strings.Split(norm, ":")
+	if len(parts) != 6 {
+		return false
+	}
+	for _, p := range parts {
+		if len(p) != 2 {
+			return false
+		}
+	}
+	return true
 }
 
 func contextWithTimeout(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
