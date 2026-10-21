@@ -1389,7 +1389,8 @@ body {
   z-index: 1000;
 }
 
-.modal-dialog {
+.modal-dialog,
+.modal-window {
   background: var(--modal-bg);
   border: 1px solid var(--border-glass-strong);
   border-radius: var(--radius-lg);
@@ -1454,7 +1455,8 @@ body {
   gap: 12px;
 }
 
-.modal-close-btn {
+.modal-close-btn,
+.btn-modal-close {
   background: transparent;
   border: none;
   color: var(--text-muted);
@@ -1466,7 +1468,8 @@ body {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.modal-close-btn:hover {
+.modal-close-btn:hover,
+.btn-modal-close:hover {
   color: var(--text-main);
   background: var(--table-row-hover);
 }
