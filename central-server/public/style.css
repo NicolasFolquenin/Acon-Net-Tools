@@ -3517,8 +3517,19 @@ body {
   margin-bottom: 24px;
 }
 
+.machines-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.machines-table thead tr {
+  background: var(--table-header-bg);
+  border-bottom: 1px solid var(--border-glass-strong);
+}
+
 .machines-table th {
-  padding: 8px 10px;
+  padding: 11px 12px;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -3529,10 +3540,34 @@ body {
 }
 
 .machines-table td {
-  padding: 7px 10px;
+  padding: 11px 12px;
   vertical-align: middle;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.machines-table th.col-actions,
+.machines-table td.col-actions {
+  text-align: right;
+  width: 290px;
+  min-width: 290px;
+  white-space: nowrap;
+}
+
+.machines-table td.col-actions .table-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 100%;
+}
+
+.machines-table .switch-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 2px;
 }
 
 .node-row {

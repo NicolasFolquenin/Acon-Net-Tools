@@ -183,6 +183,55 @@ func (h *MachineProfileHandler) HandleAdminMachines(w http.ResponseWriter, r *ht
 			if err != nil {
 				machines = []models.MachineRegistration{}
 			}
+
+			// Auto-descobre nós que já enviaram métricas mas ainda não possuem cadastro explícito na coleção machines
+			knownMap := make(map[string]bool)
+			for _, m := range machines {
+				knownMap[strings.ToLower(m.Hostname)] = true
+			}
+
+			distinctNodes, errNodes := h.mongoClient.GetDistinctNodes(ctx)
+			if errNodes == nil {
+				for _, nodeID := range distinctNodes {
+					trimmed := strings.TrimSpace(nodeID)
+					if trimmed == "" || knownMap[strings.ToLower(trimmed)] {
+						continue
+					}
+					knownMap[strings.ToLower(trimmed)] = true
+
+					// Sintetiza registro de máquina a partir da última telemetria registrada
+					synth := models.MachineRegistration{
+						Hostname:  trimmed,
+						GroupID:   "acon",
+						IsCustom:  false,
+						Status:    "active",
+						CreatedAt: time.Now().UTC(),
+						UpdatedAt: time.Now().UTC(),
+					}
+
+					if latest, errLatest := h.mongoClient.GetLatestMetricForNode(ctx, trimmed); errLatest == nil && latest != nil {
+						synth.LastSeen = latest.Timestamp
+						if latest.SystemInfo != nil {
+							synth.IPAddress = latest.SystemInfo.IPAddress
+							synth.MACAddress = latest.SystemInfo.MACAddress
+						}
+						if latest.SwitchInfo != nil {
+							synth.SwitchName = latest.SwitchInfo.SwitchName
+							synth.SwitchPort = latest.SwitchInfo.SwitchPort
+							synth.VLAN = latest.SwitchInfo.VLAN
+						}
+						if latest.VLAN > 0 && synth.VLAN == 0 {
+							synth.VLAN = latest.VLAN
+						}
+					}
+
+					_ = h.mongoClient.SaveMachine(ctx, &synth)
+					prof := h.buildProfileForMachine(ctx, &synth)
+					_ = h.saveMachineFile(synth.Hostname, prof)
+
+					machines = append(machines, synth)
+				}
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
