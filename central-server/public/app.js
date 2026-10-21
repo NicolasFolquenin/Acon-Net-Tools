@@ -3320,20 +3320,29 @@ async function loadAdminMachines() {
     if (machRes.ok) {
       allAdminMachines = await machRes.json() || [];
     } else {
-      // Fallback gracioso para usuários sem permissão de admin completa
-      allAdminMachines = currentSummaries.map(s => ({
-        hostname: s.node_id,
-        ip_address: (s.system_info && s.system_info.ip_address) || '',
-        mac_address: (s.system_info && s.system_info.mac_address) || '',
-        switch_name: (s.switch_info && s.switch_info.switch_name) || '',
-        switch_port: (s.switch_info && s.switch_info.switch_port) || '',
-        vlan: (s.switch_info && s.switch_info.vlan) || '',
-        last_seen: s.last_seen || '',
-        group_id: s.group_id || 'acon',
-        is_custom: false,
-        custom_tests: []
-      }));
+      allAdminMachines = [];
     }
+
+    // Garante que todas as máquinas com telemetria (detectadas no Dashboard) apareçam também na lista de gerenciamento
+    const registeredHostnames = new Set(allAdminMachines.map(m => (m.hostname || '').toLowerCase()));
+    currentSummaries.forEach(s => {
+      if (!s.node_id) return;
+      if (!registeredHostnames.has(s.node_id.toLowerCase())) {
+        registeredHostnames.add(s.node_id.toLowerCase());
+        allAdminMachines.push({
+          hostname: s.node_id,
+          ip_address: (s.system_info && s.system_info.ip_address) || '',
+          mac_address: (s.system_info && s.system_info.mac_address) || '',
+          switch_name: (s.switch_info && s.switch_info.switch_name) || '',
+          switch_port: (s.switch_info && s.switch_info.switch_port) || '',
+          vlan: (s.switch_info && s.switch_info.vlan) || s.vlan || '',
+          last_seen: s.last_seen || '',
+          group_id: s.group_id || 'acon',
+          is_custom: false,
+          custom_tests: []
+        });
+      }
+    });
 
     populateMachineGroupFilterOptions();
     applyMachineFilters();
@@ -3576,16 +3585,15 @@ function renderMachinesTable(machines) {
         </td>
         <td>
           <div class="node-cell-main">
-            <button type="button" class="btn-node-link font-bold font-mono" onclick="navigateToMachineDashboard('${escapeHtml(m.hostname)}')">
+            <button type="button" class="btn-node-link font-bold font-mono" onclick="navigateToMachineDashboard('${escapeHtml(m.hostname)}')" title="Abrir Dashboard desta máquina">
               ${escapeHtml(m.hostname)}
             </button>
-            <span class="node-sub-ip">${escapeHtml(m.ip_address || '--')}</span>
           </div>
         </td>
         <td>
-          <div style="font-size: 0.76rem; font-family: 'JetBrains Mono', monospace; line-height: 1.25;">
-            <div>${escapeHtml(m.ip_address || '--')}</div>
-            <div style="color: var(--text-muted); font-size: 0.70rem;">${escapeHtml(m.mac_address || '--')}</div>
+          <div style="font-size: 0.76rem; font-family: 'JetBrains Mono', monospace; line-height: 1.35; white-space: nowrap;">
+            <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(m.ip_address || '--')}</div>
+            <div style="color: var(--text-muted); font-size: 0.70rem; letter-spacing: 0.2px;">${escapeHtml(m.mac_address || '--')}</div>
           </div>
         </td>
         <td>
@@ -3597,9 +3605,9 @@ function renderMachinesTable(machines) {
           </div>
         </td>
         <td style="text-align: right;">${switchHtml}</td>
-        <td style="text-align: right;"><span class="text-subtle font-mono">${timeAgo}</span></td>
-        <td style="text-align: right;">
-          <div class="table-actions" style="justify-content: flex-end;">
+        <td style="text-align: right; white-space: nowrap;"><span class="text-subtle font-mono">${timeAgo}</span></td>
+        <td class="col-actions" style="text-align: right;">
+          <div class="table-actions" style="display: inline-flex; justify-content: flex-end; align-items: center; gap: 6px; width: 100%;">
             ${isAdmin ? `
             <button type="button" class="btn btn-outline-cyan btn-sm" onclick="openPingModal('${escapeHtml(m.hostname)}', '${escapeHtml(m.ip_address || '')}')" title="Forçar Ping ICMP nesta máquina">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
