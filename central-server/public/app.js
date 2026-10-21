@@ -4661,18 +4661,8 @@ function navigateToMachineDashboard(hostname) {
   // Alterna para a visualização do Dashboard
   switchView('dashboard');
 
-  // Se a máquina clicada for diferente da atualmente focada, foca nela
-  if (selectedChartNode !== hostname) {
-    selectNodeForCharts(hostname);
-  } else {
-    // Rola suavemente até o cabeçalho da máquina única
-    setTimeout(() => {
-      const topTarget = document.getElementById('single-machine-header') || document.getElementById('view-dashboard');
-      if (topTarget) {
-        topTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 80);
-  }
+  // Foca imediatamente na máquina selecionada e rola até o cabeçalho
+  selectNodeForCharts(hostname, true);
 }
 window.navigateToMachineDashboard = navigateToMachineDashboard;
 
