@@ -2681,7 +2681,7 @@ function renderNodesTable(summaries) {
         </td>
         <td>
           <div class="node-cell-main">
-            <button type="button" class="btn-node-link font-bold font-mono" onclick="selectNodeForCharts('${escapeHtml(s.node_id)}')">
+            <button type="button" class="btn-node-link font-bold font-mono" onclick="event.stopPropagation(); selectNodeForCharts('${escapeHtml(s.node_id)}', true)">
               ${escapeHtml(s.node_id)}
             </button>
             ${ipHtml}
