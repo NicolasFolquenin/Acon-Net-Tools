@@ -28,6 +28,7 @@ RequestExecutionLevel admin
 
 ; Páginas do Instalador
 !insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 
@@ -42,8 +43,9 @@ RequestExecutionLevel admin
 ; Idioma
 !insertmacro MUI_LANGUAGE "PortugueseBR"
 
-; Seção de Instalação Principal
-Section "Principal" SecMain
+; Seção de Instalação Principal (Obrigatória)
+Section "!Arquivos do Programa (Obrigatório)" SecMain
+  SectionIn RO
   SetOutPath "$INSTDIR"
   SetOverwrite on
 
@@ -56,11 +58,10 @@ Section "Principal" SecMain
     File "..\..\config.json"
   skip_config:
 
-  ; Cria Atalhos no Menu Iniciar e Desktop
+  ; Cria Atalhos no Menu Iniciar
   CreateDirectory "$SMPROGRAMS\UEPG Net Tools"
   CreateShortcut "$SMPROGRAMS\UEPG Net Tools\UEPG Net Tools.lnk" "$INSTDIR\uepg-net-tools.exe" "" "$INSTDIR\icon.ico" 0
   CreateShortcut "$SMPROGRAMS\UEPG Net Tools\Desinstalar.lnk" "$INSTDIR\uninst.exe"
-  CreateShortcut "$DESKTOP\UEPG Net Tools.lnk" "$INSTDIR\uepg-net-tools.exe" "" "$INSTDIR\icon.ico" 0
 
   ; Grava Desinstalador
   WriteUninstaller "$INSTDIR\uninst.exe"
@@ -76,6 +77,27 @@ Section "Principal" SecMain
   WriteRegDWORD ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "NoRepair" 1
 SectionEnd
 
+; Seção Opcional 1: Atalho no Desktop
+Section "Criar atalho na Área de Trabalho" SecDesktop
+  CreateShortcut "$DESKTOP\UEPG Net Tools.lnk" "$INSTDIR\uepg-net-tools.exe" "" "$INSTDIR\icon.ico" 0
+SectionEnd
+
+; Seção Opcional 2: Iniciar junto com o computador (Windows Startup)
+Section "Iniciar junto com o computador (Windows Startup)" SecStartup
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UEPGNetTools" '"$INSTDIR\uepg-net-tools.exe"'
+SectionEnd
+
+; Descrições dos Componentes para a Interface
+LangString DESC_SecMain ${LANG_PORTUGUESEBR} "Arquivos essenciais do executável e configurações da sonda."
+LangString DESC_SecDesktop ${LANG_PORTUGUESEBR} "Cria um atalho rápido na sua Área de Trabalho para fácil acesso."
+LangString DESC_SecStartup ${LANG_PORTUGUESEBR} "Inicia o monitoramento automaticamente sempre que o computador for ligado."
+
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecMain} $(DESC_SecMain)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecDesktop} $(DESC_SecDesktop)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecStartup} $(DESC_SecStartup)
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
+
 ; Seção do Desinstalador
 Section Uninstall
   ; Remove Atalhos
@@ -83,6 +105,9 @@ Section Uninstall
   Delete "$SMPROGRAMS\UEPG Net Tools\UEPG Net Tools.lnk"
   Delete "$SMPROGRAMS\UEPG Net Tools\Desinstalar.lnk"
   RMDir "$SMPROGRAMS\UEPG Net Tools"
+
+  ; Remove Registro de Inicialização
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UEPGNetTools"
 
   ; Remove Arquivos
   Delete "$INSTDIR\uepg-net-tools.exe"
