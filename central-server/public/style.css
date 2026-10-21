@@ -1373,7 +1373,8 @@ body {
    Modals & Overlays (Snappy, No Fade-in Sluggishness)
    ========================================================================== */
 
-.modal-overlay {
+.modal-overlay,
+.modal-backdrop {
   position: fixed;
   top: 0;
   left: 0;
@@ -2128,6 +2129,7 @@ body.auth-mode .dashboard-layout {
 /* ==========================================================================
    Login Card
    ========================================================================== */
+.login-card {
   background: var(--modal-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -2135,11 +2137,13 @@ body.auth-mode .dashboard-layout {
   border-radius: var(--radius-lg);
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6);
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
+  margin: auto;
   padding: 32px 28px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  animation: gatewayFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .login-header {
@@ -2465,8 +2469,51 @@ body.auth-mode .dashboard-layout {
   color: #0369a1;
 }
 
+[data-theme="light"] .btn-back-gateway {
+  border-color: #cbd5e1;
+  color: #475569;
+  background: #f8fafc;
+}
+
 [data-theme="light"] .btn-back-gateway:hover {
   background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+[data-theme="light"] .login-card {
+  background: #ffffff;
+  border-color: rgba(203, 213, 225, 0.9);
+  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .login-hint {
+  background: #f8fafc;
+  border-color: rgba(203, 213, 225, 0.85);
+  color: #475569;
+}
+
+[data-theme="light"] .login-hint strong {
+  color: #0284c7;
+}
+
+[data-theme="light"] .login-card .form-input {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme="light"] .login-card .form-input:focus {
+  background: #ffffff;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+[data-theme="light"] .login-card .btn-password-toggle {
+  color: #64748b;
+}
+
+[data-theme="light"] .login-card .btn-password-toggle:hover {
   color: #0f172a;
 }
 

@@ -983,6 +983,19 @@ function setupEventListeners() {
     });
   }
 
+  // Botão de Detalhes do PC a partir do cabeçalho da Máquina Única
+  const btnSmDetails = document.getElementById('btn-sm-details');
+  if (btnSmDetails) {
+    btnSmDetails.addEventListener('click', () => {
+      if (!selectedChartNode || selectedChartNode === 'all') return;
+      let summary = currentSummaries.find(item => item.node_id === selectedChartNode);
+      if (!summary) {
+        summary = { node_id: selectedChartNode, system_info: {}, metrics: {} };
+      }
+      openPCDetailsModal(summary);
+    });
+  }
+
   // Botão de Sair da Visão de Máquina Única
   const btnExitSm = document.getElementById('btn-exit-single-machine');
   if (btnExitSm) {
@@ -1018,7 +1031,12 @@ function setupEventListeners() {
         return;
       }
 
-      // 3. Clique em qualquer outro lugar da linha (ou nome do PC): Foca nos gráficos!
+      // 3. Se o clique foi no botão com o link/nome do nó, ele já possui handler próprio
+      if (e.target.closest('.btn-node-link')) {
+        return;
+      }
+
+      // 4. Clique em qualquer outro lugar da linha: Foca nos gráficos da máquina
       const row = e.target.closest('.node-row');
       if (row) {
         const nodeId = row.getAttribute('data-node-id');
@@ -2251,21 +2269,39 @@ function updateNodeSelector(nodes) {
   updateMetricToggleVisibility();
 }
 
-function selectNodeForCharts(nodeId) {
-  if (selectedChartNode === nodeId) {
-    // Se clicar na mesma máquina já selecionada, desseleciona e volta para consolidado
+function selectNodeForCharts(nodeId, forceFocus = false) {
+  if (!forceFocus && selectedChartNode === nodeId) {
+    // Se clicar na mesma máquina já selecionada (e não for foco forçado), desseleciona e volta para consolidado
     selectedChartNode = 'all';
     showToast('Exibindo gráficos consolidados de todas as sondas', 'toast-info');
+    const smHeader = document.getElementById('single-machine-header');
+    if (smHeader) smHeader.style.display = 'none';
   } else {
     selectedChartNode = nodeId;
     showToast(`Gráficos focados na sonda: ${nodeId}`, 'toast-info');
+
+    // Exibe imediatamente o cabeçalho preliminar para feedback visual instantâneo
+    const smHeader = document.getElementById('single-machine-header');
+    if (smHeader) {
+      smHeader.style.display = 'block';
+      const nameEl = document.getElementById('sm-machine-name');
+      if (nameEl) nameEl.textContent = nodeId;
+      const summary = currentSummaries.find(s => s.node_id === nodeId);
+      if (summary) {
+        const ipEl = document.getElementById('sm-ip');
+        if (ipEl && summary.system_info) {
+          ipEl.textContent = summary.system_info.ip_address || summary.system_info.IPAddress || '--';
+        }
+      }
+    }
+
     // Rola suavemente para o topo do dashboard para exibir o cabeçalho e diagnóstico
     setTimeout(() => {
       const topTarget = document.getElementById('single-machine-header') || document.getElementById('view-dashboard');
       if (topTarget) {
         topTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-    }, 80);
+    }, 50);
   }
 
   updateChartFocusUI();
