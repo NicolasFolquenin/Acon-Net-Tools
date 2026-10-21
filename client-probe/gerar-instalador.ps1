@@ -81,8 +81,24 @@ if ($makensis) {
     Write-Host ""
     Write-Host "[INFO] Para gerar o arquivo Instalador com assistente 'Avancar e Concluir':" -ForegroundColor Gray
     Write-Host "       Execute no PowerShell: winget install NSIS.NSIS" -ForegroundColor Cyan
-    Write-Host "       Depois execute este script novamente." -ForegroundColor Gray
     Write-Host "==============================================================================" -ForegroundColor Yellow
+}
+
+# 6. Sincroniza executaveis para o download web no Servidor Central
+$centralDownloads = "..\central-server\public\downloads"
+if (Test-Path "..\central-server\public") {
+    if (-not (Test-Path $centralDownloads)) {
+        New-Item -ItemType Directory -Force -Path $centralDownloads | Out-Null
+    }
+    if (Test-Path "build/bin/uepg-net-tools.exe") {
+        Copy-Item "build/bin/uepg-net-tools.exe" "$centralDownloads\uepg-net-tools.exe" -Force
+    }
+    if (Test-Path "build/bin/UEPG-Net-Tools-Instalador.exe") {
+        Copy-Item "build/bin/UEPG-Net-Tools-Instalador.exe" "$centralDownloads\UEPG-Net-Tools-Instalador.exe" -Force
+    } elseif (Test-Path "build/bin/uepg-net-tools.exe") {
+        Copy-Item "build/bin/uepg-net-tools.exe" "$centralDownloads\UEPG-Net-Tools-Instalador.exe" -Force
+    }
+    Write-Host "[OK] Instalador sincronizado para a central web (pasta public/downloads)" -ForegroundColor Green
 }
 
 Write-Host ""

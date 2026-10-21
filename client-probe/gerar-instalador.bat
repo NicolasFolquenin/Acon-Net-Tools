@@ -80,7 +80,7 @@ if exist "build\bin\UEPG-Net-Tools-Instalador.exe" (
     echo   Instalador: build\bin\UEPG-Net-Tools-Instalador.exe
     echo   Executavel: build\bin\uepg-net-tools.exe
     echo ==============================================================================
-    goto end
+    goto sync_server
 )
 
 :no_nsis
@@ -89,6 +89,15 @@ echo [DICA] O executavel portatil 'uepg-net-tools.exe' ja funciona perfeitamente
 echo        Se quiser criar tambem o Instalador (.exe com assistente 'Avancar e Concluir'):
 echo        Instale o NSIS no terminal: winget install NSIS.NSIS
 echo        E execute este script novamente.
+
+:sync_server
+if not exist "..\central-server\public\downloads" mkdir "..\central-server\public\downloads" >nul 2>nul
+if exist "build\bin\uepg-net-tools.exe" copy /y "build\bin\uepg-net-tools.exe" "..\central-server\public\downloads\uepg-net-tools.exe" >nul 2>nul
+if exist "build\bin\UEPG-Net-Tools-Instalador.exe" (
+    copy /y "build\bin\UEPG-Net-Tools-Instalador.exe" "..\central-server\public\downloads\UEPG-Net-Tools-Instalador.exe" >nul 2>nul
+) else if exist "build\bin\uepg-net-tools.exe" (
+    copy /y "build\bin\uepg-net-tools.exe" "..\central-server\public\downloads\UEPG-Net-Tools-Instalador.exe" >nul 2>nul
+)
 
 :end
 echo.

@@ -80,6 +80,16 @@
               <span>Usuários</span>
             </button>
           </div>
+
+          <span class="nav-section-title">Instaladores</span>
+          <a href="/api/v1/download/client" id="btn-sidebar-download-client" class="sidebar-nav-btn" title="Baixar Instalador da Sonda Client Windows (.exe)" download>
+            <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Baixar Sonda (.exe)</span>
+          </a>
         </nav>
       </div>
 
@@ -776,10 +786,142 @@
   </div>
 
   <!-- =========================================================================
-       MODAL 1: Login Overlay
+       MODAL 1: Portal de Entrada (Opções: Fazer Login ou Baixar Client)
        ========================================================================= -->
   <div id="login-modal-overlay" class="modal-overlay auth-overlay">
-    <div class="login-card">
+    
+    <!-- 1A: Portal de Boas-Vindas e Escolha de Fluxo -->
+    <div id="welcome-gateway-card" class="gateway-card">
+      <div class="gateway-header">
+        <div class="gateway-brand-badge">
+          <img src="uepg-logo.png" alt="Logo UEPG" class="gateway-logo" />
+        </div>
+        <div class="gateway-title-group">
+          <h2>UEPG Net Tools</h2>
+          <p class="gateway-tagline">Sistema Integrado de Telemetria e Monitoramento de Redes</p>
+        </div>
+        <p class="gateway-instruction">Bem-vindo! Selecione como deseja acessar a plataforma:</p>
+      </div>
+
+      <div class="gateway-options-grid">
+        <!-- Card Opção 1: Fazer Login no Painel -->
+        <div class="gateway-option-card card-login" id="card-choice-login">
+          <div class="option-header-badge badge-cyan">
+            <span>NOC & Gestão</span>
+          </div>
+          <div class="option-icon-box cyan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            </svg>
+          </div>
+          <div class="option-content">
+            <h3 class="option-title">Acessar Painel Central</h3>
+            <p class="option-desc">Monitore computadores em tempo real, equipamentos descobertos via switch LLDP, gráficos de tráfego e métricas.</p>
+          </div>
+          <div class="option-footer">
+            <button type="button" id="btn-gateway-go-login" class="btn btn-primary-submit gateway-action-btn">
+              <span>Fazer Login</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
+            <span class="option-subtext">Acesso para Administradores e Operadores</span>
+          </div>
+        </div>
+
+        <!-- Card Opção 2: Baixar Instalador do Client -->
+        <div class="gateway-option-card card-download" id="card-choice-download">
+          <div class="option-header-badge badge-emerald">
+            <span>Sonda Windows</span>
+          </div>
+          <div class="option-icon-box emerald">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+              <polyline points="9 9 12 12 15 9"></polyline>
+              <line x1="12" y1="5" x2="12" y2="12"></line>
+            </svg>
+          </div>
+          <div class="option-content">
+            <h3 class="option-title">Baixar Instalador da Sonda</h3>
+            <p class="option-desc">Instale o client no computador para coleta periódica de métricas, LLDP de switch, latência e diagnóstico com auto-registro.</p>
+          </div>
+          <div class="option-footer">
+            <a href="/api/v1/download/client" id="btn-gateway-download-client" class="btn btn-emerald-submit gateway-action-btn" download>
+              <span>Baixar Instalador (.exe)</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </a>
+            <div class="client-meta-indicator" id="gateway-client-meta">
+              <span class="live-dot pulse-emerald"></span>
+              <span id="gateway-client-filesize">Instalador Windows 64-bit (~23 MB)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Guia Rápido de Instalação (Acordeão Colapsável) -->
+      <div class="gateway-instructions-toggle">
+        <button type="button" id="btn-toggle-gateway-instructions" class="btn-toggle-instructions" aria-expanded="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span>Como funciona a instalação da sonda client?</span>
+          <svg class="chevron-icon" id="instructions-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+
+        <div id="gateway-instructions-panel" class="gateway-instructions-panel" style="display: none;">
+          <div class="instruction-steps">
+            <div class="instruction-step">
+              <div class="step-num">1</div>
+              <div class="step-text">
+                <strong>Baixar</strong>
+                <p>Clique em <em>Baixar Instalador (.exe)</em> para obter o instalador <code>UEPG-Net-Tools-Instalador.exe</code>.</p>
+              </div>
+            </div>
+            <div class="instruction-step">
+              <div class="step-num">2</div>
+              <div class="step-text">
+                <strong>Instalar</strong>
+                <p>Abra o instalador no Windows e avance. O aplicativo criará atalhos e configurará a inicialização.</p>
+              </div>
+            </div>
+            <div class="instruction-step">
+              <div class="step-num">3</div>
+              <div class="step-text">
+                <strong>Auto-Conexão</strong>
+                <p>A sonda se comunica de forma imediata com este servidor e a máquina surge no Dashboard.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1B: Card do Formulário de Login (Oculto inicialmente, acessado via "Fazer Login") -->
+    <div id="login-card" class="login-card" style="display: none;">
+      <div class="login-top-bar">
+        <button type="button" id="btn-back-to-gateway" class="btn-back-gateway" title="Voltar para a seleção inicial">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>Voltar às opções</span>
+        </button>
+      </div>
+
       <div class="login-header">
         <div class="logo-box login-logo">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -852,6 +994,11 @@
           <p>Perfis disponíveis:</p>
           <p><strong>admin</strong> (Acesso total + Exclusão de PCs e Gestão de Usuários)</p>
           <p><strong>operador</strong> (Visualização de métricas e hardware)</p>
+        </div>
+
+        <div class="login-secondary-action">
+          <span>Precisa monitorar este computador?</span>
+          <a href="/api/v1/download/client" id="btn-login-download-client" class="btn-text-link" download>Baixar instalador do client</a>
         </div>
       </form>
     </div>

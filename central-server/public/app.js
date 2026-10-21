@@ -123,8 +123,18 @@ const activeNodesCount = document.getElementById('active-nodes-count');
 const lastIngestTime = document.getElementById('last-ingest-time');
 const autoRefreshTimer = document.getElementById('auto-refresh-timer');
 
-// Elementos de Autenticação / Perfil
+// Elementos de Autenticação / Gateway / Perfil
 const loginModalOverlay = document.getElementById('login-modal-overlay');
+const welcomeGatewayCard = document.getElementById('welcome-gateway-card');
+const loginCard = document.getElementById('login-card');
+const btnGatewayGoLogin = document.getElementById('btn-gateway-go-login');
+const btnGatewayDownloadClient = document.getElementById('btn-gateway-download-client');
+const btnBackToGateway = document.getElementById('btn-back-to-gateway');
+const btnToggleGatewayInstructions = document.getElementById('btn-toggle-gateway-instructions');
+const gatewayInstructionsPanel = document.getElementById('gateway-instructions-panel');
+const gatewayClientFilesize = document.getElementById('gateway-client-filesize');
+const btnLoginDownloadClient = document.getElementById('btn-login-download-client');
+const btnSidebarDownloadClient = document.getElementById('btn-sidebar-download-client');
 const loginForm = document.getElementById('login-form');
 const loginUsernameInput = document.getElementById('login-username');
 const loginPasswordInput = document.getElementById('login-password');
@@ -398,8 +408,9 @@ async function checkAuthAndInitialize() {
     console.warn('Verificação de sessão:', err);
   }
 
-  // Se não estiver logado, exibe a tela de login
-  showLoginModal();
+  // Se não estiver logado, exibe o portal de entrada (Gateway de opções ou Login direto)
+  const shouldOpenDirectLogin = Boolean(authError || window.location.hash === '#login' || urlParams.get('action') === 'login');
+  showLoginModal(shouldOpenDirectLogin ? 'login' : 'gateway');
 }
 
 async function checkOIDCConfig() {
@@ -453,9 +464,23 @@ function setAuthenticatedUser(user) {
   }
 }
 
-function showLoginModal() {
+function showLoginModal(mode = 'gateway') {
   currentUser = null;
   if (loginModalOverlay) loginModalOverlay.style.display = 'flex';
+
+  if (mode === 'login') {
+    if (welcomeGatewayCard) welcomeGatewayCard.style.display = 'none';
+    if (loginCard) loginCard.style.display = 'flex';
+    setTimeout(() => {
+      if (loginUsernameInput) loginUsernameInput.focus();
+    }, 50);
+  } else {
+    // Exibe o Portal Inicial com as opções de Login ou Baixar Client
+    if (welcomeGatewayCard) welcomeGatewayCard.style.display = 'flex';
+    if (loginCard) loginCard.style.display = 'none';
+    fetchClientDownloadInfo();
+  }
+
   if (navUsername) navUsername.textContent = 'Não conectado';
   if (navRoleBadge) {
     navRoleBadge.textContent = '--';
@@ -476,6 +501,40 @@ function showLoginModal() {
   switchView('dashboard');
   if (refreshInterval) clearInterval(refreshInterval);
 }
+window.showLoginModal = showLoginModal;
+
+async function fetchClientDownloadInfo() {
+  if (!gatewayClientFilesize) return;
+  try {
+    const res = await apiFetch('/api/v1/download/client/info');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.available && data.size_formatted) {
+        gatewayClientFilesize.textContent = `Instalador Windows • ${data.size_formatted}`;
+      } else {
+        gatewayClientFilesize.textContent = 'Instalador Windows 64-bit';
+      }
+    }
+  } catch (err) {
+    console.warn('[DOWNLOAD] Falha ao consultar metadados do instalador:', err);
+  }
+}
+window.fetchClientDownloadInfo = fetchClientDownloadInfo;
+
+function toggleGatewayInstructions() {
+  if (!gatewayInstructionsPanel || !btnToggleGatewayInstructions) return;
+  const isHidden = gatewayInstructionsPanel.style.display === 'none';
+  if (isHidden) {
+    gatewayInstructionsPanel.style.display = 'block';
+    btnToggleGatewayInstructions.classList.add('expanded');
+    btnToggleGatewayInstructions.setAttribute('aria-expanded', 'true');
+  } else {
+    gatewayInstructionsPanel.style.display = 'none';
+    btnToggleGatewayInstructions.classList.remove('expanded');
+    btnToggleGatewayInstructions.setAttribute('aria-expanded', 'false');
+  }
+}
+window.toggleGatewayInstructions = toggleGatewayInstructions;
 
 /* ==========================================================================
    Controle de Views / Páginas (Dashboard vs Máquinas vs Grupos vs Módulos)
@@ -639,7 +698,8 @@ async function handleLogout() {
     console.error('Erro ao sair:', err);
   }
   showToast('Sessão encerrada com sucesso', 'toast-info');
-  showLoginModal();
+  window.history.replaceState(null, '', window.location.pathname);
+  showLoginModal('gateway');
 }
 window.handleLogout = handleLogout;
 
@@ -676,6 +736,35 @@ function applyTheme(theme, notify = false) {
    ========================================================================== */
 
 function setupEventListeners() {
+  // Gateway Inicial: Alternância entre Portal de Opções e Formulário de Login
+  if (btnGatewayGoLogin) {
+    btnGatewayGoLogin.addEventListener('click', () => {
+      showLoginModal('login');
+    });
+  }
+  if (btnBackToGateway) {
+    btnBackToGateway.addEventListener('click', () => {
+      showLoginModal('gateway');
+    });
+  }
+  if (btnToggleGatewayInstructions) {
+    btnToggleGatewayInstructions.addEventListener('click', toggleGatewayInstructions);
+  }
+
+  // Feedback de download ao clicar nos links do instalador
+  const notifyDownload = () => {
+    showToast('Download do instalador iniciado! Execute-o no Windows para monitorar este computador.', 'toast-success');
+  };
+  if (btnGatewayDownloadClient) {
+    btnGatewayDownloadClient.addEventListener('click', notifyDownload);
+  }
+  if (btnLoginDownloadClient) {
+    btnLoginDownloadClient.addEventListener('click', notifyDownload);
+  }
+  if (btnSidebarDownloadClient) {
+    btnSidebarDownloadClient.addEventListener('click', notifyDownload);
+  }
+
   if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
   if (btnLoginSubmit) btnLoginSubmit.addEventListener('click', handleLoginSubmit);
   if (btnLogout) btnLogout.addEventListener('click', handleLogout);
