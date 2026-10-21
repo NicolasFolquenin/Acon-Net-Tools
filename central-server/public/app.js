@@ -1569,7 +1569,7 @@ function renderGroupsList() {
       : '<span class="text-subtle font-mono text-xs">Padrão / Todas</span>';
 
     // Máquinas vinculadas a este grupo
-    const machinesInGroup = allAdminMachines.filter(m => m.group_id === g.id);
+    const machinesInGroup = (allAdminMachines || []).filter(m => m && m.group_id === g.id);
 
     // Módulos configurados
     let activeTestsCount = 0;
@@ -1746,28 +1746,49 @@ async function handleCreateGroupSubmit(e) {
   }
 }
 
+function isNodeOnline(lastSeen, hostname) {
+  if (hostname && typeof currentSummaries !== 'undefined' && Array.isArray(currentSummaries)) {
+    const summary = currentSummaries.find(s => s && s.node_id === hostname);
+    if (summary && typeof summary.is_healthy === 'boolean') {
+      return summary.is_healthy;
+    }
+  }
+  if (!lastSeen) return false;
+  const d = new Date(lastSeen);
+  if (isNaN(d.getTime())) return false;
+  return (Date.now() - d.getTime()) < 15 * 60 * 1000;
+}
+window.isNodeOnline = isNodeOnline;
+
 function openGroupDetailsModal(groupId, tab = 'machines') {
-  const g = currentGroups.find(item => item.id === groupId);
-  if (!g || !groupDetailsModal) return;
+  try {
+    const g = (currentGroups || []).find(item => item && item.id === groupId);
+    if (!g || !groupDetailsModal) return;
 
-  currentViewingGroupId = groupId;
+    currentViewingGroupId = groupId;
 
-  if (gdModalTitle) gdModalTitle.textContent = g.name || g.id;
-  if (gdModalBadge) gdModalBadge.textContent = g.id + (g.id === 'default' ? ' (Padrão)' : '');
+    if (gdModalTitle) gdModalTitle.textContent = g.name || g.id;
+    if (gdModalBadge) gdModalBadge.textContent = g.id + (g.id === 'default' ? ' (Padrão)' : '');
 
-  // 1. Popula Aba Máquinas
-  renderGroupMachinesTab(g);
+    // 1. Popula Aba Máquinas
+    renderGroupMachinesTab(g);
 
-  // 2. Popula Aba Módulos
-  renderGroupModulesTab(g);
+    // 2. Popula Aba Módulos
+    renderGroupModulesTab(g);
 
-  // 3. Popula Aba Edição
-  populateGroupEditForm(g);
+    // 3. Popula Aba Edição
+    populateGroupEditForm(g);
 
-  // Ativa a aba inicial
-  switchGroupDetailsTab(tab);
+    // Ativa a aba inicial
+    switchGroupDetailsTab(tab);
 
-  groupDetailsModal.style.display = 'flex';
+    groupDetailsModal.style.display = 'flex';
+  } catch (err) {
+    console.error('Erro ao abrir detalhes do grupo:', err);
+    if (typeof showToast === 'function') {
+      showToast(`Erro ao abrir grupo: ${err.message}`, 'toast-error');
+    }
+  }
 }
 window.openGroupDetailsModal = openGroupDetailsModal;
 
@@ -1793,7 +1814,7 @@ window.switchGroupDetailsTab = switchGroupDetailsTab;
 
 function renderGroupMachinesTab(g) {
   if (!gdMachinesTableBody) return;
-  const machines = allAdminMachines.filter(m => m.group_id === g.id);
+  const machines = (allAdminMachines || []).filter(m => m && m.group_id === g.id);
 
   if (gdCountMachines) gdCountMachines.textContent = machines.length;
 
@@ -1810,7 +1831,7 @@ function renderGroupMachinesTab(g) {
   }
 
   gdMachinesTableBody.innerHTML = machines.map(m => {
-    const isOnline = isNodeOnline(m.last_seen);
+    const isOnline = isNodeOnline(m.last_seen, m.hostname);
     const statusBadge = isOnline
       ? '<span class="status-badge-inline online"><span class="status-dot-sm online"></span> Online</span>'
       : '<span class="status-badge-inline offline"><span class="status-dot-sm offline"></span> Offline</span>';
