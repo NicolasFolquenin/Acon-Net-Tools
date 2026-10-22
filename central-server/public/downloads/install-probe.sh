@@ -161,12 +161,13 @@ if [ -f "$CONFIG_FILE" ]; then
   if command -v sed >/dev/null 2>&1; then
     sed -i "s|\"server_url\":[[:space:]]*\"[^\"]*\"|\"server_url\": \"${SERVER_URL}\"|g" "$CONFIG_FILE"
     sed -i "s|\"location\":[[:space:]]*\"[^\"]*\"|\"location\": \"${LOCATION}\"|g" "$CONFIG_FILE"
+    # Remove node_id do JSON para garantir que o Hostname seja sempre obtido diretamente do SO
+    sed -i '/"node_id":/d' "$CONFIG_FILE"
   fi
 else
   echo -e "${GREEN}[+] Gerando arquivo de configuração padrão em ${CYAN}${CONFIG_FILE}${NC}..."
   cat <<EOF > "$CONFIG_FILE"
 {
-  "node_id": "${HOSTNAME}",
   "location": "${LOCATION}",
   "server_url": "${SERVER_URL}",
   "interval_minutes": 60,
