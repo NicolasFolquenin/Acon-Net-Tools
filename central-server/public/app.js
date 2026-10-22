@@ -585,10 +585,12 @@ function getEffectiveServerOrigin() {
 }
 
 function updateLinuxInstallCommand() {
-  const cmdSpan = document.getElementById('linux-install-cmd');
-  if (!cmdSpan) return;
   const origin = getEffectiveServerOrigin();
-  cmdSpan.textContent = `curl -fsSL ${origin}/downloads/install-probe.sh | sudo bash`;
+  const cmd = `curl -fsSL ${origin}/downloads/install-probe.sh | bash -s -- ${origin}`;
+  const cmdSpan = document.getElementById('linux-install-cmd');
+  if (cmdSpan) cmdSpan.textContent = cmd;
+  const modalCmdSpan = document.getElementById('modal-linux-cmd');
+  if (modalCmdSpan) modalCmdSpan.textContent = cmd;
 }
 setTimeout(updateLinuxInstallCommand, 200);
 window.addEventListener('load', () => {
@@ -598,7 +600,7 @@ window.addEventListener('load', () => {
 
 function copyLinuxInstallCommand() {
   const origin = getEffectiveServerOrigin();
-  const cmd = `curl -fsSL ${origin}/downloads/install-probe.sh | sudo bash`;
+  const cmd = `curl -fsSL ${origin}/downloads/install-probe.sh | bash -s -- ${origin}`;
   const label = document.getElementById('copy-btn-label');
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -612,6 +614,23 @@ function copyLinuxInstallCommand() {
   }
 }
 window.copyLinuxInstallCommand = copyLinuxInstallCommand;
+
+function copyLinuxModalCommand() {
+  const origin = getEffectiveServerOrigin();
+  const cmd = `curl -fsSL ${origin}/downloads/install-probe.sh | bash -s -- ${origin}`;
+  const label = document.getElementById('modal-copy-btn-label');
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(cmd).then(() => {
+      if (label) label.textContent = 'Copiado!';
+      showToast('Comando copiado! Cole no terminal do seu Debian.', 'toast-success');
+      setTimeout(() => { if (label) label.textContent = 'Copiar'; }, 3000);
+    }).catch(() => fallbackCopy(cmd, label));
+  } else {
+    fallbackCopy(cmd, label);
+  }
+}
+window.copyLinuxModalCommand = copyLinuxModalCommand;
 
 function fallbackCopy(text, label) {
   const ta = document.createElement('textarea');
@@ -635,7 +654,7 @@ function openLinuxInstallModal() {
   const cmdSpan = document.getElementById('modal-linux-cmd');
   const origin = getEffectiveServerOrigin();
   if (cmdSpan) {
-    cmdSpan.textContent = `curl -fsSL ${origin}/downloads/install-probe.sh | sudo bash`;
+    cmdSpan.textContent = `curl -fsSL ${origin}/downloads/install-probe.sh | bash -s -- ${origin}`;
   }
   modal.style.display = 'flex';
 }
