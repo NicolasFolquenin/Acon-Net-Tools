@@ -25,6 +25,7 @@ type ClientFileInfo struct {
 	SizeFormatted string `json:"size_formatted"`
 	UpdatedAt     string `json:"updated_at,omitempty"`
 	Message       string `json:"message,omitempty"`
+	ServerURL     string `json:"server_url,omitempty"`
 }
 
 // NewDownloadHandler inicializa o handler de download
@@ -79,6 +80,18 @@ func formatBytes(bytes int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
+// getServerURL determina a URL pública do servidor (priorizando .env, com fallback para Host HTTP)
+func (h *DownloadHandler) getServerURL(r *http.Request) string {
+	if h.cfg.PublicServerURL != "" {
+		return h.cfg.PublicServerURL
+	}
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://%s", scheme, r.Host)
+}
+
 // HandleDownloadClient serve o arquivo instalador executável para o navegador
 func (h *DownloadHandler) HandleDownloadClient(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -110,15 +123,17 @@ func (h *DownloadHandler) HandleDownloadClient(w http.ResponseWriter, r *http.Re
 	http.ServeFile(w, r, filePath)
 }
 
-// HandleClientInfo retorna metadados JSON sobre o arquivo disponível para download
+// HandleClientInfo retorna metadados JSON sobre o arquivo disponível para download e a URL do servidor
 func (h *DownloadHandler) HandleClientInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	serverURL := h.getServerURL(r)
 
 	_, fi, err := h.locateClientFile()
 	if err != nil {
 		_ = json.NewEncoder(w).Encode(ClientFileInfo{
 			Available: false,
-			Message:   "Instalador não localizado no servidor.",
+			Message:   "Instalador Windows não localizado no servidor.",
+			ServerURL: serverURL,
 		})
 		return
 	}
@@ -134,5 +149,35 @@ func (h *DownloadHandler) HandleClientInfo(w http.ResponseWriter, r *http.Reques
 		SizeBytes:     fi.Size(),
 		SizeFormatted: formatBytes(fi.Size()),
 		UpdatedAt:     fi.ModTime().UTC().Format(time.RFC3339),
+		ServerURL:     serverURL,
 	})
+}
+
+// HandleInstallScript serve o script bash install-probe.sh dinâmico com a URL do servidor do .env embutida
+func (h *DownloadHandler) HandleInstallScript(w http.ResponseWriter, r *http.Request) {
+	candidates := []string{
+		filepath.Join(h.cfg.StaticDir, "downloads", "install-probe.sh"),
+		filepath.Join("public", "downloads", "install-probe.sh"),
+	}
+
+	var data []byte
+	var err error
+	for _, p := range candidates {
+		if data, err = os.ReadFile(p); err == nil {
+			break
+		}
+	}
+
+	if err != nil || len(data) == 0 {
+		http.Error(w, "Script de instalação não encontrado", http.StatusNotFound)
+		return
+	}
+
+	serverURL := h.getServerURL(r)
+	content := string(data)
+	content = strings.Replace(content, `SERVER_URL="http://localhost:8080"`, fmt.Sprintf(`SERVER_URL="%s"`, serverURL), 1)
+
+	w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(content))
 }

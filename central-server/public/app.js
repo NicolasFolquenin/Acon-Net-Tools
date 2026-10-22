@@ -505,16 +505,23 @@ function showLoginModal(mode = 'gateway') {
 }
 window.showLoginModal = showLoginModal;
 
+let configuredServerURL = '';
+
 async function fetchClientDownloadInfo() {
-  if (!gatewayClientFilesize) return;
   try {
     const res = await apiFetch('/api/v1/download/client/info');
     if (res.ok) {
       const data = await res.json();
-      if (data.available && data.size_formatted) {
-        gatewayClientFilesize.textContent = `Instalador Windows • ${data.size_formatted}`;
-      } else {
-        gatewayClientFilesize.textContent = 'Instalador Windows 64-bit';
+      if (data.server_url) {
+        configuredServerURL = data.server_url;
+        updateLinuxInstallCommand();
+      }
+      if (gatewayClientFilesize) {
+        if (data.available && data.size_formatted) {
+          gatewayClientFilesize.textContent = `Instalador Windows • ${data.size_formatted}`;
+        } else {
+          gatewayClientFilesize.textContent = 'Instalador Windows 64-bit';
+        }
       }
     }
   } catch (err) {
@@ -524,19 +531,138 @@ async function fetchClientDownloadInfo() {
 window.fetchClientDownloadInfo = fetchClientDownloadInfo;
 
 function toggleGatewayInstructions() {
-  if (!gatewayInstructionsPanel || !btnToggleGatewayInstructions) return;
-  const isHidden = gatewayInstructionsPanel.style.display === 'none';
+  const panel = document.getElementById('gateway-instructions-panel');
+  const btn = document.getElementById('btn-toggle-gateway-instructions');
+  if (!panel || !btn) return;
+  const isHidden = panel.style.display === 'none';
   if (isHidden) {
-    gatewayInstructionsPanel.style.display = 'block';
-    btnToggleGatewayInstructions.classList.add('expanded');
-    btnToggleGatewayInstructions.setAttribute('aria-expanded', 'true');
+    panel.style.display = 'block';
+    btn.classList.add('expanded');
+    btn.setAttribute('aria-expanded', 'true');
   } else {
-    gatewayInstructionsPanel.style.display = 'none';
-    btnToggleGatewayInstructions.classList.remove('expanded');
-    btnToggleGatewayInstructions.setAttribute('aria-expanded', 'false');
+    panel.style.display = 'none';
+    btn.classList.remove('expanded');
+    btn.setAttribute('aria-expanded', 'false');
   }
 }
 window.toggleGatewayInstructions = toggleGatewayInstructions;
+
+function selectDownloadOS(os) {
+  const btnWin = document.getElementById('btn-tab-windows');
+  const btnLin = document.getElementById('btn-tab-linux');
+  const contentWin = document.getElementById('download-content-windows');
+  const contentLin = document.getElementById('download-content-linux');
+  const tutWin = document.getElementById('instructions-tutorial-windows');
+  const tutLin = document.getElementById('instructions-tutorial-linux');
+  const badgeText = document.getElementById('download-badge-text');
+
+  if (os === 'linux') {
+    if (btnWin) { btnWin.classList.remove('active', 'pill-emerald'); }
+    if (btnLin) { btnLin.classList.add('active', 'pill-emerald'); }
+    if (contentWin) contentWin.style.display = 'none';
+    if (contentLin) contentLin.style.display = 'block';
+    if (tutWin) tutWin.style.display = 'none';
+    if (tutLin) tutLin.style.display = 'block';
+    if (badgeText) badgeText.textContent = 'Sonda Linux / CLI';
+    updateLinuxInstallCommand();
+  } else {
+    if (btnLin) { btnLin.classList.remove('active', 'pill-emerald'); }
+    if (btnWin) { btnWin.classList.add('active', 'pill-emerald'); }
+    if (contentLin) contentLin.style.display = 'none';
+    if (contentWin) contentWin.style.display = 'block';
+    if (tutLin) tutLin.style.display = 'none';
+    if (tutWin) tutWin.style.display = 'block';
+    if (badgeText) badgeText.textContent = 'Sonda Windows';
+  }
+}
+window.selectDownloadOS = selectDownloadOS;
+
+function getEffectiveServerOrigin() {
+  if (configuredServerURL && configuredServerURL.trim() !== '') {
+    return configuredServerURL.trim().replace(/\/+$/, '');
+  }
+  return window.location.origin || 'http://localhost:8080';
+}
+
+function updateLinuxInstallCommand() {
+  const cmdSpan = document.getElementById('linux-install-cmd');
+  if (!cmdSpan) return;
+  const origin = getEffectiveServerOrigin();
+  cmdSpan.textContent = `curl -fsSL ${origin}/downloads/install-probe.sh | sudo bash`;
+}
+setTimeout(updateLinuxInstallCommand, 200);
+window.addEventListener('load', () => {
+  fetchClientDownloadInfo();
+  updateLinuxInstallCommand();
+});
+
+function copyLinuxInstallCommand() {
+  const origin = getEffectiveServerOrigin();
+  const cmd = `curl -fsSL ${origin}/downloads/install-probe.sh | sudo bash`;
+  const label = document.getElementById('copy-btn-label');
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(cmd).then(() => {
+      if (label) label.textContent = 'Copiado!';
+      showToast('Comando copiado! Cole no terminal do seu Debian.', 'toast-success');
+      setTimeout(() => { if (label) label.textContent = 'Copiar'; }, 3000);
+    }).catch(() => fallbackCopy(cmd, label));
+  } else {
+    fallbackCopy(cmd, label);
+  }
+}
+window.copyLinuxInstallCommand = copyLinuxInstallCommand;
+
+function fallbackCopy(text, label) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    if (label) label.textContent = 'Copiado!';
+    showToast('Comando copiado! Cole no terminal do seu Debian.', 'toast-success');
+    setTimeout(() => { if (label) label.textContent = 'Copiar'; }, 3000);
+  } catch (err) {
+    prompt('Copie o comando abaixo manualmente:', text);
+  }
+  document.body.removeChild(ta);
+}
+
+function openLinuxInstallModal() {
+  const modal = document.getElementById('modal-linux-install');
+  if (!modal) return;
+  const cmdSpan = document.getElementById('modal-linux-cmd');
+  const origin = getEffectiveServerOrigin();
+  if (cmdSpan) {
+    cmdSpan.textContent = `curl -fsSL ${origin}/downloads/install-probe.sh | sudo bash`;
+  }
+  modal.style.display = 'flex';
+}
+window.openLinuxInstallModal = openLinuxInstallModal;
+
+function closeLinuxInstallModal() {
+  const modal = document.getElementById('modal-linux-install');
+  if (modal) modal.style.display = 'none';
+}
+window.closeLinuxInstallModal = closeLinuxInstallModal;
+
+function copyLinuxModalCommand() {
+  const origin = getEffectiveServerOrigin();
+  const cmd = `curl -fsSL ${origin}/downloads/install-probe.sh | sudo bash`;
+  const label = document.getElementById('modal-copy-btn-label');
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(cmd).then(() => {
+      if (label) label.textContent = 'Copiado!';
+      showToast('Comando copiado! Cole no terminal do seu Debian.', 'toast-success');
+      setTimeout(() => { if (label) label.textContent = 'Copiar'; }, 3000);
+    }).catch(() => fallbackCopy(cmd, label));
+  } else {
+    fallbackCopy(cmd, label);
+  }
+}
+window.copyLinuxModalCommand = copyLinuxModalCommand;
 
 /* ==========================================================================
    Controle de Views / Páginas (Dashboard vs Máquinas vs Grupos vs Módulos)

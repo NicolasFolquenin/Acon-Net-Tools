@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -230,4 +231,19 @@ func SaveConfig(cfg Config) error {
 	appConfig = &cfg
 	log.Printf("[CONFIG] Configurações e .env atualizados com sucesso")
 	return nil
+}
+
+// getNextSyncSlot calcula o próximo horário fixo (:00 ou :30) do relógio de parede
+func getNextSyncSlot(now time.Time) time.Time {
+	var target time.Time
+	if now.Minute() < 30 {
+		target = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 30, 0, 0, now.Location())
+	} else {
+		nextHour := now.Add(1 * time.Hour)
+		target = time.Date(nextHour.Year(), nextHour.Month(), nextHour.Day(), nextHour.Hour(), 0, 0, 0, now.Location())
+	}
+	if !target.After(now) {
+		target = target.Add(30 * time.Minute)
+	}
+	return target
 }

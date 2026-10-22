@@ -28,6 +28,7 @@ type AppConfig struct {
 	OIDCClientSecret string
 	OIDCRedirectURL  string
 	OIDCAdminGroup   string
+	PublicServerURL  string
 }
 
 // LoadEnvFile faz o parse de um arquivo .env simples (chave=valor) sem dependências externas
@@ -88,6 +89,7 @@ func LoadConfig() *AppConfig {
 		OIDCClientSecret: getEnv("OIDC_CLIENT_SECRET", ""),
 		OIDCRedirectURL:  getEnv("OIDC_REDIRECT_URL", ""),
 		OIDCAdminGroup:   getEnv("OIDC_ADMIN_GROUP", "noc-admins"),
+		PublicServerURL:  strings.TrimSuffix(getEnv("PUBLIC_SERVER_URL", getEnv("SERVER_EXTERNAL_URL", "")), "/"),
 	}
 
 	log.Printf("[CONFIG] Servidor configurado: Port=%s, MongoURI=%s, DB=%s, Collection=%s, OIDC=%t",

@@ -89,6 +89,7 @@ func main() {
 	mux.HandleFunc("/api/v1/download/client", downloadHandler.HandleDownloadClient)
 	mux.HandleFunc("/api/v1/download/client/info", downloadHandler.HandleClientInfo)
 	mux.HandleFunc("/download/client", downloadHandler.HandleDownloadClient)
+	mux.HandleFunc("/downloads/install-probe.sh", downloadHandler.HandleInstallScript)
 
 	// Endpoints de Gerenciamento de Usuários (Apenas Administrador)
 	mux.HandleFunc("/api/v1/users", authHandler.RequireAdmin(authHandler.HandleUsers))
