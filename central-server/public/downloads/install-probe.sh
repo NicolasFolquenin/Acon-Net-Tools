@@ -477,19 +477,19 @@ show_wifi_animation() {
 
     eval "local -a cur_f=(\"\${F_${frame_idx}[@]}\")"
 
-    printf "\r\033[K ${CYAN}%-36s${NC}  ${BLUE}┌──────────────────────────────────────────────┐${NC}\n" "${cur_f[0]}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}│${NC} ${GREEN}● STATUS: ONLINE (Sonda Ativa no Systemd)${NC}    ${BLUE}│${NC}\n" "${cur_f[1]}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}├──────────────────────────────────────────────┤${NC}\n" "${cur_f[2]}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}│${NC} • Servidor: ${CYAN}%-33s${NC} ${BLUE}│${NC}\n" "${cur_f[3]}" "${srv:0:33}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}│${NC} • Hostname: ${YELLOW}%-33s${NC} ${BLUE}│${NC}\n" "${cur_f[4]}" "${host:0:33}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}│${NC} • IP Sonda: ${CYAN}%-15s${NC}                ${BLUE}│${NC}\n" "${cur_f[5]}" "${ip:0:15}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}│${NC} • Gateway:  ${CYAN}%-15s${NC}                ${BLUE}│${NC}\n" "${cur_f[6]}" "${gw:0:15}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}│${NC} • Sinal:    ${GREEN}%-8s${NC} 📶 Uptime: ${YELLOW}%-8s${NC} ${BLUE}│${NC}\n" "${cur_f[7]}" "${sig}" "${time_str}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}│${NC} • Ondas:    Propagação de radiofrequência ativa ${BLUE}│${NC}\n" "${cur_f[8]}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}├──────────────────────────────────────────────┤${NC}\n" "${cur_f[9]}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}│${NC} ${YELLOW}👉 Pressione [ CTRL + C ] para sair          ${NC} ${BLUE}│${NC}\n" "${cur_f[10]}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}│${NC}    ${GREEN}(a sonda continuará em segundo plano)${NC}     ${BLUE}│${NC}\n" "${cur_f[11]}"
-    printf "\033[K ${CYAN}%-36s${NC}  ${BLUE}└──────────────────────────────────────────────┘${NC}\n" "${cur_f[12]}"
+    printf "\r\033[K ${CYAN}%-36s${NC}   ${GREEN}● STATUS: ONLINE${NC}  ${BLUE}[ Systemd Daemon ]${NC}\n" "${cur_f[0]}"
+    printf "\033[K ${CYAN}%-36s${NC}   ${BLUE}──────────────────────────────────────────────${NC}\n" "${cur_f[1]}"
+    printf "\033[K ${CYAN}%-36s${NC}   • Servidor:   ${CYAN}%s${NC}\n" "${cur_f[2]}" "${srv}"
+    printf "\033[K ${CYAN}%-36s${NC}   • Hostname:   ${YELLOW}%s${NC}\n" "${cur_f[3]}" "${host}"
+    printf "\033[K ${CYAN}%-36s${NC}   • IP Sonda:   ${CYAN}%s${NC}\n" "${cur_f[4]}" "${ip}"
+    printf "\033[K ${CYAN}%-36s${NC}   • Gateway:    ${CYAN}%s${NC}\n" "${cur_f[5]}" "${gw}"
+    printf "\033[K ${CYAN}%-36s${NC}   • Conexão:    ${GREEN}%s${NC}  • Uptime: ${YELLOW}%s${NC}\n" "${cur_f[6]}" "${sig}" "${time_str}"
+    printf "\033[K ${CYAN}%-36s${NC}   • Telemetria: Coleta em tempo real ativa\n" "${cur_f[7]}"
+    printf "\033[K ${CYAN}%-36s${NC}   ${BLUE}──────────────────────────────────────────────${NC}\n" "${cur_f[8]}"
+    printf "\033[K ${CYAN}%-36s${NC}   ${YELLOW}👉 Pressione [ CTRL + C ] para sair${NC}\n" "${cur_f[9]}"
+    printf "\033[K ${CYAN}%-36s${NC}      ${GREEN}(a sonda continuará em segundo plano)${NC}\n" "${cur_f[10]}"
+    printf "\033[K ${CYAN}%-36s${NC}\n" "${cur_f[11]}"
+    printf "\033[K ${CYAN}%-36s${NC}\n" "${cur_f[12]}"
     printf "\033[K ${CYAN}%-36s${NC}\n" "${cur_f[13]}"
 
     sleep 0.15
@@ -503,6 +503,27 @@ show_wifi_animation() {
   done
 }
 
+
+
+# 10. Verificação e teste imediato
+sleep 2
+if systemctl is-active --quiet uepg-probe; then
+  # Detecção robusta do IP local da máquina
+  LOCAL_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' | tr -d '\n')
+  if [ -z "$LOCAL_IP" ]; then
+    LOCAL_IP=$(ip -4 addr show up scope global 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n1)
+  fi
+  if [ -z "$LOCAL_IP" ]; then
+    LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  fi
+  [ -z "$LOCAL_IP" ] && LOCAL_IP="127.0.0.1"
+
+  # Detecção robusta do Gateway padrão
+  GATEWAY_IP=$(ip route show default 2>/dev/null | awk '/default/ {print $3}' | head -n1)
+  if [ -z "$GATEWAY_IP" ]; then
+    GATEWAY_IP=$(ip route 2>/dev/null | awk '/default/ {print $3}' | head -n1)
+  fi
+  [ -z "$GATEWAY_IP" ] && GATEWAY_IP="Automático"
 
   # Se houver terminal disponível, inicia a animação de ondas WiFi em tempo real (ASCII math)
   if [ -t 1 ] || [ -c /dev/tty ]; then
@@ -523,4 +544,3 @@ else
   echo -e "${RED}[AVISO] O serviço foi criado mas parece não ter iniciado corretamente.${NC}"
   echo -e "Verifique o log com: ${YELLOW}journalctl -u uepg-probe -xe${NC}"
 fi
-

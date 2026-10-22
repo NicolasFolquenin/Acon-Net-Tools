@@ -4883,21 +4883,28 @@ async function executeAdminPing(hostname, target) {
     const statLoss = document.getElementById('ping-stat-loss');
     const statLossDesc = document.getElementById('ping-stat-loss-desc');
 
-    const isAlive = !!data.is_alive;
+    const isAlive = (data.is_alive !== undefined) ? !!data.is_alive : !!data.success;
     if (statStatus) {
       statStatus.textContent = isAlive ? 'Conectado' : 'Sem Resposta';
       statStatus.className = `dc-health-badge ${isAlive ? 'online' : 'stale'}`;
     }
 
-    const loss = typeof data.packet_loss === 'number' ? data.packet_loss : 100;
-    const received = Math.round(4 * (1 - loss / 100));
+    const loss = typeof data.packet_loss === 'number' ? data.packet_loss :
+                 typeof data.packet_loss_percent === 'number' ? data.packet_loss_percent :
+                 (isAlive ? 0 : 100);
+    const packetsRecv = typeof data.packets_received === 'number' ? data.packets_received : Math.round(4 * (1 - loss / 100));
+    const packetsTotal = typeof data.packets_sent === 'number' ? data.packets_sent : 4;
     if (statSub) {
-      statSub.textContent = `${received} de 4 pacotes recebidos`;
+      statSub.textContent = `${packetsRecv} de ${packetsTotal} pacotes recebidos`;
     }
 
-    if (statAvg) statAvg.textContent = (data.avg_ms > 0 ? data.avg_ms.toFixed(1) : '--');
-    if (statMin) statMin.textContent = (data.min_ms > 0 ? data.min_ms.toFixed(1) : '--');
-    if (statMax) statMax.textContent = (data.max_ms > 0 ? data.max_ms.toFixed(1) : '--');
+    const avgMs = typeof data.avg_ms === 'number' ? data.avg_ms : data.avg_latency_ms;
+    const minMs = typeof data.min_ms === 'number' ? data.min_ms : data.min_latency_ms;
+    const maxMs = typeof data.max_ms === 'number' ? data.max_ms : data.max_latency_ms;
+
+    if (statAvg) statAvg.textContent = (avgMs > 0 ? avgMs.toFixed(1) : '--');
+    if (statMin) statMin.textContent = (minMs > 0 ? minMs.toFixed(1) : '--');
+    if (statMax) statMax.textContent = (maxMs > 0 ? maxMs.toFixed(1) : '--');
 
     if (statLoss) statLoss.textContent = loss.toFixed(0);
     if (statLossDesc) {
