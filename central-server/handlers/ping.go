@@ -36,12 +36,17 @@ type PingResponse struct {
 	Target            string    `json:"target"`
 	Hostname          string    `json:"hostname"`
 	Success           bool      `json:"success"`
+	IsAlive           bool      `json:"is_alive"`
 	PacketsSent       int       `json:"packets_sent"`
 	PacketsReceived   int       `json:"packets_received"`
 	PacketLossPercent float64   `json:"packet_loss_percent"`
+	PacketLoss        float64   `json:"packet_loss"`
 	MinLatencyMs      float64   `json:"min_latency_ms"`
 	AvgLatencyMs      float64   `json:"avg_latency_ms"`
 	MaxLatencyMs      float64   `json:"max_latency_ms"`
+	MinMs             float64   `json:"min_ms"`
+	AvgMs             float64   `json:"avg_ms"`
+	MaxMs             float64   `json:"max_ms"`
 	RawOutput         string    `json:"raw_output"`
 	Timestamp         time.Time `json:"timestamp"`
 }
@@ -201,4 +206,12 @@ func parsePingOutput(output string, resp *PingResponse) {
 			resp.AvgLatencyMs = sumLat / float64(validCount)
 		}
 	}
+
+	// Preenche aliases para total compatibilidade com o frontend
+	resp.IsAlive = resp.Success
+	resp.PacketLoss = resp.PacketLossPercent
+	resp.MinMs = resp.MinLatencyMs
+	resp.AvgMs = resp.AvgLatencyMs
+	resp.MaxMs = resp.MaxLatencyMs
 }
+
