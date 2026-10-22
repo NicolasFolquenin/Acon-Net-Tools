@@ -23,27 +23,61 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# 2. Determina a URL do Servidor Central
-SERVER_URL="${SERVER_URL:-$1}"
-if [ -z "$SERVER_URL" ]; then
-  # Tenta inferir a partir do referer ou host se executado via curl piping
-  if [ -n "$PROBE_SERVER" ]; then
-    SERVER_URL="$PROBE_SERVER"
+# 2. Determina a URL do Servidor Central (Interativo via /dev/tty ou parâmetros)
+SUGGESTED_URL="${SERVER_URL:-$1}"
+if [ -z "$SUGGESTED_URL" ] && [ -n "$PROBE_SERVER" ]; then
+  SUGGESTED_URL="$PROBE_SERVER"
+fi
+if [ -z "$SUGGESTED_URL" ] && [ -f "/etc/uepg-probe/config.json" ]; then
+  SUGGESTED_URL=$(grep -o '"server_url":[[:space:]]*"[^"]*"' /etc/uepg-probe/config.json 2>/dev/null | cut -d'"' -f4 || true)
+fi
+if [ -z "$SUGGESTED_URL" ]; then
+  SUGGESTED_URL="https://akvorado.acon.dev.uepg.br"
+fi
+
+echo -e "\n${BLUE}------------------------------------------------------------------${NC}"
+echo -e "${YELLOW}▶ Configuração de Conexão com o Servidor Central${NC}"
+echo -e "${BLUE}------------------------------------------------------------------${NC}"
+
+SERVER_URL=""
+
+# Lê diretamente do terminal controlador (/dev/tty), mesmo quando executado via curl piping
+if [ -c /dev/tty ]; then
+  echo -e "Informe a URL do Servidor Central onde as medições serão salvas."
+  echo -e "Pressione ${GREEN}[ENTER]${NC} para aceitar o valor sugerido: ${CYAN}${SUGGESTED_URL}${NC}"
+  echo ""
+  read -rp "URL do Servidor Central [${SUGGESTED_URL}]: " USER_INPUT_URL < /dev/tty
+  if [ -n "$USER_INPUT_URL" ]; then
+    SERVER_URL="$USER_INPUT_URL"
   else
-    # Fallback interativo ou padrão se não informado
-    if [ -t 0 ]; then
-      read -rp "Informe a URL do Servidor Central (ex: http://192.168.1.100:8080): " SERVER_URL
-    fi
+    SERVER_URL="$SUGGESTED_URL"
+  fi
+elif [ -t 0 ]; then
+  echo -e "Informe a URL do Servidor Central onde as medições serão salvas."
+  echo -e "Pressione ${GREEN}[ENTER]${NC} para aceitar o valor sugerido: ${CYAN}${SUGGESTED_URL}${NC}"
+  echo ""
+  read -rp "URL do Servidor Central [${SUGGESTED_URL}]: " USER_INPUT_URL
+  if [ -n "$USER_INPUT_URL" ]; then
+    SERVER_URL="$USER_INPUT_URL"
+  else
+    SERVER_URL="$SUGGESTED_URL"
+  fi
+else
+  # Modo não-interativo / CI
+  SERVER_URL="$SUGGESTED_URL"
+fi
+
+# Ajuste automático se o usuário digitou sem http:// ou https://
+if [[ ! "$SERVER_URL" =~ ^https?:// ]]; then
+  if [[ "$SERVER_URL" =~ ^(localhost|127\.|192\.168\.|10\.|172\.) ]]; then
+    SERVER_URL="http://${SERVER_URL}"
+  else
+    SERVER_URL="https://${SERVER_URL}"
   fi
 fi
 
-if [ -z "$SERVER_URL" ]; then
-  SERVER_URL="http://localhost:8080"
-  echo -e "${YELLOW}[AVISO] Nenhuma URL do servidor informada. Usando padrão: ${SERVER_URL}${NC}"
-fi
-
 SERVER_URL="${SERVER_URL%/}"
-echo -e "${GREEN}[+] Servidor Central definido como: ${CYAN}${SERVER_URL}${NC}"
+echo -e "${GREEN}[✓] Servidor Central configurado como: ${CYAN}${SERVER_URL}${NC}\n"
 
 # 3. Detecta arquitetura do sistema
 ARCH=$(uname -m)
@@ -87,11 +121,17 @@ fi
 chmod +x "$TARGET_BIN"
 echo -e "${GREEN}[+] Binário instalado com sucesso em ${CYAN}${TARGET_BIN}${NC}"
 
-# 6. Criação do arquivo de configuração /etc/uepg-probe/config.json se não existir
+# 6. Criação ou atualização do arquivo de configuração /etc/uepg-probe/config.json
 CONFIG_FILE="/etc/uepg-probe/config.json"
-if [ ! -f "$CONFIG_FILE" ]; then
+HOSTNAME=$(cat /etc/hostname 2>/dev/null || uname -n)
+
+if [ -f "$CONFIG_FILE" ]; then
+  echo -e "${GREEN}[+] Atualizando 'server_url' para ${CYAN}${SERVER_URL}${GREEN} no arquivo ${CYAN}${CONFIG_FILE}${NC}..."
+  if command -v sed >/dev/null 2>&1; then
+    sed -i "s|\"server_url\":[[:space:]]*\"[^\"]*\"|\"server_url\": \"${SERVER_URL}\"|g" "$CONFIG_FILE"
+  fi
+else
   echo -e "${GREEN}[+] Gerando arquivo de configuração padrão em ${CYAN}${CONFIG_FILE}${NC}..."
-  HOSTNAME=$(cat /etc/hostname 2>/dev/null || uname -n)
   cat <<EOF > "$CONFIG_FILE"
 {
   "node_id": "${HOSTNAME}",
@@ -102,8 +142,6 @@ if [ ! -f "$CONFIG_FILE" ]; then
   "sync_with_central": true
 }
 EOF
-else
-  echo -e "${YELLOW}[!] Arquivo ${CONFIG_FILE} já existente mantido intacto.${NC}"
 fi
 
 # 7. Sugestão de pacote lldpd para captura de porta de switch
