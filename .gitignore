@@ -8,9 +8,9 @@ bin/
 *.so
 *.dylib
 
-# Permite o instalador oficial do client para distribuição no servidor web
-!central-server/public/downloads/*.exe
-!central-server/public/downloads/**/*.exe
+# Permite o instalador oficial e binários do client para distribuição no servidor web
+!central-server/public/downloads/*
+client-probe/build/linux/
 
 # Bancos de dados locais
 *.db

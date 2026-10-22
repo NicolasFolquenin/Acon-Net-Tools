@@ -1,3 +1,5 @@
+//go:build !cli
+
 package main
 
 import (
@@ -165,21 +167,6 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.storage != nil {
 		a.storage.Close()
 	}
-}
-
-// getNextSyncSlot calcula o próximo horário fixo (:00 ou :30) do relógio de parede
-func getNextSyncSlot(now time.Time) time.Time {
-	var target time.Time
-	if now.Minute() < 30 {
-		target = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 30, 0, 0, now.Location())
-	} else {
-		nextHour := now.Add(1 * time.Hour)
-		target = time.Date(nextHour.Year(), nextHour.Month(), nextHour.Day(), nextHour.Hour(), 0, 0, 0, now.Location())
-	}
-	if !target.After(now) {
-		target = target.Add(30 * time.Minute)
-	}
-	return target
 }
 
 // backgroundScheduler gerencia a execução periódica de testes.

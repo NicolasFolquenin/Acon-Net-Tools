@@ -21,9 +21,11 @@ func CollectSystemInfo() SystemInfo {
 	// 1. Informações de Rede (IP Local, Gateway e MAC Address)
 	collectNetworkDetails(&info)
 
-	// 2. Informações de Hardware no Windows via WMI / PowerShell
+	// 2. Informações de Hardware no Windows via WMI / PowerShell ou Linux via /proc
 	if runtime.GOOS == "windows" {
 		collectWindowsHardware(&info)
+	} else if runtime.GOOS == "linux" {
+		collectLinuxHardware(&info)
 	}
 
 	return info
@@ -82,7 +84,53 @@ func collectNetworkDetails(info *SystemInfo) {
 		if out, err := cmd.Output(); err == nil {
 			info.Gateway = strings.TrimSpace(string(out))
 		}
+	} else if runtime.GOOS == "linux" {
+		collectLinuxGateway(info)
 	}
+}
+
+func collectLinuxGateway(info *SystemInfo) {
+	// 1. Tenta via comando ip route show default
+	cmd := exec.Command("ip", "route", "show", "default")
+	if out, err := cmd.Output(); err == nil && len(out) > 0 {
+		fields := strings.Fields(string(out))
+		for i, field := range fields {
+			if field == "via" && i+1 < len(fields) {
+				info.Gateway = fields[i+1]
+			}
+			if field == "dev" && i+1 < len(fields) && info.NetworkAdapter == "" {
+				info.NetworkAdapter = fields[i+1]
+			}
+		}
+	}
+
+	// 2. Fallback: leitura de /proc/net/route
+	if info.Gateway == "" {
+		if data, err := os.ReadFile("/proc/net/route"); err == nil {
+			lines := strings.Split(string(data), "\n")
+			for _, line := range lines[1:] {
+				cols := strings.Fields(line)
+				if len(cols) >= 3 && cols[1] == "00000000" { // Destino default 0.0.0.0
+					if gwHex, err := parseHexIPv4(cols[2]); err == nil && gwHex != "0.0.0.0" {
+						info.Gateway = gwHex
+						if info.NetworkAdapter == "" {
+							info.NetworkAdapter = cols[0]
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+}
+
+func parseHexIPv4(hexStr string) (string, error) {
+	var ipBytes [4]byte
+	n, err := fmt.Sscanf(hexStr, "%02x%02x%02x%02x", &ipBytes[3], &ipBytes[2], &ipBytes[1], &ipBytes[0])
+	if err != nil || n != 4 {
+		return "", fmt.Errorf("formato hex invalido")
+	}
+	return fmt.Sprintf("%d.%d.%d.%d", ipBytes[0], ipBytes[1], ipBytes[2], ipBytes[3]), nil
 }
 
 func collectWindowsHardware(info *SystemInfo) {
@@ -132,5 +180,66 @@ func collectWindowsHardware(info *SystemInfo) {
 	hideWindow(cmdAdapter)
 	if outA, errA := cmdAdapter.Output(); errA == nil && len(strings.TrimSpace(string(outA))) > 0 {
 		info.NetworkAdapter = strings.TrimSpace(string(outA))
+	}
+}
+
+func collectLinuxHardware(info *SystemInfo) {
+	// 1. Nome do SO via /etc/os-release
+	if data, err := os.ReadFile("/etc/os-release"); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "PRETTY_NAME=") {
+				val := strings.TrimPrefix(line, "PRETTY_NAME=")
+				info.OS = strings.Trim(val, "\"")
+				break
+			}
+		}
+	}
+
+	// 2. CPU via /proc/cpuinfo
+	if data, err := os.ReadFile("/proc/cpuinfo"); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "model name") || strings.HasPrefix(line, "Hardware") {
+				parts := strings.SplitN(line, ":", 2)
+				if len(parts) == 2 {
+					info.CPU = strings.TrimSpace(parts[1])
+					break
+				}
+			}
+		}
+	}
+
+	// 3. RAM Total via /proc/meminfo
+	if data, err := os.ReadFile("/proc/meminfo"); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "MemTotal:") {
+				fields := strings.Fields(line)
+				if len(fields) >= 2 {
+					var kb float64
+					if _, err := fmt.Sscanf(fields[1], "%f", &kb); err == nil && kb > 0 {
+						gb := kb / (1024 * 1024)
+						info.RAMTotalGB = float64(int(gb*10+0.5)) / 10.0
+					}
+				}
+				break
+			}
+		}
+	}
+
+	// 4. Modelo de hardware DMI / Device-Tree (ex: Raspberry Pi)
+	vendor := ""
+	if vData, err := os.ReadFile("/sys/class/dmi/id/sys_vendor"); err == nil {
+		vendor = strings.TrimSpace(string(vData))
+	}
+	product := ""
+	if pData, err := os.ReadFile("/sys/class/dmi/id/product_name"); err == nil {
+		product = strings.TrimSpace(string(pData))
+	}
+	if vendor != "" || product != "" {
+		info.Model = strings.TrimSpace(vendor + " " + product)
+	} else if dtModel, err := os.ReadFile("/proc/device-tree/model"); err == nil {
+		info.Model = strings.TrimSpace(string(dtModel))
 	}
 }
