@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UEPG Net Tools - Monitoramento de Rede</title>
-  <link rel="stylesheet" href="style.css?v=2.6.5" />
+  <link rel="stylesheet" href="style.css?v=2.6.6" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -901,29 +901,50 @@
               <h3 class="option-title">Instalação no Linux (Debian / Ubuntu / Raspberry Pi)</h3>
               <p class="option-desc">Execute o comando abaixo no terminal da sua máquina Linux como root/sudo para instalar o serviço da sonda automaticamente:</p>
               
-              <!-- Bloco do comando com botão copiar -->
-              <div class="cli-command-box">
-                <div class="cli-command-text">
-                  <span class="cli-command-prompt">#</span>
-                  <span id="linux-install-cmd">curl -fsSL http://localhost:8080/downloads/install-probe.sh | sudo bash</span>
+              <!-- Bloco de Terminal com Header e Botão Copiar -->
+              <div class="cli-terminal-block">
+                <div class="cli-terminal-top">
+                  <div class="cli-terminal-dots">
+                    <span class="cli-dot red"></span>
+                    <span class="cli-dot yellow"></span>
+                    <span class="cli-dot green"></span>
+                    <span class="cli-terminal-shell">bash</span>
+                  </div>
+                  <button type="button" class="btn-copy-command" id="btn-copy-linux-cmd" onclick="copyLinuxInstallCommand()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <span id="copy-btn-label">Copiar</span>
+                  </button>
                 </div>
-                <button type="button" class="btn-copy-command" id="btn-copy-linux-cmd" onclick="copyLinuxInstallCommand()">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                  </svg>
-                  <span id="copy-btn-label">Copiar</span>
-                </button>
+                <div class="cli-terminal-code">
+                  <span class="cli-terminal-prompt">$</span>
+                  <code id="linux-install-cmd">curl -fsSL http://localhost:8080/downloads/install-probe.sh | sudo bash</code>
+                </div>
               </div>
 
-              <div class="linux-binary-links">
-                <span style="font-size:0.75rem; color:var(--text-dim); margin-right:4px;">Binários avulsos:</span>
-                <a href="/downloads/uepg-probe-linux-amd64" class="linux-bin-link" download="uepg-probe-linux-amd64" title="Binário x86_64">
-                  🐧 Linux x86_64 (amd64)
-                </a>
-                <a href="/downloads/uepg-probe-linux-arm64" class="linux-bin-link" download="uepg-probe-linux-arm64" title="Binário ARM64 / Raspberry Pi">
-                  🍓 ARM64 (Raspberry Pi)
-                </a>
+              <!-- Grade de Binários Avulsos perfeitamente alinhada -->
+              <div class="linux-bin-section">
+                <span class="linux-bin-label">Downloads manuais avulsos:</span>
+                <div class="linux-bin-grid">
+                  <a href="/downloads/uepg-probe-linux-amd64" class="linux-bin-btn" download="uepg-probe-linux-amd64" title="Binário x86_64">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Linux x86_64 (amd64)</span>
+                  </a>
+                  <a href="/downloads/uepg-probe-linux-arm64" class="linux-bin-btn" download="uepg-probe-linux-arm64" title="Binário ARM64 / Raspberry Pi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>ARM64 (Raspberry Pi)</span>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -2127,18 +2148,27 @@
           Conecte-se ao seu servidor Debian/Linux via terminal (SSH) e execute o comando abaixo com privilégios de superusuário (<code class="code-badge-inline">sudo</code>):
         </p>
 
-        <div class="cli-command-box">
-          <div class="cli-command-text">
-            <span class="cli-command-prompt">#</span>
-            <span id="modal-linux-cmd">curl -fsSL http://localhost:8080/downloads/install-probe.sh | sudo bash</span>
+        <!-- Bloco de Terminal com Header e Botão Copiar -->
+        <div class="cli-terminal-block">
+          <div class="cli-terminal-top">
+            <div class="cli-terminal-dots">
+              <span class="cli-dot red"></span>
+              <span class="cli-dot yellow"></span>
+              <span class="cli-dot green"></span>
+              <span class="cli-terminal-shell">bash</span>
+            </div>
+            <button type="button" class="btn-copy-command" onclick="copyLinuxModalCommand()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span id="modal-copy-btn-label">Copiar</span>
+            </button>
           </div>
-          <button type="button" class="btn-copy-command" onclick="copyLinuxModalCommand()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            <span id="modal-copy-btn-label">Copiar</span>
-          </button>
+          <div class="cli-terminal-code">
+            <span class="cli-terminal-prompt">$</span>
+            <code id="modal-linux-cmd">curl -fsSL http://localhost:8080/downloads/install-probe.sh | sudo bash</code>
+          </div>
         </div>
 
         <div style="margin-top: 18px; border-top: 1px solid var(--border-glass); padding-top: 14px;">
@@ -2161,17 +2191,26 @@
           </div>
         </div>
 
-        <div class="linux-binary-links" style="margin-top: 14px;">
-          <span style="font-size:0.75rem; color:var(--text-dim); margin-right:4px;">Downloads manuais:</span>
-          <a href="/downloads/uepg-probe-linux-amd64" class="linux-bin-link" download="uepg-probe-linux-amd64">
-            🐧 Binário x86_64
-          </a>
-          <a href="/downloads/uepg-probe-linux-arm64" class="linux-bin-link" download="uepg-probe-linux-arm64">
-            🍓 Binário ARM64
-          </a>
-          <a href="/downloads/install-probe.sh" class="linux-bin-link" download="install-probe.sh">
-            📄 Script install-probe.sh
-          </a>
+        <div class="linux-bin-section" style="margin-top: 14px;">
+          <span class="linux-bin-label">Downloads manuais avulsos:</span>
+          <div class="linux-bin-grid">
+            <a href="/downloads/uepg-probe-linux-amd64" class="linux-bin-btn" download="uepg-probe-linux-amd64">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Linux x86_64</span>
+            </a>
+            <a href="/downloads/uepg-probe-linux-arm64" class="linux-bin-btn" download="uepg-probe-linux-arm64">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>ARM64</span>
+            </a>
+          </div>
         </div>
       </div>
 
@@ -2184,7 +2223,7 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="app.js?v=2.6.5"></script>
+  <script src="app.js?v=2.6.6"></script>
 </body>
 </html>
 
