@@ -182,20 +182,100 @@ systemctl daemon-reload
 systemctl enable uepg-probe
 systemctl restart uepg-probe
 
+# Função de animação de telemetria de rede e tráfego
+show_network_animation() {
+  local srv="$1"
+  local host="$2"
+  local ip="$3"
+  local gw="$4"
+
+  # Trap para interceptar o Ctrl+C e confirmar a execução em segundo plano
+  trap '
+    printf "\033[?25h\n\n"
+    echo -e "${GREEN}==================================================================${NC}"
+    echo -e "${GREEN}  ✓ Sonda operando com sucesso em SEGUNDO PLANO (systemd)!       ${NC}"
+    echo -e "${GREEN}==================================================================${NC}"
+    echo -e "A sonda UEPG Net Tools permanece ativa e enviando dados para o servidor."
+    echo -e "Comandos rápidos úteis:"
+    echo -e "  • Logs em tempo real: ${YELLOW}journalctl -u uepg-probe -f${NC}"
+    echo -e "  • Consultar status:   ${YELLOW}systemctl status uepg-probe${NC}"
+    echo -e "  • Reiniciar sonda:    ${YELLOW}systemctl restart uepg-probe${NC}\n"
+    exit 0
+  ' SIGINT SIGTERM
+
+  # Esconde o cursor
+  printf "\033[?25l"
+
+  local frames=(
+    "───( ●  ○  ○ )──[ 🌐 INTERNET ]──────────────>"
+    "────( ○  ●  ○ )─[ 🌐 INTERNET ]──────────────>"
+    "─────( ○  ○  ● )[ 🌐 INTERNET ]──────────────>"
+    "────────────────[ 🌐 INTERNET ]──( ●  ○  ○ )─>"
+    "────────────────[ 🌐 INTERNET ]───( ○  ●  ○ )─>"
+    "<───( ●  ○  ○ )─[ 🌐 INTERNET ]────────────────"
+    "<────( ○  ●  ○ )[ 🌐 INTERNET ]────────────────"
+    "<─────( ○  ○  ●)[ 🌐 INTERNET ]────────────────"
+  )
+  local globes=("🌍" "🌎" "🌏")
+  local signals=("[ ▂   ]" "[ ▂▄  ]" "[ ▂▄▆ ]" "[ ▂▄▆█]")
+
+  local sec=0
+  local f=0
+  local total_frames=${#frames[@]}
+
+  echo -e "\n${BLUE}==================================================================${NC}"
+  echo -e "${CYAN}     🚀 SONDA ATIVA • MONITORAMENTO DE REDE EM TEMPO REAL         ${NC}"
+  echo -e "${BLUE}==================================================================${NC}\n"
+
+  while true; do
+    local wire="${frames[$f]}"
+    local globe="${globes[$(( (f / 2) % 3 ))]}"
+    local sig="${signals[$(( f % 4 ))]}"
+    local mm=$(( sec / 60 ))
+    local ss=$(( sec % 60 ))
+    local time_str=$(printf "%02d:%02d" $mm $ss)
+
+    printf "\r\033[K ${CYAN}💻 [${host}]${NC} ${YELLOW}${wire}${NC} ${GREEN}☁ [Servidor Central]${NC}\n"
+    printf "\033[K   ${BLUE}├─${NC} Status:     ${GREEN}● ONLINE${NC} (Daemon Systemd Ativo)\n"
+    printf "\033[K   ${BLUE}├─${NC} Servidor:   ${CYAN}%s${NC}\n" "${srv}"
+    printf "\033[K   ${BLUE}├─${NC} IP Local:   ${CYAN}%s${NC} | Gateway: ${CYAN}%s${NC}\n" "${ip}" "${gw}"
+    printf "\033[K   ${BLUE}├─${NC} Conexão:    ${GREEN}%s${NC} %s Uptime: ${YELLOW}%s${NC}\n" "${sig}" "${globe}" "${time_str}"
+    printf "\033[K   ${BLUE}└─${NC} ${YELLOW}👉 Pressione [ CTRL + C ] para voltar ao terminal e deixar em 2º plano${NC}\n"
+
+    sleep 0.4
+    sec=$(( sec + 1 ))
+    f=$(( (f + 1) % total_frames ))
+
+    # Retorna 6 linhas para cima para redesenhar fluidamente o próximo frame
+    printf "\033[6A"
+  done
+}
+
 # 10. Verificação e teste imediato
 sleep 2
 if systemctl is-active --quiet uepg-probe; then
-  echo -e "\n${GREEN}==================================================================${NC}"
-  echo -e "${GREEN}  ✓ Sonda instalada e rodando com sucesso no seu Debian/Linux!   ${NC}"
-  echo -e "${GREEN}==================================================================${NC}"
-  echo -e "A máquina já realizou o auto-registro e está visível no Dashboard central.\n"
-  echo -e "Comandos úteis para gerenciar a sonda:"
-  echo -e "  • Ver status:       ${YELLOW}systemctl status uepg-probe${NC}"
-  echo -e "  • Ver logs ao vivo: ${YELLOW}journalctl -u uepg-probe -f${NC}"
-  echo -e "  • Reiniciar:        ${YELLOW}systemctl restart uepg-probe${NC}"
-  echo -e "  • Teste manual CLI: ${YELLOW}/usr/local/bin/uepg-probe -once${NC}"
-  echo -e "  • Configuração:     ${CYAN}/etc/uepg-probe/config.json${NC}\n"
+  LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  [ -z "$LOCAL_IP" ] && LOCAL_IP="127.0.0.1"
+  GATEWAY_IP=$(ip route 2>/dev/null | awk '/default/ {print $3}' | head -n1)
+  [ -z "$GATEWAY_IP" ] && GATEWAY_IP="Automático"
+
+  # Se houver terminal disponível, inicia a animação de tráfego interativo
+  if [ -t 1 ] || [ -c /dev/tty ]; then
+    show_network_animation "${SERVER_URL}" "${HOSTNAME}" "${LOCAL_IP}" "${GATEWAY_IP}"
+  else
+    echo -e "\n${GREEN}==================================================================${NC}"
+    echo -e "${GREEN}  ✓ Sonda instalada e rodando com sucesso no seu Debian/Linux!   ${NC}"
+    echo -e "${GREEN}==================================================================${NC}"
+    echo -e "A máquina já realizou o auto-registro e está visível no Dashboard central.\n"
+    echo -e "Comandos úteis para gerenciar a sonda:"
+    echo -e "  • Ver status:       ${YELLOW}systemctl status uepg-probe${NC}"
+    echo -e "  • Ver logs ao vivo: ${YELLOW}journalctl -u uepg-probe -f${NC}"
+    echo -e "  • Reiniciar:        ${YELLOW}systemctl restart uepg-probe${NC}"
+    echo -e "  • Teste manual CLI: ${YELLOW}/usr/local/bin/uepg-probe -once${NC}"
+    echo -e "  • Configuração:     ${CYAN}/etc/uepg-probe/config.json${NC}\n"
+  fi
 else
   echo -e "${RED}[AVISO] O serviço foi criado mas parece não ter iniciado corretamente.${NC}"
   echo -e "Verifique o log com: ${YELLOW}journalctl -u uepg-probe -xe${NC}"
 fi
+
