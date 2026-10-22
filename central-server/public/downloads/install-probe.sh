@@ -79,6 +79,29 @@ fi
 SERVER_URL="${SERVER_URL%/}"
 echo -e "${GREEN}[✓] Servidor Central configurado como: ${CYAN}${SERVER_URL}${NC}\n"
 
+# Determina valor padrão ou sugerido da localização
+SUGGESTED_LOCATION="Campus Uvaranas"
+if [ -f "/etc/uepg-probe/config.json" ]; then
+  EXISTING_LOC=$(grep -o '"location":[[:space:]]*"[^"]*"' /etc/uepg-probe/config.json 2>/dev/null | cut -d'"' -f4 || true)
+  if [ -n "$EXISTING_LOC" ] && [ "$EXISTING_LOC" != "Debian Linux Server" ]; then
+    SUGGESTED_LOCATION="$EXISTING_LOC"
+  fi
+fi
+
+LOCATION=""
+if [ -c /dev/tty ]; then
+  echo -e "Informe o Bloco / Localização física desta máquina (ex: Bloco L - NTI, Reitoria, etc.)"
+  read -rp "Localização [${SUGGESTED_LOCATION}]: " USER_INPUT_LOC < /dev/tty
+  LOCATION="${USER_INPUT_LOC:-$SUGGESTED_LOCATION}"
+elif [ -t 0 ]; then
+  echo -e "Informe o Bloco / Localização física desta máquina (ex: Bloco L - NTI, Reitoria, etc.)"
+  read -rp "Localização [${SUGGESTED_LOCATION}]: " USER_INPUT_LOC
+  LOCATION="${USER_INPUT_LOC:-$SUGGESTED_LOCATION}"
+else
+  LOCATION="$SUGGESTED_LOCATION"
+fi
+echo -e "${GREEN}[✓] Localização definida como: ${CYAN}${LOCATION}${NC}\n"
+
 # 3. Detecta arquitetura do sistema
 ARCH=$(uname -m)
 BIN_NAME=""
@@ -134,16 +157,17 @@ CONFIG_FILE="/etc/uepg-probe/config.json"
 HOSTNAME=$(cat /etc/hostname 2>/dev/null || uname -n)
 
 if [ -f "$CONFIG_FILE" ]; then
-  echo -e "${GREEN}[+] Atualizando 'server_url' para ${CYAN}${SERVER_URL}${GREEN} no arquivo ${CYAN}${CONFIG_FILE}${NC}..."
+  echo -e "${GREEN}[+] Atualizando configurações no arquivo ${CYAN}${CONFIG_FILE}${NC}..."
   if command -v sed >/dev/null 2>&1; then
     sed -i "s|\"server_url\":[[:space:]]*\"[^\"]*\"|\"server_url\": \"${SERVER_URL}\"|g" "$CONFIG_FILE"
+    sed -i "s|\"location\":[[:space:]]*\"[^\"]*\"|\"location\": \"${LOCATION}\"|g" "$CONFIG_FILE"
   fi
 else
   echo -e "${GREEN}[+] Gerando arquivo de configuração padrão em ${CYAN}${CONFIG_FILE}${NC}..."
   cat <<EOF > "$CONFIG_FILE"
 {
   "node_id": "${HOSTNAME}",
-  "location": "Debian Linux Server",
+  "location": "${LOCATION}",
   "server_url": "${SERVER_URL}",
   "interval_minutes": 60,
   "ping_target": "auto_gateway",
