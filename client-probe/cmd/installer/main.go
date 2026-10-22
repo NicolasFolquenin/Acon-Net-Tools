@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -77,6 +78,7 @@ var (
 
 	hwndMain       uintptr
 	hwndPathEdit   uintptr
+	hwndServerEdit uintptr
 	hwndChkDesktop uintptr
 	hwndChkStartup uintptr
 	hwndChkMenu    uintptr
@@ -288,6 +290,20 @@ func performInstallation() {
 	}
 	_ = extractFile("payload/icon.ico", iconPath)
 
+	// Atualiza server_url no config.json com o valor informado pelo usuário
+	serverURL := getControlText(hwndServerEdit)
+	if serverURL != "" {
+		if data, err := os.ReadFile(configPath); err == nil {
+			var cfgMap map[string]interface{}
+			if err := json.Unmarshal(data, &cfgMap); err == nil {
+				cfgMap["server_url"] = strings.TrimRight(serverURL, "/")
+				if updatedData, err := json.MarshalIndent(cfgMap, "", "  "); err == nil {
+					_ = os.WriteFile(configPath, updatedData, 0644)
+				}
+			}
+		}
+	}
+
 	userProfile := os.Getenv("USERPROFILE")
 	appData := os.Getenv("APPDATA")
 
@@ -363,7 +379,7 @@ func main() {
 	pRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
 
 	winW := int32(520)
-	winH := int32(410)
+	winH := int32(450)
 
 	scrW, _, _ := user32.NewProc("GetSystemMetrics").Call(0)
 	scrH, _, _ := user32.NewProc("GetSystemMetrics").Call(1)
@@ -384,30 +400,34 @@ func main() {
 	createControl("STATIC", "Configure as opções de instalação da sonda de rede neste computador:", 0, 24, 42, 460, 20, 0, defaultFont)
 
 	// Seção 1: Pasta de Instalação
-	createControl("STATIC", "Pasta de Destino:", 0, 24, 76, 460, 18, 0, defaultFont)
-	hwndPathEdit = createControl("EDIT", getDefaultInstallDir(), WS_BORDER|ES_AUTOHSCROLL|WS_TABSTOP, 24, 98, 360, 26, 0, defaultFont)
-	hwndBtnBrowse = createControl("BUTTON", "Procurar...", WS_TABSTOP, 394, 98, 90, 26, ID_BTN_BROWSE, defaultFont)
+	createControl("STATIC", "Pasta de Destino:", 0, 24, 72, 460, 18, 0, defaultFont)
+	hwndPathEdit = createControl("EDIT", getDefaultInstallDir(), WS_BORDER|ES_AUTOHSCROLL|WS_TABSTOP, 24, 92, 360, 26, 0, defaultFont)
+	hwndBtnBrowse = createControl("BUTTON", "Procurar...", WS_TABSTOP, 394, 92, 90, 26, ID_BTN_BROWSE, defaultFont)
 
-	// Seção 2: Opções de Atalhos e Inicialização (Caixas de seleção / Checkboxes)
-	createControl("STATIC", "Opções Adicionais:", 0, 24, 142, 460, 18, 0, defaultFont)
+	// Seção 2: URL do Servidor Central
+	createControl("STATIC", "URL do Servidor Central (Backend):", 0, 24, 126, 460, 18, 0, defaultFont)
+	hwndServerEdit = createControl("EDIT", "https://akvorado.acon.dev.uepg.br", WS_BORDER|ES_AUTOHSCROLL|WS_TABSTOP, 24, 146, 460, 26, 0, defaultFont)
 
-	hwndChkDesktop = createControl("BUTTON", "Criar atalho na Área de Trabalho (Desktop)", BS_AUTOCHECKBOX|WS_TABSTOP, 24, 168, 460, 24, ID_CHK_DESKTOP, defaultFont)
+	// Seção 3: Opções Adicionais (Atalhos e Inicialização)
+	createControl("STATIC", "Opções Adicionais:", 0, 24, 182, 460, 18, 0, defaultFont)
+
+	hwndChkDesktop = createControl("BUTTON", "Criar atalho na Área de Trabalho (Desktop)", BS_AUTOCHECKBOX|WS_TABSTOP, 24, 204, 460, 22, ID_CHK_DESKTOP, defaultFont)
 	pSendMessageW.Call(hwndChkDesktop, BM_SETCHECK, BST_CHECKED, 0)
 
-	hwndChkStartup = createControl("BUTTON", "Iniciar automaticamente junto com o computador (Windows Startup)", BS_AUTOCHECKBOX|WS_TABSTOP, 24, 198, 460, 24, ID_CHK_STARTUP, defaultFont)
+	hwndChkStartup = createControl("BUTTON", "Iniciar automaticamente com o computador (Windows Startup)", BS_AUTOCHECKBOX|WS_TABSTOP, 24, 230, 460, 22, ID_CHK_STARTUP, defaultFont)
 	pSendMessageW.Call(hwndChkStartup, BM_SETCHECK, BST_CHECKED, 0)
 
-	hwndChkMenu = createControl("BUTTON", "Criar atalhos no Menu Iniciar do Windows", BS_AUTOCHECKBOX|WS_TABSTOP, 24, 228, 460, 24, ID_CHK_STARTMENU, defaultFont)
+	hwndChkMenu = createControl("BUTTON", "Criar atalhos no Menu Iniciar do Windows", BS_AUTOCHECKBOX|WS_TABSTOP, 24, 256, 460, 22, ID_CHK_STARTMENU, defaultFont)
 	pSendMessageW.Call(hwndChkMenu, BM_SETCHECK, BST_CHECKED, 0)
 
 	// Status text
-	hwndStatus = createControl("STATIC", "Clique em 'Instalar' para iniciar a cópia e configuração.", 0, 24, 275, 460, 20, 0, defaultFont)
+	hwndStatus = createControl("STATIC", "Clique em 'Instalar' para iniciar a cópia e configuração.", 0, 24, 298, 460, 20, 0, defaultFont)
 
 	// Linha divisória / Botões inferiores
-	createControl("STATIC", "", WS_BORDER, 24, 305, 460, 1, 0, 0)
+	createControl("STATIC", "", WS_BORDER, 24, 328, 460, 1, 0, 0)
 
-	hwndBtnCancel = createControl("BUTTON", "Cancelar", WS_TABSTOP, 384, 320, 100, 32, ID_BTN_CANCEL, defaultFont)
-	hwndBtnInstall = createControl("BUTTON", "Instalar", BS_DEFPUSHBUTTON|WS_TABSTOP, 274, 320, 100, 32, ID_BTN_INSTALL, defaultFont)
+	hwndBtnCancel = createControl("BUTTON", "Cancelar", WS_TABSTOP, 384, 345, 100, 32, ID_BTN_CANCEL, defaultFont)
+	hwndBtnInstall = createControl("BUTTON", "Instalar", BS_DEFPUSHBUTTON|WS_TABSTOP, 274, 345, 100, 32, ID_BTN_INSTALL, defaultFont)
 
 	var msg MSG
 	for {
