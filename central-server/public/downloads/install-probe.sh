@@ -98,27 +98,35 @@ esac
 
 echo -e "${GREEN}[+] Arquitetura detectada: ${CYAN}${ARCH}${GREEN} -> Binário: ${CYAN}${BIN_NAME}${NC}"
 
-# 4. Criação dos diretórios de sistema
+# 4. Criação dos diretórios de sistema e parada de serviço ativo para atualização
 echo -e "${GREEN}[+] Criando diretórios em /etc/uepg-probe e /var/lib/uepg-probe...${NC}"
 mkdir -p /etc/uepg-probe
 mkdir -p /var/lib/uepg-probe
+mkdir -p /usr/local/bin
 
-# 5. Download do binário
+if systemctl is-active --quiet uepg-probe 2>/dev/null; then
+  echo -e "${YELLOW}[!] Parando serviço anterior para atualização do executável...${NC}"
+  systemctl stop uepg-probe 2>/dev/null || true
+fi
+
+# 5. Download do binário (com arquivo temporário para evitar Text File Busy)
 DOWNLOAD_URL="${SERVER_URL}/downloads/${BIN_NAME}"
 TARGET_BIN="/usr/local/bin/uepg-probe"
+TMP_BIN="/usr/local/bin/uepg-probe.tmp.$$"
 
 echo -e "${GREEN}[+] Baixando executável de: ${CYAN}${DOWNLOAD_URL}${NC}..."
 if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$DOWNLOAD_URL" -o "$TARGET_BIN"
+  curl -fsSL "$DOWNLOAD_URL" -o "$TMP_BIN"
 elif command -v wget >/dev/null 2>&1; then
-  wget -q "$DOWNLOAD_URL" -O "$TARGET_BIN"
+  wget -q "$DOWNLOAD_URL" -O "$TMP_BIN"
 else
   echo -e "${RED}[ERRO] Nem 'curl' nem 'wget' foram encontrados no sistema.${NC}"
   echo -e "Instale um deles com: ${YELLOW}apt update && apt install -y curl${NC}"
   exit 1
 fi
 
-chmod +x "$TARGET_BIN"
+chmod +x "$TMP_BIN"
+mv -f "$TMP_BIN" "$TARGET_BIN"
 echo -e "${GREEN}[+] Binário instalado com sucesso em ${CYAN}${TARGET_BIN}${NC}"
 
 # 6. Criação ou atualização do arquivo de configuração /etc/uepg-probe/config.json
