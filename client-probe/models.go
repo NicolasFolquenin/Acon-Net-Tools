@@ -5,17 +5,30 @@ import (
 	"time"
 )
 
+// NetworkInterfaceDetail representa uma placa de rede identificada no computador
+type NetworkInterfaceDetail struct {
+	Name        string   `json:"name"`                   // Ex: "Wi-Fi", "Ethernet", "eth0"
+	Description string   `json:"description,omitempty"`  // Ex: "Intel(R) Wi-Fi 6 AX201"
+	MACAddress  string   `json:"mac_address"`            // Ex: "E4-54-E8-12-34-56"
+	IPAddresses []string `json:"ip_addresses,omitempty"` // Lista de IPs associados
+	Type        string   `json:"type"`                   // "ethernet", "wifi", "virtual", "other"
+	IsPrimary   bool     `json:"is_primary"`             // True se for a placa com a rota padrão/gateway ativo
+	IsUp        bool     `json:"is_up"`                  // Link operacional ativo
+	Gateway     string   `json:"gateway,omitempty"`      // Gateway associado
+}
+
 // SystemInfo armazena dados de hardware e rede local da máquina que executa o teste
 type SystemInfo struct {
-	Hostname       string  `json:"hostname"`
-	Model          string  `json:"model"`
-	CPU            string  `json:"cpu"`
-	RAMTotalGB     float64 `json:"ram_total_gb"`
-	OS             string  `json:"os"`
-	IPAddress      string  `json:"ip_address"`
-	MACAddress     string  `json:"mac_address"`
-	Gateway        string  `json:"gateway"`
-	NetworkAdapter string  `json:"network_adapter"`
+	Hostname       string                   `json:"hostname"`
+	Model          string                   `json:"model"`
+	CPU            string                   `json:"cpu"`
+	RAMTotalGB     float64                  `json:"ram_total_gb"`
+	OS             string                   `json:"os"`
+	IPAddress      string                   `json:"ip_address"`
+	MACAddress     string                   `json:"mac_address"`
+	Gateway        string                   `json:"gateway"`
+	NetworkAdapter string                   `json:"network_adapter"`
+	Interfaces     []NetworkInterfaceDetail `json:"interfaces,omitempty"`
 }
 
 // SwitchInfo armazena as informações do switch descobertas via LLDP
@@ -76,6 +89,7 @@ const (
 	TaskTypeSystemInfo         TaskType = "system_info"
 	TaskTypeHTTPCheck          TaskType = "http_check"
 	TaskTypeTraceroute         TaskType = "traceroute"
+	TaskTypeWiFiStatus         TaskType = "wifi_status"
 )
 
 // HostBootstrapInfo carrega dados do host para o auto-registro inicial
@@ -110,6 +124,7 @@ type TestTaskConfig struct {
 	Endpoint             string                 `json:"endpoint,omitempty"`
 	SizeMB               int                    `json:"size_mb,omitempty"`
 	Domain               string                 `json:"domain,omitempty"`
+	DNSServers           []string               `json:"dns_servers,omitempty"`
 	Count                int                    `json:"count,omitempty"`
 	TimeoutMS            int                    `json:"timeout_ms,omitempty"`
 	TimeoutSeconds       int                    `json:"timeout_seconds,omitempty"`
@@ -165,6 +180,7 @@ type SpeedtestUploadConfig struct {
 type DNSModuleConfig struct {
 	Enabled bool     `json:"enabled"`
 	Domains []string `json:"domains"`
+	Servers []string `json:"servers,omitempty"` // IPs dos servidores DNS específicos (ex: 10.x.x.x, 8.8.8.8)
 }
 
 type HTTPCheckModuleConfig struct {
@@ -183,6 +199,10 @@ type LLDPModuleConfig struct {
 	Enabled bool `json:"enabled"`
 }
 
+type WiFiModuleConfig struct {
+	Enabled bool `json:"enabled"`
+}
+
 type TestModulesConfig struct {
 	Ping       PingModuleConfig        `json:"ping"`
 	PacketLoss PacketLossModuleConfig  `json:"packet_loss"`
@@ -192,6 +212,7 @@ type TestModulesConfig struct {
 	HTTPCheck  HTTPCheckModuleConfig   `json:"http_check"`
 	Traceroute TracerouteModuleConfig  `json:"traceroute"`
 	LLDP       LLDPModuleConfig        `json:"lldp"`
+	WiFi       WiFiModuleConfig        `json:"wifi"`
 }
 
 func DefaultModulesConfig() TestModulesConfig {
@@ -218,7 +239,8 @@ func DefaultModulesConfig() TestModulesConfig {
 		},
 		DNS: DNSModuleConfig{
 			Enabled: true,
-			Domains: []string{"google.com", "cloudflare.com"},
+			Domains: []string{"uepg.br", "google.com"},
+			Servers: []string{"auto"},
 		},
 		HTTPCheck: HTTPCheckModuleConfig{
 			Enabled:        true,
@@ -231,6 +253,9 @@ func DefaultModulesConfig() TestModulesConfig {
 			MaxHops: 15,
 		},
 		LLDP: LLDPModuleConfig{
+			Enabled: true,
+		},
+		WiFi: WiFiModuleConfig{
 			Enabled: true,
 		},
 	}
@@ -291,8 +316,40 @@ type TracerouteResult struct {
 	Success   bool            `json:"success"`
 }
 
+type SingleDNSProbeResult struct {
+	Server     string  `json:"server"`
+	LatencyMs  float64 `json:"latency_ms"`
+	ResolvedIP string  `json:"resolved_ip"`
+	Success    bool    `json:"success"`
+	Error      string  `json:"error,omitempty"`
+}
+
+type MultiDNSResult struct {
+	Domain  string                 `json:"domain"`
+	Servers []SingleDNSProbeResult `json:"servers"`
+	BestMs  float64                `json:"best_ms"`
+	AvgMs   float64                `json:"avg_ms"`
+}
+
+type WiFiMetricResult struct {
+	HasWiFiAdapter bool    `json:"has_wifi_adapter"`
+	Connected      bool    `json:"connected"`
+	SSID           string  `json:"ssid,omitempty"`
+	BSSID          string  `json:"bssid,omitempty"`
+	SignalPercent  int     `json:"signal_percent"`
+	SignalDBm      int     `json:"signal_dbm"`
+	RadioType      string  `json:"radio_type,omitempty"`
+	Band           string  `json:"band,omitempty"`
+	Channel        int     `json:"channel,omitempty"`
+	RxRateMbps     float64 `json:"rx_rate_mbps,omitempty"`
+	TxRateMbps     float64 `json:"tx_rate_mbps,omitempty"`
+	Status         string  `json:"status"` // "ok", "disconnected", "no_adapter"
+}
+
 type ModularResults struct {
 	DNS        *DNSResult        `json:"dns,omitempty"`
+	MultiDNS   *MultiDNSResult   `json:"multi_dns,omitempty"`
+	WiFi       *WiFiMetricResult `json:"wifi,omitempty"`
 	PacketLoss *PacketLossResult `json:"packet_loss,omitempty"`
 	HTTPCheck  *HTTPCheckResult  `json:"http_check,omitempty"`
 	Traceroute *TracerouteResult `json:"traceroute,omitempty"`

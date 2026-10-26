@@ -2554,6 +2554,48 @@ function renderSingleMachineHeaderAndAlert(diagnostic, summaries) {
   if (switchEl) switchEl.textContent = swName;
   if (portEl) portEl.textContent = swPort;
 
+  // Metadados Wi-Fi e DNS no Cabeçalho de Máquina Única
+  const smWifiMeta = document.getElementById('sm-wifi-meta');
+  const smWifiVal = document.getElementById('sm-wifi-val');
+  const smDnsMeta = document.getElementById('sm-dns-meta');
+  const smDnsVal = document.getElementById('sm-dns-val');
+
+  const modResults = (diagnostic && diagnostic.modular_results) || (summary && summary.modular_results);
+  if (smWifiMeta && smWifiVal) {
+    if (modResults && modResults.wifi && modResults.wifi.status && modResults.wifi.status !== 'skipped') {
+      const wf = modResults.wifi;
+      smWifiMeta.style.display = 'inline-flex';
+      if (wf.status === 'disconnected') {
+        smWifiVal.textContent = 'Desconectado';
+        smWifiVal.className = 'sm-meta-val text-subtle';
+      } else {
+        const pct = wf.signal_quality_percent || 0;
+        const ssid = wf.ssid || 'Wi-Fi';
+        smWifiVal.textContent = `${ssid} (${pct}%)`;
+        smWifiVal.className = 'sm-meta-val text-emerald font-bold';
+      }
+    } else {
+      smWifiMeta.style.display = 'none';
+    }
+  }
+
+  if (smDnsMeta && smDnsVal) {
+    if (modResults && modResults.multi_dns && modResults.multi_dns.probes && modResults.multi_dns.probes.length > 0) {
+      smDnsMeta.style.display = 'inline-flex';
+      const uepgProbe = modResults.multi_dns.probes.find(p => p.server_ip && p.server_ip.startsWith('177.101.22.'));
+      if (uepgProbe && uepgProbe.status === 'success') {
+        smDnsVal.textContent = `${uepgProbe.latency_ms.toFixed(1)} ms`;
+      } else if (modResults.multi_dns.fastest_server) {
+        const fastest = modResults.multi_dns.probes.find(p => p.server_ip === modResults.multi_dns.fastest_server);
+        smDnsVal.textContent = fastest ? `${fastest.latency_ms.toFixed(1)} ms (${fastest.server_ip})` : '--';
+      } else {
+        smDnsVal.textContent = '--';
+      }
+    } else {
+      smDnsMeta.style.display = 'none';
+    }
+  }
+
   // Modo Histórico
   const isHistorical = diagnostic ? !!diagnostic.is_historical_fallback : false;
   if (histTag) histTag.style.display = isHistorical ? 'inline-flex' : 'none';
@@ -2914,11 +2956,213 @@ function openPCDetailsModal(s) {
   document.getElementById('modal-hw-ram').textContent = sys.ram_total_gb ? `${sys.ram_total_gb.toFixed(1)} GB` : '--';
   document.getElementById('modal-hw-os').textContent = sys.os || '--';
 
-  // 3. Rede Local
-  document.getElementById('modal-net-ip').textContent = sys.ip_address || '--';
-  document.getElementById('modal-net-mac').textContent = sys.mac_address || '--';
-  document.getElementById('modal-net-gateway').textContent = sys.gateway || '--';
-  document.getElementById('modal-net-adapter').textContent = sys.network_adapter || '--';
+  // 3. Rede Local (Resumo Primário)
+  document.getElementById('modal-net-ip').textContent = sys.ip_address || sys.IPAddress || '--';
+  document.getElementById('modal-net-mac').textContent = sys.mac_address || sys.MACAddress || '--';
+  document.getElementById('modal-net-gateway').textContent = sys.gateway || sys.Gateway || '--';
+  document.getElementById('modal-net-adapter').textContent = sys.network_adapter || sys.NetworkAdapter || '--';
+
+  // 3.0 Múltiplas Interfaces e MACs
+  const ifacesTbody = document.getElementById('modal-interfaces-body');
+  const ifacesCount = document.getElementById('modal-interfaces-count');
+  const ifacesList = sys.interfaces || sys.Interfaces || [];
+
+  if (ifacesTbody) {
+    if (ifacesList.length > 0) {
+      if (ifacesCount) ifacesCount.textContent = `${ifacesList.length} placa(s)`;
+      ifacesTbody.innerHTML = ifacesList.map(iface => {
+        const isUp = !!iface.is_up;
+        const isPrimary = !!iface.is_primary;
+        const ifaceType = (iface.type || 'ethernet').toLowerCase();
+        let badgeTypeClass = 'badge-iface-eth';
+        let typeLabel = 'Ethernet';
+        if (ifaceType === 'wifi' || ifaceType === 'wi-fi') {
+          badgeTypeClass = 'badge-iface-wifi';
+          typeLabel = 'Wi-Fi';
+        } else if (ifaceType === 'virtual') {
+          badgeTypeClass = 'badge-iface-virtual';
+          typeLabel = 'Virtual';
+        }
+
+        const ipsStr = (iface.ip_addresses && iface.ip_addresses.length > 0)
+          ? iface.ip_addresses.join('<br>')
+          : '<span class="text-subtle">Sem IP</span>';
+
+        return `
+          <tr>
+            <td>
+              <span class="${isUp ? 'status-dot-up' : 'status-dot-down'}"></span>
+              <span class="${isUp ? 'text-emerald' : 'text-subtle'} font-bold">${isUp ? 'Ativa' : 'Inativa'}</span>
+            </td>
+            <td>
+              <div class="font-bold">${escapeHtml(iface.name || 'Interface')}</div>
+              ${iface.description ? `<div class="text-subtle" style="font-size: 0.72rem;">${escapeHtml(iface.description)}</div>` : ''}
+            </td>
+            <td>
+              <span class="badge-iface-type ${badgeTypeClass}">${typeLabel}</span>
+            </td>
+            <td>
+              <span class="font-mono">${escapeHtml(iface.mac_address || '--')}</span>
+            </td>
+            <td>
+              <span class="font-mono text-cyan">${ipsStr}</span>
+            </td>
+            <td>
+              ${isPrimary
+                ? '<span class="badge-primary-route">★ Principal</span>'
+                : '<span class="text-subtle">Secundária</span>'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      if (ifacesCount) ifacesCount.textContent = '1 placa';
+      const fallbackMac = sys.mac_address || sys.MACAddress || '--';
+      const fallbackIp = sys.ip_address || sys.IPAddress || '--';
+      const fallbackName = sys.network_adapter || sys.NetworkAdapter || 'Interface Ativa';
+      ifacesTbody.innerHTML = `
+        <tr>
+          <td>
+            <span class="status-dot-up"></span>
+            <span class="text-emerald font-bold">Ativa</span>
+          </td>
+          <td>
+            <div class="font-bold">${escapeHtml(fallbackName)}</div>
+          </td>
+          <td>
+            <span class="badge-iface-type badge-iface-eth">Ethernet</span>
+          </td>
+          <td>
+            <span class="font-mono">${escapeHtml(fallbackMac)}</span>
+          </td>
+          <td>
+            <span class="font-mono text-cyan">${escapeHtml(fallbackIp)}</span>
+          </td>
+          <td>
+            <span class="badge-primary-route">★ Principal</span>
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  // 3.1 Status Wi-Fi
+  const wifiSection = document.getElementById('modal-wifi-section');
+  const modResults = s.modular_results || {};
+  const wf = modResults.wifi;
+
+  if (wifiSection) {
+    if (wf && wf.status && wf.status !== 'skipped') {
+      wifiSection.style.display = 'block';
+      const signalPct = Math.max(0, Math.min(100, wf.signal_quality_percent || 0));
+      const signalDbm = wf.signal_strength_dbm ? `(${wf.signal_strength_dbm} dBm)` : '';
+
+      const pctEl = document.getElementById('modal-wifi-signal-pct');
+      const dbmEl = document.getElementById('modal-wifi-signal-dbm');
+      const fillEl = document.getElementById('modal-wifi-signal-fill');
+      const descEl = document.getElementById('modal-wifi-signal-desc');
+      const stateBadge = document.getElementById('modal-wifi-state-badge');
+
+      if (pctEl) pctEl.textContent = `${signalPct}%`;
+      if (dbmEl) dbmEl.textContent = signalDbm;
+      if (fillEl) {
+        fillEl.style.width = `${signalPct}%`;
+        fillEl.className = 'wifi-signal-bar-fill';
+        if (signalPct < 40) fillEl.classList.add('poor');
+        else if (signalPct < 70) fillEl.classList.add('warning');
+      }
+
+      let qualityText = 'Sinal Excelente';
+      if (signalPct < 30) qualityText = 'Sinal Muito Fraco';
+      else if (signalPct < 50) qualityText = 'Sinal Fraco';
+      else if (signalPct < 75) qualityText = 'Sinal Regular/Bom';
+
+      if (descEl) {
+        descEl.textContent = wf.status === 'disconnected'
+          ? 'Adaptador sem fio desconectado'
+          : `${qualityText} • Canal ${wf.channel || '--'} (${wf.radio_type || 'Wi-Fi'})`;
+      }
+
+      if (stateBadge) {
+        const isConn = wf.status === 'success' || wf.status === 'connected';
+        stateBadge.className = `wifi-signal-state-badge ${isConn ? '' : 'disconnected'}`;
+        stateBadge.textContent = isConn ? 'Conectado' : 'Desconectado';
+      }
+
+      const ssidEl = document.getElementById('modal-wifi-ssid');
+      const bssidEl = document.getElementById('modal-wifi-bssid');
+      const rcEl = document.getElementById('modal-wifi-radio-channel');
+      const ratesEl = document.getElementById('modal-wifi-rates');
+
+      if (ssidEl) ssidEl.textContent = wf.ssid || (wf.status === 'disconnected' ? 'Desconectado' : '--');
+      if (bssidEl) bssidEl.textContent = wf.bssid || '--';
+      if (rcEl) rcEl.textContent = `${wf.radio_type || '--'} • Canal ${wf.channel || '--'}`;
+      if (ratesEl) {
+        const tx = wf.tx_rate_mbps ? `${wf.tx_rate_mbps} Mbps` : '--';
+        const rx = wf.rx_rate_mbps ? `${wf.rx_rate_mbps} Mbps` : '--';
+        ratesEl.textContent = `TX: ${tx} / RX: ${rx}`;
+      }
+    } else {
+      wifiSection.style.display = 'none';
+    }
+  }
+
+  // 3.2 Benchmark Multi-DNS
+  const dnsSection = document.getElementById('modal-dns-section');
+  const dnsTbody = document.getElementById('modal-dns-tbody');
+  const mdns = modResults.multi_dns;
+
+  if (dnsSection && dnsTbody) {
+    if (mdns && mdns.probes && mdns.probes.length > 0) {
+      dnsSection.style.display = 'block';
+      const fastestIp = mdns.fastest_server || '';
+
+      dnsTbody.innerHTML = mdns.probes.map(probe => {
+        const isFastest = (probe.server_ip === fastestIp && probe.status === 'success');
+        let providerName = 'Servidor DNS';
+        if (probe.server_ip && probe.server_ip.startsWith('177.101.22.')) {
+          providerName = 'UEPG Institucional';
+        } else if (probe.server_ip === '1.1.1.1' || probe.server_ip === '1.0.0.1') {
+          providerName = 'Cloudflare';
+        } else if (probe.server_ip === '8.8.8.8' || probe.server_ip === '8.8.4.4') {
+          providerName = 'Google Public DNS';
+        } else if (probe.server_ip === '9.9.9.9') {
+          providerName = 'Quad9';
+        }
+
+        let latClass = 'dns-lat-fast';
+        if (probe.latency_ms > 80) latClass = 'dns-lat-slow';
+        else if (probe.latency_ms > 30) latClass = 'dns-lat-mid';
+
+        const latText = probe.status === 'success' ? `${probe.latency_ms.toFixed(1)} ms` : 'Timeout / Falha';
+
+        return `
+          <tr>
+            <td>
+              <span class="font-mono font-bold">${escapeHtml(probe.server_ip)}</span>
+              ${isFastest ? '<span class="dns-fastest-badge">⚡ Mais Rápido</span>' : ''}
+            </td>
+            <td>
+              <span class="text-white">${providerName}</span>
+            </td>
+            <td>
+              <span class="${latClass}">${latText}</span>
+            </td>
+            <td>
+              <span class="${probe.status === 'success' ? 'text-emerald' : 'text-rose'} font-bold">
+                ${probe.status === 'success' ? '✔ Resolvido' : '✖ Erro'}
+              </span>
+            </td>
+            <td>
+              <span class="font-mono text-cyan">${escapeHtml(probe.resolved_ip || '--')}</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      dnsSection.style.display = 'none';
+    }
+  }
 
   // 4. Switch & LLDP
   const sw = s.switch_info || {};

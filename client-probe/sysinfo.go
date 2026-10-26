@@ -37,56 +37,120 @@ func collectNetworkDetails(info *SystemInfo) {
 		return
 	}
 
-	for _, iface := range interfaces {
-		// Ignora loopback e interfaces inativas
-		if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 {
-			continue
-		}
-
-		mac := iface.HardwareAddr.String()
-		if mac == "" {
-			continue
-		}
-
-		addrs, err := iface.Addrs()
-		if err != nil {
-			continue
-		}
-
-		for _, addr := range addrs {
-			ipNet, ok := addr.(*net.IPNet)
-			if !ok || ipNet.IP.IsLoopback() {
-				continue
-			}
-			ip4 := ipNet.IP.To4()
-			if ip4 != nil {
-				// Evita endereços de autoconfiguração 169.254.x.x
-				if ip4[0] == 169 && ip4[1] == 254 {
-					continue
-				}
-				info.IPAddress = ip4.String()
-				info.MACAddress = strings.ToUpper(strings.ReplaceAll(mac, ":", "-"))
-				info.NetworkAdapter = iface.Name
-				break
-			}
-		}
-
-		if info.IPAddress != "" {
-			break
-		}
-	}
-
-	// Tenta capturar Gateway via comando do sistema
+	// 1. Tenta capturar Gateway e Interface primária via comando do sistema
+	primaryAdapterName := ""
 	if runtime.GOOS == "windows" {
 		cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
-			`(Get-NetRoute -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue | Select-Object -First 1).NextHop`)
+			`$r = (Get-NetRoute -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue | Sort-Object RouteMetric | Select-Object -First 1); if ($r) { "$($r.NextHop)|$($r.InterfaceAlias)" }`)
 		hideWindow(cmd)
 		if out, err := cmd.Output(); err == nil {
-			info.Gateway = strings.TrimSpace(string(out))
+			parts := strings.Split(strings.TrimSpace(string(out)), "|")
+			if len(parts) >= 1 && parts[0] != "" {
+				info.Gateway = parts[0]
+			}
+			if len(parts) >= 2 && parts[1] != "" {
+				primaryAdapterName = strings.TrimSpace(parts[1])
+			}
 		}
 	} else if runtime.GOOS == "linux" {
 		collectLinuxGateway(info)
+		primaryAdapterName = info.NetworkAdapter
 	}
+
+	var details []NetworkInterfaceDetail
+	var primaryDetail *NetworkInterfaceDetail
+
+	for _, iface := range interfaces {
+		// Ignora interfaces de loopback
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		mac := strings.ToUpper(strings.ReplaceAll(iface.HardwareAddr.String(), ":", "-"))
+		isUp := (iface.Flags & net.FlagUp) != 0
+
+		var ipList []string
+		if addrs, err := iface.Addrs(); err == nil {
+			for _, addr := range addrs {
+				ipNet, ok := addr.(*net.IPNet)
+				if !ok || ipNet.IP.IsLoopback() {
+					continue
+				}
+				ip4 := ipNet.IP.To4()
+				if ip4 != nil {
+					// Evita endereços de autoconfiguração 169.254.x.x
+					if ip4[0] == 169 && ip4[1] == 254 {
+						continue
+					}
+					ipList = append(ipList, ip4.String())
+				}
+			}
+		}
+
+		// Se a placa não tem MAC, não tem IP e está down, ignoramos (adapters virtuais transientes)
+		if mac == "" && len(ipList) == 0 && !isUp {
+			continue
+		}
+
+		ifaceType := detectInterfaceType(iface.Name)
+		isPrimary := false
+		if primaryAdapterName != "" && (strings.EqualFold(iface.Name, primaryAdapterName) || strings.Contains(strings.ToLower(iface.Name), strings.ToLower(primaryAdapterName))) {
+			isPrimary = true
+		}
+
+		detail := NetworkInterfaceDetail{
+			Name:        iface.Name,
+			Description: iface.Name,
+			MACAddress:  mac,
+			IPAddresses: ipList,
+			Type:        ifaceType,
+			IsPrimary:   isPrimary,
+			IsUp:        isUp,
+			Gateway:     info.Gateway,
+		}
+
+		details = append(details, detail)
+
+		if isPrimary && primaryDetail == nil && len(ipList) > 0 {
+			primaryDetail = &detail
+		}
+	}
+
+	// Se nenhuma foi eleita como primária pela rota, seleciona a primeira interface UP que tenha IPv4 válido
+	if primaryDetail == nil {
+		for i := range details {
+			if details[i].IsUp && len(details[i].IPAddresses) > 0 && details[i].MACAddress != "" {
+				details[i].IsPrimary = true
+				primaryDetail = &details[i]
+				break
+			}
+		}
+	}
+
+	info.Interfaces = details
+
+	// Preenche campos legados com a interface primária
+	if primaryDetail != nil {
+		if len(primaryDetail.IPAddresses) > 0 {
+			info.IPAddress = primaryDetail.IPAddresses[0]
+		}
+		info.MACAddress = primaryDetail.MACAddress
+		info.NetworkAdapter = primaryDetail.Name
+	}
+}
+
+func detectInterfaceType(name string) string {
+	lower := strings.ToLower(name)
+	if strings.Contains(lower, "wi-fi") || strings.Contains(lower, "wifi") || strings.Contains(lower, "wireless") || strings.Contains(lower, "wlan") || strings.HasPrefix(lower, "wl") {
+		return "wifi"
+	}
+	if strings.Contains(lower, "ethernet") || strings.Contains(lower, "eth") || strings.HasPrefix(lower, "en") || strings.HasPrefix(lower, "em") {
+		return "ethernet"
+	}
+	if strings.Contains(lower, "veth") || strings.Contains(lower, "docker") || strings.Contains(lower, "br-") || strings.Contains(lower, "virtual") || strings.Contains(lower, "vpn") {
+		return "virtual"
+	}
+	return "ethernet"
 }
 
 func collectLinuxGateway(info *SystemInfo) {

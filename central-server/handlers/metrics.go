@@ -261,6 +261,8 @@ func (h *MetricsHandler) buildNodeDiagnostic(ctx context.Context, nodeID string,
 			}
 		}
 
+		diag.ModularResults = latest.ModularResults
+
 		lastTs := latest.Timestamp.UTC()
 		diag.LastMetricTimestamp = &lastTs
 
