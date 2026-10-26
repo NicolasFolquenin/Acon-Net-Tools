@@ -4087,17 +4087,25 @@ body.auth-mode .dashboard-layout {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 0;
   box-shadow: var(--shadow-card);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .machines-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  min-width: 960px;
 }
 
 .machines-table thead tr {
@@ -4106,7 +4114,7 @@ body.auth-mode .dashboard-layout {
 }
 
 .machines-table th {
-  padding: 11px 12px;
+  padding: 12px 14px;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -4117,17 +4125,17 @@ body.auth-mode .dashboard-layout {
 }
 
 .machines-table td {
-  padding: 11px 12px;
+  padding: 12px 14px;
   vertical-align: middle;
   font-size: 0.82rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--border-glass);
 }
 
 .machines-table th.col-actions,
 .machines-table td.col-actions {
   text-align: right;
-  width: 290px;
-  min-width: 290px;
+  width: 220px;
+  min-width: 220px;
   white-space: nowrap;
 }
 
@@ -4137,6 +4145,33 @@ body.auth-mode .dashboard-layout {
   justify-content: flex-end;
   gap: 6px;
   width: 100%;
+}
+
+.machines-table .group-quick-select {
+  max-width: 165px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.btn-action-compact {
+  padding: 5px 9px !important;
+  font-size: 0.74rem !important;
+  font-weight: 600 !important;
+  gap: 5px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.btn-icon-only {
+  padding: 5px 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: var(--radius-sm) !important;
 }
 
 .machines-table .switch-cell {

@@ -3009,7 +3009,7 @@ function openPCDetailsModal(s) {
             </td>
             <td>
               ${isPrimary
-                ? '<span class="badge-primary-route">★ Principal</span>'
+                ? '<span class="badge-primary-route"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:-1px; margin-right:3px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Principal</span>'
                 : '<span class="text-subtle">Secundária</span>'}
             </td>
           </tr>
@@ -3039,7 +3039,7 @@ function openPCDetailsModal(s) {
             <span class="font-mono text-cyan">${escapeHtml(fallbackIp)}</span>
           </td>
           <td>
-            <span class="badge-primary-route">★ Principal</span>
+            <span class="badge-primary-route"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:-1px; margin-right:3px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Principal</span>
           </td>
         </tr>
       `;
@@ -3140,7 +3140,7 @@ function openPCDetailsModal(s) {
           <tr>
             <td>
               <span class="font-mono font-bold">${escapeHtml(probe.server_ip)}</span>
-              ${isFastest ? '<span class="dns-fastest-badge">⚡ Mais Rápido</span>' : ''}
+              ${isFastest ? '<span class="dns-fastest-badge"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline-block; vertical-align:-1px; margin-right:3px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>Mais Rápido</span>' : ''}
             </td>
             <td>
               <span class="text-white">${providerName}</span>
@@ -3150,7 +3150,7 @@ function openPCDetailsModal(s) {
             </td>
             <td>
               <span class="${probe.status === 'success' ? 'text-emerald' : 'text-rose'} font-bold">
-                ${probe.status === 'success' ? '✔ Resolvido' : '✖ Erro'}
+                ${probe.status === 'success' ? 'Resolvido' : 'Erro'}
               </span>
             </td>
             <td>
@@ -4110,7 +4110,8 @@ function renderMachinesTable(machines) {
       const diffText = diffParts.join(', ') || `${effectiveTests.length} ativos`;
       modulesBadgeHtml = `
         <span class="badge-custom-tag" title="Módulos ativos (${effectiveTests.length}): ${escapeHtml(tooltipTests)}">
-          ⚙️ Alterado (${diffText})
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:3px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          Customizado (${diffText})
         </span>
       `;
     }
@@ -4129,7 +4130,7 @@ function renderMachinesTable(machines) {
     let groupSelectHtml = `<span class="badge-group-tag">${escapeHtml(grpName)}</span>`;
     if (isAdmin) {
       groupSelectHtml = `
-        <select class="form-input form-input-sm" style="min-width: 110px; padding: 2px 8px; font-size: 0.78rem;" onchange="handleQuickChangeGroup('${escapeHtml(m.hostname)}', this.value)">
+        <select class="form-input form-input-sm group-quick-select" onchange="handleQuickChangeGroup('${escapeHtml(m.hostname)}', this.value)">
           ${currentGroups.map(g => `<option value="${escapeHtml(g.id)}" ${g.id === m.group_id ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
         </select>
       `;
@@ -4167,23 +4168,23 @@ function renderMachinesTable(machines) {
         <td style="text-align: right;">${switchHtml}</td>
         <td style="text-align: right; white-space: nowrap;"><span class="text-subtle font-mono">${timeAgo}</span></td>
         <td class="col-actions" style="text-align: right;">
-          <div class="table-actions" style="display: inline-flex; justify-content: flex-end; align-items: center; gap: 6px; width: 100%;">
+          <div class="table-actions" style="display: inline-flex; justify-content: flex-end; align-items: center; gap: 4px; width: 100%;">
             ${isAdmin ? `
-            <button type="button" class="btn btn-outline-cyan btn-sm" onclick="openPingModal('${escapeHtml(m.hostname)}', '${escapeHtml(m.ip_address || '')}')" title="Forçar Ping ICMP nesta máquina">
+            <button type="button" class="btn btn-outline-cyan btn-sm btn-action-compact" onclick="openPingModal('${escapeHtml(m.hostname)}', '${escapeHtml(m.ip_address || '')}')" title="Forçar Ping ICMP nesta máquina">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
               <span>Ping</span>
             </button>
             ` : ''}
-            <button type="button" class="btn btn-glass btn-sm" onclick="openMachineMetricsModal('${escapeHtml(m.hostname)}')" title="Visualizar gráficos e estatísticas da máquina">
+            <button type="button" class="btn btn-glass btn-sm btn-action-compact" onclick="openMachineMetricsModal('${escapeHtml(m.hostname)}')" title="Visualizar gráficos e estatísticas da máquina">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
               <span>Gráficos</span>
             </button>
-            <button type="button" class="btn btn-glass btn-sm" onclick="openMachineConfigModal('${escapeHtml(m.hostname)}')" title="Alterar grupo e módulos">
+            <button type="button" class="btn btn-glass btn-sm btn-action-compact" onclick="openMachineConfigModal('${escapeHtml(m.hostname)}')" title="Alterar grupo e módulos">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
               <span>Editar</span>
             </button>
             ${isAdmin ? `
-            <button type="button" class="btn btn-outline-danger btn-sm" onclick="promptDeleteNode('${escapeHtml(m.hostname)}')" title="Excluir máquina">
+            <button type="button" class="btn btn-outline-danger btn-sm btn-icon-only" onclick="promptDeleteNode('${escapeHtml(m.hostname)}')" title="Excluir máquina">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
             </button>
             ` : ''}
@@ -4618,7 +4619,7 @@ function updateMachineConfigStatusSummary(groupId) {
   } else {
     if (mcStatusBadge) {
       mcStatusBadge.className = 'badge-custom-tag';
-      mcStatusBadge.innerHTML = '⚙️ Perfil Customizado';
+      mcStatusBadge.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:3px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Perfil Customizado';
     }
     const diffParts = [];
     if (added.length > 0) diffParts.push(`+${added.length} a mais`);
@@ -5044,6 +5045,20 @@ async function handleSaveModuleUploadSubmit() {
 /* ==========================================================================
    14. Navegação para Dashboard da Máquina & Diagnóstico de Ping ICMP
    ========================================================================== */
+
+function navigateToHomeDashboard() {
+  selectedChartNode = 'all';
+  if (selectNode) selectNode.value = 'all';
+  if (machinesSearchInput) machinesSearchInput.value = '';
+  const nodesSearch = document.getElementById('nodes-search-input');
+  if (nodesSearch) nodesSearch.value = '';
+  switchView('dashboard');
+  updateChartFocusUI();
+  updateMetricToggleVisibility();
+  loadDashboardData();
+  showToast('Exibindo visão consolidada de todas as sondas', 'toast-info');
+}
+window.navigateToHomeDashboard = navigateToHomeDashboard;
 
 function navigateToMachineDashboard(hostname) {
   if (!hostname) return;
