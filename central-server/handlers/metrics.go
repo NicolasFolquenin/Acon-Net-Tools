@@ -141,7 +141,7 @@ func (h *MetricsHandler) GetDashboardMetrics(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Agrega resumos de cada nó (última leitura, taxa de sucesso, etc.) com desduplicação por MAC
-	summaries := computeNodeSummaries(series)
+	summaries := h.computeNodeSummaries(ctx, series)
 
 	// Lista de nós distintos baseada nos nós desduplicados
 	nodesList := make([]string, 0, len(summaries))
@@ -396,8 +396,8 @@ func (h *MetricsHandler) DeleteNode(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// computeNodeSummaries agrupa por nó e localiza a leitura mais recente
-func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSummaryCard {
+// computeNodeSummaries agrupa por nó e localiza a leitura mais recente com avaliação precisa de saúde de conexão
+func (h *MetricsHandler) computeNodeSummaries(ctx context.Context, series []models.FlattenedMetricItem) []models.NodeSummaryCard {
 	type nodeAgg struct {
 		latest   models.FlattenedMetricItem
 		count    int
@@ -433,9 +433,35 @@ func computeNodeSummaries(series []models.FlattenedMetricItem) []models.NodeSumm
 		}
 	}
 
+	// Mapeia intervalo esperado por nó a partir do cadastro de máquinas e perfis de grupo
+	nodeIntervalMap := make(map[string]int)
+	if machines, err := h.db.ListMachines(ctx); err == nil {
+		groupIntervals := make(map[string]int)
+		for _, m := range machines {
+			interval := 30
+			if m.GroupID != "" {
+				if grpInt, ok := groupIntervals[m.GroupID]; ok {
+					interval = grpInt
+				} else {
+					if grp, errG := h.db.GetMachineGroup(ctx, m.GroupID); errG == nil && grp != nil && grp.Profile.IntervalMinutes > 0 {
+						interval = grp.Profile.IntervalMinutes
+						groupIntervals[m.GroupID] = interval
+					}
+				}
+			}
+			nodeIntervalMap[m.Hostname] = interval
+		}
+	}
+
 	var summaries []models.NodeSummaryCard
 	for _, agg := range aggMap {
-		isHealthy := time.Since(agg.latest.Timestamp) < 3*time.Hour
+		expectedMin := 30
+		if val, ok := nodeIntervalMap[agg.latest.NodeID]; ok && val > 0 {
+			expectedMin = val
+		}
+		// A tolerância para considerar a sonda online é o intervalo esperado de ciclo + 5 minutos de margem
+		tolerance := time.Duration(expectedMin+5) * time.Minute
+		isHealthy := time.Since(agg.latest.Timestamp) <= tolerance
 		sys := agg.latest.SystemInfo
 		if sys == nil {
 			sys = agg.knownSys
