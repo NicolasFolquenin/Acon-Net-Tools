@@ -16,9 +16,7 @@ import (
 	"time"
 )
 
-const (
-	cliVersion = "1.2.0-cli"
-)
+var cliVersion = CurrentClientVersion
 
 func main() {
 	configPathFlag := flag.String("config", "", "Caminho do arquivo config.json (padrão: auto-detect)")
@@ -49,6 +47,9 @@ func main() {
 	fmt.Printf("   SO: %s | Arquitetura: %s\n", runtime.GOOS, runtime.GOARCH)
 	fmt.Println("==================================================================")
 
+	// 0. Limpeza de resíduos de atualizações anteriores (.old / .new)
+	CleanupOldBinaries()
+
 	// 1. Resolução do arquivo de configuração
 	cfgPath := resolveConfigPath(*configPathFlag)
 	cfgLoaded, err := LoadConfig(cfgPath)
@@ -58,6 +59,18 @@ func main() {
 	} else {
 		log.Printf("[CLI] Aviso: não foi possível carregar '%s' (%v). Usando padrões.", cfgPath, err)
 		cfg = GetCurrentConfig()
+	}
+
+	// Verifica se há auto-update disponível em segundo plano
+	if !*onceFlag {
+		go func() {
+			time.Sleep(2 * time.Second)
+			upCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			if cfg.ServerURL != "" && cfg.ServerURL != "none" {
+				_, _ = CheckAndApplyAutoUpdate(upCtx, cfg.ServerURL, cfg.APIToken)
+			}
+		}()
 	}
 
 	// Sobrescreve com flags CLI se fornecidas

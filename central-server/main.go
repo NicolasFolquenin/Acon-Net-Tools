@@ -88,6 +88,8 @@ func main() {
 	// Download público do Instalador / Executável da Sonda Client
 	mux.HandleFunc("/api/v1/download/client", downloadHandler.HandleDownloadClient)
 	mux.HandleFunc("/api/v1/download/client/info", downloadHandler.HandleClientInfo)
+	mux.HandleFunc("/api/v1/download/version", downloadHandler.HandleVersionInfo)
+	mux.HandleFunc("/api/v1/download/binary/", downloadHandler.HandleDownloadBinary)
 	mux.HandleFunc("/download/client", downloadHandler.HandleDownloadClient)
 	mux.HandleFunc("/downloads/install-probe.sh", downloadHandler.HandleInstallScript)
 
