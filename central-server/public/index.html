@@ -245,6 +245,14 @@
               <span class="sm-meta-label">Porta:</span>
               <span id="sm-port" class="sm-meta-val font-mono">--</span>
             </div>
+            <div class="sm-meta-item" id="sm-wifi-meta" style="display: none;">
+              <span class="sm-meta-label">Wi-Fi:</span>
+              <span id="sm-wifi-val" class="sm-meta-val font-bold">--</span>
+            </div>
+            <div class="sm-meta-item" id="sm-dns-meta" style="display: none;">
+              <span class="sm-meta-label">DNS UEPG:</span>
+              <span id="sm-dns-val" class="sm-meta-val font-mono text-cyan">--</span>
+            </div>
             <div class="sm-meta-item" id="sm-historical-tag" style="display: none;">
               <span class="sm-history-badge">📊 Modo Histórico (Últimos Testes)</span>
             </div>
@@ -1240,6 +1248,115 @@
               <span class="info-key">Adaptador de Rede:</span>
               <span class="info-val" id="modal-net-adapter">--</span>
             </div>
+          </div>
+
+          <!-- Múltiplas Interfaces e MACs Detectados -->
+          <div class="interfaces-block" id="modal-interfaces-wrapper" style="margin-top: 14px;">
+            <div class="interfaces-header-row">
+              <span class="info-subkey">Interfaces Físicas & MACs do Host</span>
+              <span id="modal-interfaces-count" class="interfaces-count-badge">0 placas</span>
+            </div>
+            <div class="interfaces-table-scroll">
+              <table class="interfaces-table">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Interface</th>
+                    <th>Tipo</th>
+                    <th>Endereço MAC</th>
+                    <th>Endereço IPv4</th>
+                    <th>Papel</th>
+                  </tr>
+                </thead>
+                <tbody id="modal-interfaces-body">
+                  <tr>
+                    <td colspan="6" class="text-center text-subtle" style="padding: 10px;">Nenhuma interface detalhada reportada.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.1 Status de Rede Sem Fio (Wi-Fi) -->
+        <div class="details-section" id="modal-wifi-section" style="display: none;">
+          <div class="section-badge-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+              <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+              <line x1="12" y1="20" x2="12.01" y2="20"></line>
+            </svg>
+            <span>Status de Rede Sem Fio (Wi-Fi)</span>
+          </div>
+          
+          <div class="wifi-summary-box">
+            <div class="wifi-signal-meter">
+              <div class="wifi-meter-label-row">
+                <span class="wifi-meter-title">Potência do Sinal Wi-Fi:</span>
+                <div class="wifi-signal-value-group">
+                  <span class="wifi-signal-pct" id="modal-wifi-signal-pct">--%</span>
+                  <span class="wifi-signal-dbm" id="modal-wifi-signal-dbm">(-- dBm)</span>
+                </div>
+              </div>
+              <div class="wifi-signal-bar-track">
+                <div class="wifi-signal-bar-fill" id="modal-wifi-signal-fill" style="width: 0%;"></div>
+              </div>
+              <div class="wifi-meter-footer">
+                <span class="wifi-signal-desc" id="modal-wifi-signal-desc">Aguardando dados</span>
+                <span class="wifi-signal-state-badge" id="modal-wifi-state-badge">Conectado</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="details-info-table" style="margin-top: 10px;">
+            <div class="info-row">
+              <span class="info-key">Rede Wi-Fi (SSID):</span>
+              <span class="info-val font-bold text-cyan" id="modal-wifi-ssid">--</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key">Ponto de Acesso (BSSID):</span>
+              <span class="info-val font-mono" id="modal-wifi-bssid">--</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key">Rádio & Canal:</span>
+              <span class="info-val" id="modal-wifi-radio-channel">--</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key">Taxa de Conexão (TX / RX):</span>
+              <span class="info-val font-mono text-emerald" id="modal-wifi-rates">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.2 Benchmark de Resolução Multi-DNS -->
+        <div class="details-section" id="modal-dns-section" style="display: none;">
+          <div class="section-badge-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span>Benchmark de Resolução Multi-DNS</span>
+          </div>
+          
+          <div class="dns-summary-table-scroll">
+            <table class="interfaces-table">
+              <thead>
+                <tr>
+                  <th>Servidor DNS</th>
+                  <th>Tipo / Provedor</th>
+                  <th>Latência</th>
+                  <th>Status</th>
+                  <th>IP Resolvido</th>
+                </tr>
+              </thead>
+              <tbody id="modal-dns-tbody">
+                <tr>
+                  <td colspan="5" class="text-center text-subtle" style="padding: 10px;">Nenhum teste Multi-DNS registrado.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 

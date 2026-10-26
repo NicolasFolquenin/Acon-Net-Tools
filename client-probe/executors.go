@@ -85,6 +85,9 @@ func NewExecutorRegistry() map[TaskType]TaskExecutor {
 		TaskTypeTraceroute: TaskExecutorFunc(func(ctx context.Context, task TestTaskConfig, execCtx *ExecutionContext) TaskExecutionResult {
 			return TaskExecutionResult{Metric: ExecuteTracerouteTask(ctx, task, execCtx)}
 		}),
+		TaskTypeWiFiStatus: TaskExecutorFunc(func(ctx context.Context, task TestTaskConfig, execCtx *ExecutionContext) TaskExecutionResult {
+			return TaskExecutionResult{Metric: ExecuteWiFiStatusTask(ctx, task, execCtx)}
+		}),
 	}
 }
 
@@ -407,45 +410,118 @@ func ExecuteThroughputUploadTask(ctx context.Context, task TestTaskConfig, execC
 	}
 }
 
-// ExecuteDNSLookupTask mede a latência de resolução de nomes (DNS)
+// ExecuteDNSLookupTask mede a latência de resolução de nomes (DNS), suportando múltiplos servidores DNS
 func ExecuteDNSLookupTask(ctx context.Context, task TestTaskConfig, execCtx *ExecutionContext) DynamicMetricResult {
 	domain := strings.TrimSpace(task.Domain)
 	if domain == "" {
 		domain = "uepg.br"
 	}
 
-	timeout := time.Duration(task.TimeoutMS) * time.Millisecond
-	if timeout <= 0 {
-		timeout = 2000 * time.Millisecond
+	timeoutMs := task.TimeoutMS
+	if timeoutMs <= 0 {
+		timeoutMs = 2000
+	}
+	perServerTimeout := time.Duration(timeoutMs) * time.Millisecond
+
+	dnsServers := task.DNSServers
+	if len(dnsServers) == 0 {
+		dnsServers = []string{"auto"}
 	}
 
-	lookupCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var results []SingleDNSProbeResult
+	var totalMs float64
+	var successCount int
+	bestMs := 999999.0
 
-	start := time.Now()
-	ips, err := net.DefaultResolver.LookupIPAddr(lookupCtx, domain)
-	elapsedMs := time.Since(start).Seconds() * 1000.0
+	for _, s := range dnsServers {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
 
-	if err != nil {
+		serverLabel := s
+		if s == "auto" || s == "default" {
+			serverLabel = "DNS Padrão SO"
+		}
+
+		lookupCtx, cancel := context.WithTimeout(ctx, perServerTimeout)
+		start := time.Now()
+
+		var ips []net.IPAddr
+		var err error
+
+		if s == "auto" || s == "default" {
+			ips, err = net.DefaultResolver.LookupIPAddr(lookupCtx, domain)
+		} else {
+			serverAddr := s
+			if !strings.Contains(serverAddr, ":") {
+				serverAddr = serverAddr + ":53"
+			}
+			resolver := &net.Resolver{
+				PreferGo: true,
+				Dial: func(dialCtx context.Context, network, address string) (net.Conn, error) {
+					d := net.Dialer{Timeout: perServerTimeout}
+					return d.DialContext(dialCtx, "udp", serverAddr)
+				},
+			}
+			ips, err = resolver.LookupIPAddr(lookupCtx, domain)
+		}
+
+		elapsedMs := math.Round(time.Since(start).Seconds()*1000.0*100) / 100
+		cancel()
+
+		probeRes := SingleDNSProbeResult{
+			Server:    serverLabel,
+			LatencyMs: elapsedMs,
+		}
+
+		if err != nil {
+			probeRes.Success = false
+			probeRes.Error = err.Error()
+		} else {
+			probeRes.Success = true
+			if len(ips) > 0 {
+				probeRes.ResolvedIP = ips[0].IP.String()
+			}
+			totalMs += elapsedMs
+			successCount++
+			if elapsedMs < bestMs {
+				bestMs = elapsedMs
+			}
+		}
+
+		results = append(results, probeRes)
+	}
+
+	if successCount == 0 {
 		return DynamicMetricResult{
 			Value:   0,
 			Unit:    "ms",
 			Status:  "error",
-			Error:   err.Error(),
-			Details: fmt.Sprintf("Falha ao resolver %s", domain),
+			Details: fmt.Sprintf("Falha ao resolver %s em todos os servidores DNS testados", domain),
+			Error:   "falha em todos os servidores",
 		}
 	}
 
-	var ipStrs []string
-	for _, ip := range ips {
-		ipStrs = append(ipStrs, ip.IP.String())
+	avgMs := math.Round((totalMs/float64(successCount))*100) / 100
+	if bestMs == 999999.0 {
+		bestMs = avgMs
+	}
+
+	var detailsParts []string
+	for _, r := range results {
+		if r.Success {
+			detailsParts = append(detailsParts, fmt.Sprintf("%s: %.1fms", r.Server, r.LatencyMs))
+		} else {
+			detailsParts = append(detailsParts, fmt.Sprintf("%s: falha", r.Server))
+		}
 	}
 
 	return DynamicMetricResult{
-		Value:   math.Round(elapsedMs*100) / 100,
+		Value:   bestMs,
 		Unit:    "ms",
 		Status:  "ok",
-		Details: fmt.Sprintf("%s -> %s", domain, strings.Join(ipStrs, ", ")),
+		Details: fmt.Sprintf("%s (%s)", domain, strings.Join(detailsParts, ", ")),
 	}
 }
 
@@ -569,5 +645,173 @@ func ExecuteTracerouteTask(ctx context.Context, task TestTaskConfig, execCtx *Ex
 		Unit:    "hops",
 		Status:  status,
 		Details: fmt.Sprintf("Alvo: %s (%d saltos)", res.Target, res.TotalHops),
+	}
+}
+
+// ExecuteWiFiStatusTask mede o status da conexão Wi-Fi e a força/potência do sinal
+func ExecuteWiFiStatusTask(ctx context.Context, task TestTaskConfig, execCtx *ExecutionContext) DynamicMetricResult {
+	if runtime.GOOS == "windows" {
+		return executeWindowsWiFiStatus(ctx)
+	} else if runtime.GOOS == "linux" {
+		return executeLinuxWiFiStatus(ctx)
+	}
+	return DynamicMetricResult{
+		Value:   0,
+		Unit:    "%",
+		Status:  "skipped",
+		Details: "Wi-Fi não suportado neste sistema operacional",
+	}
+}
+
+func executeWindowsWiFiStatus(ctx context.Context) DynamicMetricResult {
+	cmd := exec.CommandContext(ctx, "netsh", "wlan", "show", "interfaces")
+	hideWindow(cmd)
+	out, err := cmd.Output()
+	if err != nil {
+		return DynamicMetricResult{
+			Value:   0,
+			Unit:    "%",
+			Status:  "skipped",
+			Details: "Sem adaptador Wi-Fi ou serviço de WLAN inativo",
+		}
+	}
+
+	lines := strings.Split(string(out), "\n")
+	res := WiFiMetricResult{
+		HasWiFiAdapter: false,
+		Connected:      false,
+		Status:         "no_adapter",
+	}
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, ":") {
+			parts := strings.SplitN(line, ":", 2)
+			key := strings.ToLower(strings.TrimSpace(parts[0]))
+			val := strings.TrimSpace(parts[1])
+
+			if strings.Contains(key, "nome") || strings.Contains(key, "name") {
+				res.HasWiFiAdapter = true
+			} else if strings.Contains(key, "estado") || strings.Contains(key, "state") {
+				lowerVal := strings.ToLower(val)
+				if strings.Contains(lowerVal, "conectado") || strings.Contains(lowerVal, "connected") {
+					res.Connected = true
+					res.Status = "ok"
+				} else {
+					res.Status = "disconnected"
+				}
+			} else if key == "ssid" {
+				res.SSID = val
+			} else if key == "bssid" {
+				res.BSSID = strings.ToUpper(strings.ReplaceAll(val, ":", "-"))
+			} else if strings.Contains(key, "sinal") || strings.Contains(key, "signal") {
+				valClean := strings.TrimSuffix(val, "%")
+				valClean = strings.TrimSpace(valClean)
+				var sig int
+				if _, err := fmt.Sscanf(valClean, "%d", &sig); err == nil {
+					res.SignalPercent = sig
+					// Estimativa de dBm: dBm = (SignalPercent / 2) - 100
+					res.SignalDBm = (sig / 2) - 100
+				}
+			} else if strings.Contains(key, "tipo de rádio") || strings.Contains(key, "radio type") {
+				res.RadioType = val
+			} else if strings.Contains(key, "canal") || strings.Contains(key, "channel") {
+				var ch int
+				if _, err := fmt.Sscanf(val, "%d", &ch); err == nil {
+					res.Channel = ch
+					if ch <= 14 {
+						res.Band = "2.4 GHz"
+					} else if ch <= 165 {
+						res.Band = "5 GHz"
+					} else {
+						res.Band = "6 GHz"
+					}
+				}
+			} else if strings.Contains(key, "recepção") || strings.Contains(key, "receive rate") {
+				var r float64
+				if _, err := fmt.Sscanf(val, "%f", &r); err == nil {
+					res.RxRateMbps = r
+				}
+			} else if strings.Contains(key, "transmissão") || strings.Contains(key, "transmit rate") {
+				var r float64
+				if _, err := fmt.Sscanf(val, "%f", &r); err == nil {
+					res.TxRateMbps = r
+				}
+			}
+		}
+	}
+
+	if !res.HasWiFiAdapter {
+		return DynamicMetricResult{
+			Value:   0,
+			Unit:    "%",
+			Status:  "skipped",
+			Details: "Máquina sem placa de rede sem fio",
+		}
+	}
+
+	if !res.Connected {
+		return DynamicMetricResult{
+			Value:   0,
+			Unit:    "%",
+			Status:  "warning",
+			Details: "Placa Wi-Fi desconectada",
+		}
+	}
+
+	detailsStr := fmt.Sprintf("SSID: %s, Sinal: %d%% (%d dBm), Canal: %d (%s), Rádio: %s",
+		res.SSID, res.SignalPercent, res.SignalDBm, res.Channel, res.Band, res.RadioType)
+
+	return DynamicMetricResult{
+		Value:   float64(res.SignalPercent),
+		Unit:    "%",
+		Status:  "ok",
+		Details: detailsStr,
+	}
+}
+
+func executeLinuxWiFiStatus(ctx context.Context) DynamicMetricResult {
+	cmd := exec.CommandContext(ctx, "nmcli", "-t", "-f", "active,ssid,bssid,signal,freq,chan", "dev", "wifi")
+	if out, err := cmd.Output(); err == nil {
+		lines := strings.Split(string(out), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "yes:") {
+				parts := strings.Split(line, ":")
+				if len(parts) >= 6 {
+					var sig int
+					fmt.Sscanf(parts[3], "%d", &sig)
+					var ch int
+					fmt.Sscanf(parts[5], "%d", &ch)
+					dbm := (sig / 2) - 100
+					band := "2.4 GHz"
+					if ch > 14 {
+						band = "5 GHz"
+					}
+					return DynamicMetricResult{
+						Value:   float64(sig),
+						Unit:    "%",
+						Status:  "ok",
+						Details: fmt.Sprintf("SSID: %s, Sinal: %d%% (%d dBm), Canal: %d (%s)", parts[1], sig, dbm, ch, band),
+					}
+				}
+			}
+		}
+	}
+
+	cmdIw := exec.CommandContext(ctx, "iw", "dev")
+	if out, err := cmdIw.Output(); err == nil && len(out) > 0 {
+		return DynamicMetricResult{
+			Value:   0,
+			Unit:    "%",
+			Status:  "warning",
+			Details: "Adaptador Wi-Fi detectado (não conectado)",
+		}
+	}
+
+	return DynamicMetricResult{
+		Value:   0,
+		Unit:    "%",
+		Status:  "skipped",
+		Details: "Máquina sem placa de rede sem fio",
 	}
 }

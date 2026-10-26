@@ -15,6 +15,7 @@ const (
 	TaskTypeSystemInfo         TaskType = "system_info"
 	TaskTypeHTTPCheck          TaskType = "http_check"
 	TaskTypeTraceroute         TaskType = "traceroute"
+	TaskTypeWiFiStatus         TaskType = "wifi_status"
 )
 
 // TestTaskConfig define a configuração de um teste individual enviado à sonda
@@ -27,6 +28,7 @@ type TestTaskConfig struct {
 	Endpoint             string                 `bson:"endpoint,omitempty" json:"endpoint,omitempty"`                         // Ex: "/api/v1/speedtest/download"
 	SizeMB               int                    `bson:"size_mb,omitempty" json:"size_mb,omitempty"`                           // Ex: 5
 	Domain               string                 `bson:"domain,omitempty" json:"domain,omitempty"`                             // Ex: "uepg.br"
+	DNSServers           []string               `bson:"dns_servers,omitempty" json:"dns_servers,omitempty"`                   // Ex: ["auto", "10.0.0.1", "8.8.8.8"]
 	Count                int                    `bson:"count,omitempty" json:"count,omitempty"`                               // Ex: 3
 	TimeoutMS            int                    `bson:"timeout_ms,omitempty" json:"timeout_ms,omitempty"`                     // Ex: 1000
 	TimeoutSeconds       int                    `bson:"timeout_seconds,omitempty" json:"timeout_seconds,omitempty"`           // Ex: 15

@@ -5,17 +5,30 @@ import (
 	"time"
 )
 
+// NetworkInterfaceDetail representa uma placa de rede identificada no computador
+type NetworkInterfaceDetail struct {
+	Name        string   `bson:"name" json:"name"`                                   // Ex: "Wi-Fi", "Ethernet", "eth0"
+	Description string   `bson:"description,omitempty" json:"description,omitempty"` // Ex: "Intel(R) Wi-Fi 6 AX201"
+	MACAddress  string   `bson:"mac_address" json:"mac_address"`                     // Ex: "E4-54-E8-12-34-56"
+	IPAddresses []string `bson:"ip_addresses,omitempty" json:"ip_addresses,omitempty"`
+	Type        string   `bson:"type" json:"type"`                                   // "ethernet", "wifi", "virtual", "other"
+	IsPrimary   bool     `bson:"is_primary" json:"is_primary"`                       // Placa com a rota default/gateway ativo
+	IsUp        bool     `bson:"is_up" json:"is_up"`                                 // Link operacional ativo
+	Gateway     string   `bson:"gateway,omitempty" json:"gateway,omitempty"`
+}
+
 // SystemInfo armazena dados de hardware e rede local do host
 type SystemInfo struct {
-	Hostname       string  `bson:"hostname,omitempty" json:"hostname,omitempty"`
-	Model          string  `bson:"model,omitempty" json:"model,omitempty"`
-	CPU            string  `bson:"cpu,omitempty" json:"cpu,omitempty"`
-	RAMTotalGB     float64 `bson:"ram_total_gb,omitempty" json:"ram_total_gb,omitempty"`
-	OS             string  `bson:"os,omitempty" json:"os,omitempty"`
-	IPAddress      string  `bson:"ip_address,omitempty" json:"ip_address,omitempty"`
-	MACAddress     string  `bson:"mac_address,omitempty" json:"mac_address,omitempty"`
-	Gateway        string  `bson:"gateway,omitempty" json:"gateway,omitempty"`
-	NetworkAdapter string  `bson:"network_adapter,omitempty" json:"network_adapter,omitempty"`
+	Hostname       string                   `bson:"hostname,omitempty" json:"hostname,omitempty"`
+	Model          string                   `bson:"model,omitempty" json:"model,omitempty"`
+	CPU            string                   `bson:"cpu,omitempty" json:"cpu,omitempty"`
+	RAMTotalGB     float64                  `bson:"ram_total_gb,omitempty" json:"ram_total_gb,omitempty"`
+	OS             string                   `bson:"os,omitempty" json:"os,omitempty"`
+	IPAddress      string                   `bson:"ip_address,omitempty" json:"ip_address,omitempty"`
+	MACAddress     string                   `bson:"mac_address,omitempty" json:"mac_address,omitempty"`
+	Gateway        string                   `bson:"gateway,omitempty" json:"gateway,omitempty"`
+	NetworkAdapter string                   `bson:"network_adapter,omitempty" json:"network_adapter,omitempty"`
+	Interfaces     []NetworkInterfaceDetail `bson:"interfaces,omitempty" json:"interfaces,omitempty"`
 }
 
 // SwitchInfo armazena as informações do switch descobertas via LLDP
@@ -114,9 +127,41 @@ type TracerouteResult struct {
 	Success   bool            `bson:"success" json:"success"`
 }
 
+type SingleDNSProbeResult struct {
+	Server     string  `bson:"server" json:"server"`
+	LatencyMs  float64 `bson:"latency_ms" json:"latency_ms"`
+	ResolvedIP string  `bson:"resolved_ip" json:"resolved_ip"`
+	Success    bool    `bson:"success" json:"success"`
+	Error      string  `bson:"error,omitempty" json:"error,omitempty"`
+}
+
+type MultiDNSResult struct {
+	Domain  string                 `bson:"domain" json:"domain"`
+	Servers []SingleDNSProbeResult `bson:"servers" json:"servers"`
+	BestMs  float64                `bson:"best_ms" json:"best_ms"`
+	AvgMs   float64                `bson:"avg_ms" json:"avg_ms"`
+}
+
+type WiFiMetricResult struct {
+	HasWiFiAdapter bool    `bson:"has_wifi_adapter" json:"has_wifi_adapter"`
+	Connected      bool    `bson:"connected" json:"connected"`
+	SSID           string  `bson:"ssid,omitempty" json:"ssid,omitempty"`
+	BSSID          string  `bson:"bssid,omitempty" json:"bssid,omitempty"`
+	SignalPercent  int     `bson:"signal_percent" json:"signal_percent"`
+	SignalDBm      int     `bson:"signal_dbm" json:"signal_dbm"`
+	RadioType      string  `bson:"radio_type,omitempty" json:"radio_type,omitempty"`
+	Band           string  `bson:"band,omitempty" json:"band,omitempty"`
+	Channel        int     `bson:"channel,omitempty" json:"channel,omitempty"`
+	RxRateMbps     float64 `bson:"rx_rate_mbps,omitempty" json:"rx_rate_mbps,omitempty"`
+	TxRateMbps     float64 `bson:"tx_rate_mbps,omitempty" json:"tx_rate_mbps,omitempty"`
+	Status         string  `bson:"status" json:"status"`
+}
+
 // ModularResults agrupa os resultados dos novos módulos de testes
 type ModularResults struct {
 	DNS        *DNSResult        `bson:"dns,omitempty" json:"dns,omitempty"`
+	MultiDNS   *MultiDNSResult   `bson:"multi_dns,omitempty" json:"multi_dns,omitempty"`
+	WiFi       *WiFiMetricResult `bson:"wifi,omitempty" json:"wifi,omitempty"`
 	PacketLoss *PacketLossResult `bson:"packet_loss,omitempty" json:"packet_loss,omitempty"`
 	HTTPCheck  *HTTPCheckResult  `bson:"http_check,omitempty" json:"http_check,omitempty"`
 	Traceroute *TracerouteResult `bson:"traceroute,omitempty" json:"traceroute,omitempty"`
@@ -211,7 +256,8 @@ type NodeDiagnosticInfo struct {
 	GroupName            string      `json:"group_name,omitempty"`
 	VLAN                 int         `json:"vlan,omitempty"`
 	SystemInfo           *SystemInfo `json:"system_info,omitempty"`
-	SwitchInfo           *SwitchInfo `json:"switch_info,omitempty"`
+	SwitchInfo           *SwitchInfo     `json:"switch_info,omitempty"`
+	ModularResults       *ModularResults `json:"modular_results,omitempty"`
 }
 
 // DashboardResponse resposta agregada do endpoint GET /api/v1/dashboard/metrics
