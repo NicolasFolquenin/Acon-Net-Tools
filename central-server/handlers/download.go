@@ -181,3 +181,137 @@ func (h *DownloadHandler) HandleInstallScript(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(content))
 }
+
+// locateRawBinary localiza o binário executável puro (não instalador) para a plataforma requisitada
+func (h *DownloadHandler) locateRawBinary(platform string) (string, os.FileInfo, error) {
+	norm := strings.ToLower(strings.TrimSpace(platform))
+	var candidates []string
+
+	switch norm {
+	case "windows", "windows-amd64", "win":
+		candidates = []string{
+			filepath.Join(h.cfg.StaticDir, "downloads", "uepg-net-tools.exe"),
+			filepath.Join("..", "client-probe", "build", "bin", "uepg-net-tools.exe"),
+			filepath.Join("..", "client-probe", "probe-app.exe"),
+			filepath.Join("client-probe", "build", "bin", "uepg-net-tools.exe"),
+			filepath.Join("client-probe", "probe-app.exe"),
+		}
+	case "linux-amd64", "linux_amd64", "linux":
+		candidates = []string{
+			filepath.Join(h.cfg.StaticDir, "downloads", "uepg-probe-linux-amd64"),
+			filepath.Join("..", "client-probe", "build", "linux", "uepg-probe-linux-amd64"),
+			filepath.Join("client-probe", "build", "linux", "uepg-probe-linux-amd64"),
+		}
+	case "linux-arm64", "linux_arm64":
+		candidates = []string{
+			filepath.Join(h.cfg.StaticDir, "downloads", "uepg-probe-linux-arm64"),
+			filepath.Join("..", "client-probe", "build", "linux", "uepg-probe-linux-arm64"),
+			filepath.Join("client-probe", "build", "linux", "uepg-probe-linux-arm64"),
+		}
+	default:
+		return "", nil, fmt.Errorf("plataforma desconhecida: %s", platform)
+	}
+
+	for _, p := range candidates {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() && fi.Size() > 0 {
+			return p, fi, nil
+		}
+	}
+
+	return "", nil, os.ErrNotExist
+}
+
+// PlatformArtifactInfo detalha o binário de uma plataforma
+type PlatformArtifactInfo struct {
+	Available     bool   `json:"available"`
+	Filename      string `json:"filename"`
+	URL           string `json:"url"`
+	SizeBytes     int64  `json:"size_bytes"`
+	SizeFormatted string `json:"size_formatted"`
+	UpdatedAt     string `json:"updated_at,omitempty"`
+}
+
+// VersionInfoResponse resposta do endpoint GET /api/v1/download/version
+type VersionInfoResponse struct {
+	Version   string                          `json:"version"`
+	ServerURL string                          `json:"server_url"`
+	Platforms map[string]PlatformArtifactInfo `json:"platforms"`
+}
+
+// HandleVersionInfo fornece a versão mais atual do client-probe e links para download automático dos binários
+func (h *DownloadHandler) HandleVersionInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	serverURL := h.getServerURL(r)
+
+	// Tenta ler versão de public/downloads/version.txt ou usa padrão "2.4.0"
+	version := "2.4.0"
+	versionPath := filepath.Join(h.cfg.StaticDir, "downloads", "version.txt")
+	if data, err := os.ReadFile(versionPath); err == nil {
+		vStr := strings.TrimSpace(string(data))
+		if vStr != "" {
+			version = vStr
+		}
+	}
+
+	platforms := make(map[string]PlatformArtifactInfo)
+
+	for _, plat := range []string{"windows", "linux-amd64", "linux-arm64"} {
+		pPath, fi, err := h.locateRawBinary(plat)
+		if err == nil && fi != nil {
+			platforms[plat] = PlatformArtifactInfo{
+				Available:     true,
+				Filename:      fi.Name(),
+				URL:           fmt.Sprintf("%s/api/v1/download/binary/%s", serverURL, plat),
+				SizeBytes:     fi.Size(),
+				SizeFormatted: formatBytes(fi.Size()),
+				UpdatedAt:     fi.ModTime().UTC().Format(time.RFC3339),
+			}
+		} else {
+			platforms[plat] = PlatformArtifactInfo{
+				Available: false,
+				URL:       fmt.Sprintf("%s/api/v1/download/binary/%s", serverURL, plat),
+			}
+		}
+		_ = pPath
+	}
+
+	_ = json.NewEncoder(w).Encode(VersionInfoResponse{
+		Version:   version,
+		ServerURL: serverURL,
+		Platforms: platforms,
+	})
+}
+
+// HandleDownloadBinary serve o executável puro diretamente para auto-update da sonda
+func (h *DownloadHandler) HandleDownloadBinary(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extrai plataforma da URL (ex: /api/v1/download/binary/windows)
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) == 0 {
+		http.Error(w, "Plataforma não informada", http.StatusBadRequest)
+		return
+	}
+	platform := parts[len(parts)-1]
+
+	filePath, fi, err := h.locateRawBinary(platform)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":    "Binário não disponível",
+			"platform": platform,
+			"message":  "O binário compilado para esta plataforma ainda não está presente na pasta de downloads.",
+		})
+		return
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fi.Name()))
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+
+	http.ServeFile(w, r, filePath)
+}

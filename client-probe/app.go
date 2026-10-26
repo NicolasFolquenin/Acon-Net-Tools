@@ -45,6 +45,20 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	log.Println("[APP] Inicializando Desktop Probe...")
 
+	// Limpeza de arquivos residuais de atualizações anteriores (.old / .new)
+	CleanupOldBinaries()
+
+	// Checagem assíncrona de auto-update com o servidor central
+	go func() {
+		time.Sleep(3 * time.Second)
+		upCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		cfg := GetCurrentConfig()
+		if cfg.ServerURL != "" && cfg.ServerURL != "none" {
+			_, _ = CheckAndApplyAutoUpdate(upCtx, cfg.ServerURL, cfg.APIToken)
+		}
+	}()
+
 	// 1. Carrega configurações
 	cfg, err := LoadConfig("")
 	if err != nil {
@@ -211,6 +225,16 @@ func (a *App) backgroundScheduler(ctx context.Context) {
 		case <-timer.C:
 			log.Printf("[SCHEDULER] Horário de medição atingido (%s)! Executando teste programado...", time.Now().Format("15:04:05"))
 			_, _ = a.ExecuteTest("Agendado")
+
+			// Checagem assíncrona de nova versão publicada no Central Server
+			go func() {
+				upCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				defer cancel()
+				curCfg := GetCurrentConfig()
+				if curCfg.ServerURL != "" && curCfg.ServerURL != "none" {
+					_, _ = CheckAndApplyAutoUpdate(upCtx, curCfg.ServerURL, curCfg.APIToken)
+				}
+			}()
 		}
 	}
 }
