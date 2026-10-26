@@ -2986,31 +2986,31 @@ function openPCDetailsModal(s) {
 
         const ipsStr = (iface.ip_addresses && iface.ip_addresses.length > 0)
           ? iface.ip_addresses.join('<br>')
-          : '<span class="text-subtle">Sem IP</span>';
+          : '<span class="iface-no-ip">Sem IP</span>';
 
         return `
           <tr>
             <td>
               <span class="${isUp ? 'status-dot-up' : 'status-dot-down'}"></span>
-              <span class="${isUp ? 'text-emerald' : 'text-subtle'} font-bold">${isUp ? 'Ativa' : 'Inativa'}</span>
+              <span class="${isUp ? 'status-iface-active' : 'status-iface-inactive'} font-bold">${isUp ? 'Ativa' : 'Inativa'}</span>
             </td>
             <td>
-              <div class="font-bold">${escapeHtml(iface.name || 'Interface')}</div>
-              ${iface.description ? `<div class="text-subtle" style="font-size: 0.72rem;">${escapeHtml(iface.description)}</div>` : ''}
+              <div class="iface-name font-bold">${escapeHtml(iface.name || 'Interface')}</div>
+              ${iface.description ? `<div class="iface-desc">${escapeHtml(iface.description)}</div>` : ''}
             </td>
             <td>
               <span class="badge-iface-type ${badgeTypeClass}">${typeLabel}</span>
             </td>
             <td>
-              <span class="font-mono">${escapeHtml(iface.mac_address || '--')}</span>
+              <span class="font-mono iface-mac">${escapeHtml(iface.mac_address || '--')}</span>
             </td>
             <td>
-              <span class="font-mono text-cyan">${ipsStr}</span>
+              <span class="font-mono ${isUp ? 'text-cyan font-bold' : ''}">${ipsStr}</span>
             </td>
             <td>
               ${isPrimary
                 ? '<span class="badge-primary-route"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:-1px; margin-right:3px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Principal</span>'
-                : '<span class="text-subtle">Secundária</span>'}
+                : '<span class="iface-role-secondary">Secundária</span>'}
             </td>
           </tr>
         `;
@@ -3024,19 +3024,19 @@ function openPCDetailsModal(s) {
         <tr>
           <td>
             <span class="status-dot-up"></span>
-            <span class="text-emerald font-bold">Ativa</span>
+            <span class="status-iface-active font-bold">Ativa</span>
           </td>
           <td>
-            <div class="font-bold">${escapeHtml(fallbackName)}</div>
+            <div class="iface-name font-bold">${escapeHtml(fallbackName)}</div>
           </td>
           <td>
             <span class="badge-iface-type badge-iface-eth">Ethernet</span>
           </td>
           <td>
-            <span class="font-mono">${escapeHtml(fallbackMac)}</span>
+            <span class="font-mono iface-mac">${escapeHtml(fallbackMac)}</span>
           </td>
           <td>
-            <span class="font-mono text-cyan">${escapeHtml(fallbackIp)}</span>
+            <span class="font-mono text-cyan font-bold">${escapeHtml(fallbackIp)}</span>
           </td>
           <td>
             <span class="badge-primary-route"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:-1px; margin-right:3px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Principal</span>

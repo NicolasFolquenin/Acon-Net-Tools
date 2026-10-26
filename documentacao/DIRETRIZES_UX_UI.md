@@ -78,7 +78,20 @@ Para evitar que colunas e botões extrapolem o container da página (como aconte
 
 ---
 
-## ✅ 5. Checklist Obrigatório Pré-Deploy (Passo a Passo)
+## 🎨 5. Contraste em Modais & Contorno em Cards de Módulos
+
+1. **Modais de Detalhes (ex.: Host/PC, Configurações):**
+   - Nunca utilizar cores duras hardcoded escuras (`rgba(15, 23, 42, 0.45)`) com textos acinzentados apagados (`#94a3b8`, `#64748b`).
+   - Todos os textos de telemetria, títulos de subseções e nomes de hardware devem utilizar variáveis de contraste semânticas (`var(--text-main)`, `var(--text-muted)`).
+   - Dados de status e interfaces devem utilizar badges ou estados visuais com contraste nítido em ambos os temas (Dark & Light). Textos como "Inativa", "Sem IP" ou "Secundária" devem ter legibilidade clara, sem parecer que estão apagados ou inexistentes.
+
+2. **Cards de Módulos & Catálogo JSON:**
+   - As caixas de módulos (`.module-card`) devem possuir contorno aparente (`1.5px solid var(--border-card-prominent)`) e elevação com sombra suave (`box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08)`), para nunca se mesclarem ao fundo da página.
+   - No tema claro (`[data-theme="light"]`), o contorno deve ter espessura de `1.5px solid #94a3b8` para perfeita separação dos cards em relação ao fundo branco.
+
+---
+
+## ✅ 6. Checklist Obrigatório Pré-Deploy (Passo a Passo)
 
 Antes de aprovar qualquer alteração visual no Central Server, verifique cada item abaixo:
 

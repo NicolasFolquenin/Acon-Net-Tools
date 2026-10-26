@@ -38,6 +38,8 @@
   --table-header-bg: rgba(0, 0, 0, 0.35);
   --table-row-hover: rgba(255, 255, 255, 0.03);
   --spec-box-bg: rgba(0, 0, 0, 0.35);
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --border-card-prominent: rgba(255, 255, 255, 0.22);
 }
 
 [data-theme="light"] {
@@ -49,6 +51,8 @@
   --bg-input: #ffffff;
   --border-glass: rgba(203, 213, 225, 0.8);
   --border-glass-strong: rgba(148, 163, 184, 0.6);
+  --border-subtle: #cbd5e1;
+  --border-card-prominent: #94a3b8;
 
   --text-main: #0f172a;
   --text-muted: #475569;
@@ -4273,18 +4277,25 @@ body.auth-mode .dashboard-layout {
 
 .module-card {
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  border: 1.5px solid var(--border-card-prominent);
   border-radius: var(--radius-md);
   padding: 18px;
   display: flex;
   flex-direction: column;
-  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-theme="light"] .module-card {
+  background: #ffffff;
+  border: 1.5px solid #94a3b8;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
 }
 
 .module-card:hover {
   transform: translateY(-2px);
-  border-color: var(--border-focus);
-  box-shadow: var(--shadow-card);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
 }
 
 .module-card-top {
@@ -5436,149 +5447,197 @@ body.auth-mode .dashboard-layout {
 }
 
 /* ==========================================================================
-   Multi-Interface, Wi-Fi Signal & Multi-DNS Styles
+   Multi-Interface, Wi-Fi Signal & Multi-DNS Styles (High Contrast & Clear Readability)
    ========================================================================== */
 
 .interfaces-block {
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 12px;
+  background: var(--spec-box-bg);
+  border: 1.5px solid var(--border-glass-strong);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 .interfaces-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .info-subkey {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #94a3b8;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-main);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .interfaces-count-badge {
-  background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 8px;
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--accent-cyan);
+  border: 1.5px solid var(--accent-cyan);
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 3px 10px;
   border-radius: 999px;
   font-family: 'JetBrains Mono', monospace;
 }
 
 .interfaces-table-scroll,
 .dns-summary-table-scroll {
-  max-height: 220px;
+  max-height: 240px;
   overflow-y: auto;
   overflow-x: auto;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-glass-strong);
+  background: var(--bg-card-solid);
 }
 
-.interfaces-table {
+.interfaces-table,
+.dns-summary-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   text-align: left;
 }
 
-.interfaces-table thead th {
-  background: rgba(30, 41, 59, 0.8);
-  color: #94a3b8;
-  font-weight: 600;
-  padding: 8px 10px;
+.interfaces-table thead th,
+.dns-summary-table thead th {
+  background: var(--table-header-bg);
+  color: var(--text-main);
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 10px 12px;
   position: sticky;
   top: 0;
   z-index: 2;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 2px solid var(--border-glass-strong);
   white-space: nowrap;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
-.interfaces-table tbody td {
-  padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  color: #cbd5e1;
+.interfaces-table tbody td,
+.dns-summary-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-glass);
+  color: var(--text-main);
   vertical-align: middle;
 }
 
-.interfaces-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.03);
+.interfaces-table tbody tr:hover,
+.dns-summary-table tbody tr:hover {
+  background: var(--table-row-hover);
+}
+
+.iface-name {
+  color: var(--text-main);
+  font-size: 0.84rem;
+}
+
+.iface-desc {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  margin-top: 2px;
+}
+
+.iface-mac {
+  color: var(--text-main);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.status-iface-active {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.status-iface-inactive {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.iface-no-ip {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-style: italic;
+}
+
+.iface-role-secondary {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
 }
 
 .badge-iface-type {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: 4px;
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
 .badge-iface-eth {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgba(2, 132, 199, 0.2);
   color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  border: 1px solid rgba(56, 189, 248, 0.45);
 }
 
 .badge-iface-wifi {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(16, 185, 129, 0.2);
   color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid rgba(52, 211, 153, 0.45);
 }
 
 .badge-iface-virtual {
-  background: rgba(168, 85, 247, 0.12);
+  background: rgba(168, 85, 247, 0.2);
   color: #c084fc;
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  border: 1px solid rgba(192, 132, 252, 0.45);
 }
 
 .badge-primary-route {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  padding: 2px 7px;
+  background: rgba(245, 158, 11, 0.22);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  padding: 3px 9px;
   border-radius: 999px;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
 .status-dot-up {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #10b981;
   box-shadow: 0 0 6px #10b981;
-  margin-right: 5px;
+  margin-right: 6px;
 }
 
 .status-dot-down {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #64748b;
-  margin-right: 5px;
+  background: var(--text-muted);
+  margin-right: 6px;
 }
 
 /* Wi-Fi Signal Meter */
 .wifi-summary-box {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.4) 100%);
-  border: 1px solid rgba(56, 189, 248, 0.2);
-  border-radius: 10px;
+  background: var(--spec-box-bg);
+  border: 1.5px solid var(--border-glass-strong);
+  border-radius: var(--radius-md);
   padding: 14px 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 .wifi-meter-label-row {
@@ -5589,9 +5648,9 @@ body.auth-mode .dashboard-layout {
 }
 
 .wifi-meter-title {
-  font-size: 0.82rem;
-  color: #94a3b8;
-  font-weight: 500;
+  font-size: 0.84rem;
+  color: var(--text-main);
+  font-weight: 700;
 }
 
 .wifi-signal-value-group {
@@ -5603,20 +5662,20 @@ body.auth-mode .dashboard-layout {
 .wifi-signal-pct {
   font-size: 1.25rem;
   font-weight: 800;
-  color: #38bdf8;
+  color: var(--accent-cyan);
   font-family: 'JetBrains Mono', monospace;
 }
 
 .wifi-signal-dbm {
-  font-size: 0.8rem;
-  color: #64748b;
+  font-size: 0.82rem;
+  color: var(--text-muted);
   font-family: 'JetBrains Mono', monospace;
 }
 
 .wifi-signal-bar-track {
   width: 100%;
   height: 8px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   overflow: hidden;
   margin-bottom: 8px;
@@ -5641,53 +5700,119 @@ body.auth-mode .dashboard-layout {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
 }
 
 .wifi-signal-desc {
-  color: #cbd5e1;
-  font-weight: 500;
-}
-
-.wifi-signal-state-badge {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.72rem;
+  color: var(--text-main);
   font-weight: 600;
 }
 
+.wifi-signal-state-badge {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
 .wifi-signal-state-badge.disconnected {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 /* DNS Benchmarks */
 .dns-fastest-badge {
-  background: rgba(16, 185, 129, 0.18);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.4);
-  padding: 1px 6px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  padding: 1px 7px;
   border-radius: 4px;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
   margin-left: 6px;
 }
 
 .dns-lat-fast {
-  color: #34d399;
+  color: #10b981;
   font-weight: 700;
 }
 
 .dns-lat-mid {
-  color: #fbbf24;
+  color: #f59e0b;
   font-weight: 700;
 }
 
 .dns-lat-slow {
-  color: #f87171;
+  color: #ef4444;
   font-weight: 700;
 }
+
+/* Light Theme Overrides for High Contrast */
+[data-theme="light"] .interfaces-block,
+[data-theme="light"] .wifi-summary-box {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="light"] .interfaces-table thead th,
+[data-theme="light"] .dns-summary-table thead th {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-bottom: 2px solid #cbd5e1;
+}
+
+[data-theme="light"] .interfaces-table-scroll,
+[data-theme="light"] .dns-summary-table-scroll {
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+
+[data-theme="light"] .interfaces-table tbody td,
+[data-theme="light"] .dns-summary-table tbody td {
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+[data-theme="light"] .iface-name,
+[data-theme="light"] .iface-mac,
+[data-theme="light"] .info-subkey,
+[data-theme="light"] .wifi-meter-title,
+[data-theme="light"] .wifi-signal-desc {
+  color: #0f172a;
+}
+
+[data-theme="light"] .iface-desc,
+[data-theme="light"] .iface-no-ip,
+[data-theme="light"] .iface-role-secondary,
+[data-theme="light"] .status-iface-inactive,
+[data-theme="light"] .wifi-signal-dbm {
+  color: #475569;
+}
+
+[data-theme="light"] .badge-iface-eth {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+  border-color: rgba(2, 132, 199, 0.35);
+}
+
+[data-theme="light"] .badge-iface-wifi {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+[data-theme="light"] .badge-primary-route {
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+[data-theme="light"] .wifi-signal-bar-track {
+  background: #e2e8f0;
+}
+
