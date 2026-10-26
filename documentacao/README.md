@@ -14,6 +14,7 @@ Esta pasta contém guias detalhados sobre a arquitetura, novos módulos de rede,
 | **[2. Módulos de Rede: Wi-Fi, MACs e Multi-DNS](novos_modulos_wifi_macs_dns.md)** | Detalhamento técnico da medição de sinal Wi-Fi (dBm/%), inventário multi-placa/MACs e benchmark de servidores DNS. |
 | **[3. Sistema de Auto-Update e Patches](sistema_de_auto_update.md)** | Mecanismo de auto-patching transparente das sondas nas máquinas clientes, endpoints de versão e substituição segura de binários. |
 | **[4. Guia de Compilação e Deploy](guia_de_compilacao_e_deploy.md)** | Passo a passo para compilar o Central Server, gerar executáveis e instaladores Windows/Linux, e implantar novas versões. |
+| **[5. Diretrizes de UX e UI](DIRETRIZES_UX_UI.md)** | Guia oficial e checklist obrigatório de design, padronização de listas, eliminação de emojis e responsividade. |
 
 ---
 

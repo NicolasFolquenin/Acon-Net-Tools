@@ -21,7 +21,7 @@
     <div class="sidebar-wrapper">
       <aside class="app-sidebar" id="app-sidebar">
         <div class="sidebar-top">
-          <div class="sidebar-brand">
+          <div class="sidebar-brand" id="brand-logo-btn" style="cursor: pointer;" title="Voltar ao Dashboard Inicial" onclick="navigateToHomeDashboard()">
             <img src="uepg-logo.png" alt="Logo UEPG" class="brand-logo" />
             <div class="brand-text">
               <h2>UEPG Net Tools</h2>
@@ -154,7 +154,7 @@
       <header class="main-topbar">
         <div class="topbar-left">
           <div class="topbar-breadcrumbs">
-            <span class="breadcrumb-root">UEPG Net Tools</span>
+            <span class="breadcrumb-root" id="breadcrumb-brand" style="cursor: pointer;" title="Voltar ao Dashboard Inicial" onclick="navigateToHomeDashboard()">UEPG Net Tools</span>
             <span class="breadcrumb-sep">/</span>
             <span class="breadcrumb-current" id="page-title">Dashboard</span>
           </div>
@@ -254,7 +254,9 @@
               <span id="sm-dns-val" class="sm-meta-val font-mono text-cyan">--</span>
             </div>
             <div class="sm-meta-item" id="sm-historical-tag" style="display: none;">
-              <span class="sm-history-badge">📊 Modo Histórico (Últimos Testes)</span>
+              <span class="sm-history-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -1px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Modo Histórico (Últimos Testes)
+              </span>
             </div>
           </div>
         </div>
@@ -444,7 +446,9 @@
               <p class="charts-section-sub">Acompanhamento contínuo de vazão e latência. Clique em qualquer linha acima para filtrar.</p>
             </div>
             <div class="charts-header-right">
-              <span id="chart-historical-badge" class="sm-history-badge" style="display: none;">📊 Dados Históricos</span>
+              <span id="chart-historical-badge" class="sm-history-badge" style="display: none;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -1px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Dados Históricos
+              </span>
               <div id="chart-focus-indicator" class="chart-focus-pill all">
                 <span class="focus-dot"></span>
                 <span class="focus-label">Exibindo:</span>
@@ -732,7 +736,7 @@
                   <th>Módulos Ativos</th>
                   <th style="text-align: right; min-width: 120px;">Switch / Porta</th>
                   <th style="text-align: right; min-width: 110px;">Último Sinal</th>
-                  <th class="col-actions" style="text-align: right; width: 290px; min-width: 290px;">Ações</th>
+                  <th class="col-actions" style="text-align: right; width: 220px; min-width: 220px;">Ações</th>
                 </tr>
               </thead>
               <tbody id="machines-table-body">
