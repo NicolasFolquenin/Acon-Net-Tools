@@ -4504,6 +4504,36 @@ function openMachineMetricsModal(hostname) {
     }
   }
 
+  // Wi-Fi (se presente na telemetria ou modular_results)
+  const wifiRow = document.getElementById('mm-wifi-row');
+  const wifiValEl = document.getElementById('mm-hw-wifi');
+  if (wifiRow && wifiValEl) {
+    const modResults = (summary && summary.modular_results) || {};
+    const wf = modResults.wifi;
+    const wsMetric = (summary && summary.metrics && summary.metrics.wifi_status);
+
+    if (wf && wf.status && wf.status !== 'skipped' && wf.status !== 'no_adapter') {
+      wifiRow.style.display = 'flex';
+      if (wf.status === 'disconnected') {
+        wifiValEl.textContent = 'Adaptador desconectado';
+        wifiValEl.className = 'detail-val font-semibold text-subtle';
+      } else {
+        const pct = wf.signal_quality_percent || 0;
+        const dbmStr = wf.signal_strength_dbm ? ` (${wf.signal_strength_dbm} dBm)` : '';
+        wifiValEl.textContent = `${wf.ssid || 'Conectado'}: ${pct}%${dbmStr}`;
+        wifiValEl.className = 'detail-val font-semibold text-emerald';
+      }
+    } else if (wsMetric && wsMetric.status === 'ok') {
+      wifiRow.style.display = 'flex';
+      const pct = Math.round(wsMetric.value || 0);
+      const dbm = Math.round((pct / 2) - 100);
+      wifiValEl.textContent = `${pct}% (${dbm} dBm)`;
+      wifiValEl.className = 'detail-val font-semibold text-emerald';
+    } else {
+      wifiRow.style.display = 'none';
+    }
+  }
+
   // Switch LLDP
   const sw = (summary && summary.switch_info) || {};
   document.getElementById('mm-sw-name').textContent = machine.switch_name || sw.switch_name || 'Não descoberto';
