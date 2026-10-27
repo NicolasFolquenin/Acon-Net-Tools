@@ -80,8 +80,7 @@ const modJsonErrorText = document.getElementById('mod-json-error-text');
 // Estado de Máquinas e Módulos
 let allAdminMachines = [];
 let allCatalogModules = [];
-let mmLatencyChart = null;
-let mmThroughputChart = null;
+// Graficos no modal desativados em favor do Dashboard
 let currentInspectedMachine = null;
 const machineFilterState = {
   search: '',
@@ -4412,9 +4411,9 @@ function renderMachinesTable(machines) {
               <span>Ping</span>
             </button>
             ` : ''}
-            <button type="button" class="btn btn-glass btn-sm btn-action-compact" onclick="openMachineMetricsModal('${escapeHtml(m.hostname)}')" title="Visualizar gráficos e estatísticas da máquina">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-              <span>Gráficos</span>
+            <button type="button" class="btn btn-glass btn-sm btn-action-compact" onclick="openMachineMetricsModal('${escapeHtml(m.hostname)}')" title="Visualizar principais informações e métricas da máquina">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+              <span>Detalhes</span>
             </button>
             <button type="button" class="btn btn-glass btn-sm btn-action-compact" onclick="openMachineConfigModal('${escapeHtml(m.hostname)}')" title="Alterar grupo e módulos">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -4461,15 +4460,19 @@ window.handleQuickChangeGroup = handleQuickChangeGroup;
    11. Modal de Métricas e Gráficos da Máquina
    ========================================================================== */
 
-async function openMachineMetricsModal(hostname) {
+function openMachineMetricsModal(hostname) {
   if (!machineMetricsModal) return;
   currentInspectedMachine = hostname;
 
   const machine = allAdminMachines.find(m => m.hostname === hostname) || { hostname };
-  const summary = currentSummaries.find(s => s.node_id === hostname);
+  const summary = currentSummaries ? currentSummaries.find(s => s.node_id === hostname) : null;
+  const effectiveLastDate = getMachineEffectiveLastDate(machine);
+
+  const grp = currentGroups ? currentGroups.find(g => g.id === machine.group_id) : null;
+  const grpName = grp ? grp.name : (machine.group_id || 'default');
 
   document.getElementById('mm-hostname').textContent = hostname;
-  document.getElementById('mm-subtitle').textContent = `Grupo: ${machine.group_id || 'default'} • ${machine.is_custom ? 'Perfil Personalizado' : 'Perfil Herdado'}`;
+  document.getElementById('mm-subtitle').textContent = `Grupo: ${grpName} • ${machine.is_custom ? 'Perfil Customizado' : 'Perfil Herdado'}`;
 
   document.getElementById('mm-stat-ping').textContent = summary ? summary.last_ping.toFixed(1) : '--';
   document.getElementById('mm-stat-down').textContent = summary ? summary.last_download.toFixed(1) : '--';
@@ -4477,8 +4480,8 @@ async function openMachineMetricsModal(hostname) {
   document.getElementById('mm-stat-readings').textContent = summary ? summary.total_readings_24h : '0';
 
   const subStatus = document.getElementById('mm-sub-status');
+  const isOnline = summary ? summary.is_healthy : (effectiveLastDate && (Date.now() - effectiveLastDate.getTime()) < 15 * 60 * 1000);
   if (subStatus) {
-    const isOnline = summary && summary.is_healthy;
     subStatus.textContent = isOnline ? 'Online na rede' : 'Sem sinal recente';
     subStatus.style.color = isOnline ? '#34d399' : '#f87171';
   }
@@ -4490,6 +4493,17 @@ async function openMachineMetricsModal(hostname) {
   document.getElementById('mm-hw-os').textContent = sys.os || '--';
   document.getElementById('mm-hw-specs').textContent = `${sys.cpu || '--'} (${sys.ram_total_gb ? sys.ram_total_gb.toFixed(1) + 'GB' : '--'})`;
 
+  const lastSeenEl = document.getElementById('mm-hw-last-seen');
+  if (lastSeenEl) {
+    if (effectiveLastDate) {
+      const dateStr = effectiveLastDate.toLocaleString('pt-BR');
+      const timeAgo = formatTimeAgo(effectiveLastDate);
+      lastSeenEl.textContent = `${dateStr} (${timeAgo})`;
+    } else {
+      lastSeenEl.textContent = 'Nunca registrado';
+    }
+  }
+
   // Switch LLDP
   const sw = (summary && summary.switch_info) || {};
   document.getElementById('mm-sw-name').textContent = machine.switch_name || sw.switch_name || 'Não descoberto';
@@ -4497,142 +4511,37 @@ async function openMachineMetricsModal(hostname) {
   document.getElementById('mm-sw-vlan').textContent = machine.vlan ? `VLAN ${machine.vlan}` : (sw.vlan ? `VLAN ${sw.vlan}` : '--');
   document.getElementById('mm-sw-proto').textContent = sw.protocol || 'LLDP/CDP';
 
-  machineMetricsModal.style.display = 'flex';
-
-  try {
-    const res = await apiFetch(`/api/v1/dashboard/metrics?node_id=${encodeURIComponent(hostname)}`);
-    if (res.ok) {
-      const data = await res.json();
-      renderMachineMetricsCharts(data.metrics_series || []);
-    }
-  } catch (err) {
-    console.error('Falha ao carregar gráficos da máquina:', err);
+  const swGroupEl = document.getElementById('mm-sw-group');
+  if (swGroupEl) {
+    swGroupEl.textContent = grpName;
   }
+
+  // Módulos Ativos
+  const modulesListEl = document.getElementById('mm-modules-list');
+  if (modulesListEl) {
+    let effectiveTests = [];
+    if (machine.is_custom && machine.custom_tests && machine.custom_tests.length > 0) {
+      effectiveTests = machine.custom_tests;
+    } else if (grp && grp.profile && grp.profile.tests) {
+      effectiveTests = grp.profile.tests;
+    }
+
+    if (effectiveTests.length === 0) {
+      modulesListEl.innerHTML = '<span class="text-subtle font-mono text-xs">Nenhum módulo configurado</span>';
+    } else {
+      modulesListEl.innerHTML = effectiveTests.map(t => {
+        const testName = t.name || t.id;
+        return `<span class="badge-group-standard" style="margin-right: 4px; margin-bottom: 4px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#38bdf8;margin-right:4px;"></span>${escapeHtml(testName)}</span>`;
+      }).join('');
+    }
+  }
+
+  machineMetricsModal.style.display = 'flex';
 }
 window.openMachineMetricsModal = openMachineMetricsModal;
 
 function closeMachineMetricsModal() {
   if (machineMetricsModal) machineMetricsModal.style.display = 'none';
-  if (mmLatencyChart) { mmLatencyChart.destroy(); mmLatencyChart = null; }
-  if (mmThroughputChart) { mmThroughputChart.destroy(); mmThroughputChart = null; }
-}
-
-function renderMachineMetricsCharts(metricsSeries) {
-  if (typeof Chart === 'undefined') return;
-  const ctxLatency = document.getElementById('mmLatencyChart');
-  const ctxThroughput = document.getElementById('mmThroughputChart');
-  if (!ctxLatency || !ctxThroughput) return;
-
-  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-  const colors = getChartThemeColors(currentTheme);
-
-  if (mmLatencyChart) { mmLatencyChart.destroy(); mmLatencyChart = null; }
-  if (mmThroughputChart) { mmThroughputChart.destroy(); mmThroughputChart = null; }
-
-  const sorted = [...metricsSeries].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  const labels = sorted.map(m => new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-  const pings = sorted.map(m => m.ping_gateway || 0);
-  const downs = sorted.map(m => m.download_mbps || 0);
-  const ups = sorted.map(m => m.upload_mbps || 0);
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    layout: { padding: { left: 8, right: 28, top: 10, bottom: 4 } },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: colors.tooltipBg,
-        titleColor: colors.tooltipTitle,
-        bodyColor: colors.tooltipBody,
-        borderColor: colors.tooltipBorder,
-        borderWidth: 1,
-        padding: 10,
-        cornerRadius: 6
-      }
-    },
-    scales: {
-      x: {
-        grid: { color: colors.gridColor, drawBorder: false },
-        ticks: { color: colors.textColor, font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }
-      },
-      y: {
-        grid: { color: colors.gridColor, drawBorder: false },
-        ticks: { color: colors.textColor, font: { size: 10 } }
-      }
-    }
-  };
-
-  const ctxLat = ctxLatency.getContext('2d');
-  mmLatencyChart = new Chart(ctxLat, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Ping Gateway',
-        data: pings,
-        borderColor: '#10b981',
-        backgroundColor: createFillGradient(ctxLat, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
-        fill: true,
-        tension: 0.35,
-        borderWidth: 2,
-        pointRadius: 2.5,
-        pointHoverRadius: 5
-      }]
-    },
-    options: {
-      ...chartOptions,
-      scales: {
-        ...chartOptions.scales,
-        y: {
-          ...chartOptions.scales.y,
-          title: { display: true, text: 'ms', color: colors.textColor, font: { size: 10 } }
-        }
-      }
-    }
-  });
-
-  const ctxThr = ctxThroughput.getContext('2d');
-  mmThroughputChart = new Chart(ctxThr, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Download',
-          data: downs,
-          borderColor: '#0284c7',
-          backgroundColor: createFillGradient(ctxThr, 'rgba(2, 132, 199, 0.22)', 'rgba(2, 132, 199, 0.01)'),
-          fill: true,
-          tension: 0.35,
-          borderWidth: 2,
-          pointRadius: 2.5,
-          pointHoverRadius: 5
-        },
-        {
-          label: 'Upload',
-          data: ups,
-          borderColor: '#4f46e5',
-          backgroundColor: createFillGradient(ctxThr, 'rgba(79, 70, 229, 0.20)', 'rgba(79, 70, 229, 0.01)'),
-          fill: true,
-          tension: 0.35,
-          borderWidth: 2,
-          pointRadius: 2.5,
-          pointHoverRadius: 5
-        }
-      ]
-    },
-    options: {
-      ...chartOptions,
-      scales: {
-        ...chartOptions.scales,
-        y: {
-          ...chartOptions.scales.y,
-          title: { display: true, text: 'Mbps', color: colors.textColor, font: { size: 10 } }
-        }
-      }
-    }
-  });
 }
 
 /* ==========================================================================

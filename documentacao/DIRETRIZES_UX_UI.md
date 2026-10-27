@@ -100,6 +100,7 @@ Para evitar que colunas e botões extrapolem o container da página (como aconte
    - Nunca utilizar cores duras hardcoded escuras (`rgba(15, 23, 42, 0.45)`) com textos acinzentados apagados (`#94a3b8`, `#64748b`).
    - Todos os textos de telemetria, títulos de subseções e nomes de hardware devem utilizar variáveis de contraste semânticas (`var(--text-main)`, `var(--text-muted)`).
    - Dados de status e interfaces devem utilizar badges ou estados visuais com contraste nítido em ambos os temas (Dark & Light). Textos como "Inativa", "Sem IP" ou "Secundária" devem ter legibilidade clara, sem parecer que estão apagados ou inexistentes.
+   - **Modal de Detalhes Sem Gráficos Embutidos:** O modal acionado na tabela de máquinas apresenta exclusivamente as **principais informações e estado atual** da sonda (KPIs mais recentes, telemetria de hardware/SO, conectividade LLDP, último sinal completo e módulos ativos). **Gráficos pesados não devem ser renderizados dentro deste modal**. O histórico detalhado de séries temporais é centralizado no Dashboard, acionado pelo botão **"Focar no Dashboard"**.
 
 2. **Cards de Módulos & Catálogo JSON:**
    - As caixas de módulos (`.module-card`) devem possuir contorno aparente (`1.5px solid var(--border-card-prominent)`) e elevação com sombra suave (`box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08)`), para nunca se mesclarem ao fundo da página.
@@ -125,6 +126,7 @@ Antes de aprovar qualquer alteração visual no Central Server, verifique cada i
 - [ ] **5. Ordenação por Último Sinal:** Máquinas com sinal mais recente/próximo aparecem no topo por padrão em ambas as visões de lista.
 - [ ] **6. Filtro por Grupo em Gráficos:** O seletor de grupo nos gráficos comparativos filtra as séries apenas das máquinas do grupo selecionado, exibe a contagem de máquinas no pill e o botão "Limpar Filtro" restaura o estado global.
 - [ ] **7. Paginação Operacional:** O rodapé de paginação mostra itens por página, controles `Anterior` / `Próxima` e indicador de página atual.
-- [ ] **8. Tema Claro & Tema Escuro:** O contraste de texto e fundos das tabelas foi verificado em ambos os modos.
-- [ ] **9. Clique na Logo:** Clicar na logo da UEPG no canto superior esquerdo reseta a máquina individual, o filtro de grupo e volta ao Dashboard consolidado.
+- [ ] **8. Modal de Detalhes Leve:** O modal de detalhes da máquina abre de forma instantânea com dados essenciais (KPIs, SO, LLDP, módulos e data do último sinal), sem gráficos embutidos, redirecionando o histórico para o Dashboard via "Focar no Dashboard".
+- [ ] **9. Tema Claro & Tema Escuro:** O contraste de texto e fundos das tabelas foi verificado em ambos os modos.
+- [ ] **10. Clique na Logo:** Clicar na logo da UEPG no canto superior esquerdo reseta a máquina individual, o filtro de grupo e volta ao Dashboard consolidado.
 
