@@ -2843,21 +2843,35 @@ function applyNodeFilters() {
       if ((s.group_name || '') !== groupFilter) return false;
     }
 
-    // 3. Filtro de Texto (hostname, local, ip, switch, vlan)
+    // 3. Filtro de Texto (hostname, local, ip, mac, switch, porta, vlan)
     if (query) {
-      const matchNodeId = (s.node_id || '').toLowerCase().includes(query);
-      const matchLoc = (s.location || '').toLowerCase().includes(query);
-      const matchGroup = (s.group_name || '').toLowerCase().includes(query);
-      const matchIp = (s.system_info && s.system_info.ip_address) ? s.system_info.ip_address.toLowerCase().includes(query) : false;
-      const matchSwitch = (s.switch_info && s.switch_info.switch_name) ? s.switch_info.switch_name.toLowerCase().includes(query) : false;
-      const matchVlan = s.vlan ? String(s.vlan).includes(query) : false;
+      const q = query;
+      const cleanQ = q.replace(/[:-]/g, '');
+      const matchNodeId = (s.node_id || '').toLowerCase().includes(q);
+      const matchLoc = (s.location || '').toLowerCase().includes(q);
+      const matchGroup = (s.group_name || '').toLowerCase().includes(q);
+      const matchIp = (s.system_info && s.system_info.ip_address) ? s.system_info.ip_address.toLowerCase().includes(q) : false;
+      const rawMac = (s.system_info && s.system_info.mac_address) ? s.system_info.mac_address.toLowerCase() : '';
+      const cleanMac = rawMac.replace(/[:-]/g, '');
+      const matchMac = rawMac.includes(q) || (cleanQ.length >= 3 && cleanMac.includes(cleanQ));
+      const matchSwitch = (s.switch_info && s.switch_info.switch_name) ? s.switch_info.switch_name.toLowerCase().includes(q) : false;
+      const matchPort = (s.switch_info && s.switch_info.switch_port) ? s.switch_info.switch_port.toLowerCase().includes(q) : false;
+      const matchVlan = s.vlan ? String(s.vlan).includes(q) : false;
 
-      if (!matchNodeId && !matchLoc && !matchGroup && !matchIp && !matchSwitch && !matchVlan) {
+      if (!matchNodeId && !matchLoc && !matchGroup && !matchIp && !matchMac && !matchSwitch && !matchPort && !matchVlan) {
         return false;
       }
     }
 
     return true;
+  });
+
+  // Ordena pelo último sinal mais recente/próximo por primeiro
+  filtered.sort((a, b) => {
+    const timeA = a.last_seen ? new Date(a.last_seen).getTime() : 0;
+    const timeB = b.last_seen ? new Date(b.last_seen).getTime() : 0;
+    if (timeB !== timeA) return timeB - timeA;
+    return (a.node_id || '').localeCompare(b.node_id || '');
   });
 
   if (nodesFilterCount) {
@@ -3998,6 +4012,28 @@ function showToast(message, type = 'toast-info') {
    10. Gerenciamento Avançado de Máquinas & Sondas
    ========================================================================== */
 
+function getMachineEffectiveLastDate(m) {
+  if (!m) return null;
+  const summary = currentSummaries ? currentSummaries.find(s => s.node_id === m.hostname) : null;
+  let effectiveDate = null;
+  if (summary && summary.last_seen) {
+    const ds = new Date(summary.last_seen);
+    if (!isNaN(ds.getTime())) effectiveDate = ds;
+  }
+  if (m.last_seen) {
+    const dm = new Date(m.last_seen);
+    if (!isNaN(dm.getTime()) && (!effectiveDate || dm > effectiveDate)) {
+      effectiveDate = dm;
+    }
+  }
+  return effectiveDate;
+}
+
+function getMachineLastSeenTimestamp(m) {
+  const d = getMachineEffectiveLastDate(m);
+  return d ? d.getTime() : 0;
+}
+
 async function loadAdminMachines() {
   if (!machinesTableBody) return;
   machinesTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando máquinas e perfis...</td></tr>`;
@@ -4055,8 +4091,8 @@ async function loadAdminMachines() {
           macMap.set(mac, m);
         } else {
           const existing = macMap.get(mac);
-          const timeM = m.last_seen ? new Date(m.last_seen).getTime() : 0;
-          const timeEx = existing.last_seen ? new Date(existing.last_seen).getTime() : 0;
+          const timeM = getMachineLastSeenTimestamp(m);
+          const timeEx = getMachineLastSeenTimestamp(existing);
           if (timeM > timeEx) {
             macMap.set(mac, m);
           }
@@ -4066,6 +4102,14 @@ async function loadAdminMachines() {
       }
     });
     allAdminMachines = [...macMap.values(), ...withoutMac];
+
+    // Ordena pelo último sinal mais recente/próximo por primeiro
+    allAdminMachines.sort((a, b) => {
+      const timeA = getMachineLastSeenTimestamp(a);
+      const timeB = getMachineLastSeenTimestamp(b);
+      if (timeB !== timeA) return timeB - timeA;
+      return (a.hostname || '').localeCompare(b.hostname || '');
+    });
 
     populateMachineGroupFilterOptions();
     applyMachineFilters();
@@ -4133,36 +4177,77 @@ function applyMachineFilters() {
 
     // 4. Filtro por Dia (Último Sinal)
     if (machineFilterState.date) {
-      let lastDate = null;
-      if (summary && summary.last_seen) {
-        const ds = new Date(summary.last_seen);
-        if (!isNaN(ds.getTime())) lastDate = ds;
-      }
-      if (m.last_seen) {
-        const dm = new Date(m.last_seen);
-        if (!isNaN(dm.getTime()) && (!lastDate || dm > lastDate)) {
-          lastDate = dm;
-        }
-      }
+      const lastDate = getMachineEffectiveLastDate(m);
       if (!lastDate) return false;
       const dStr = lastDate.toLocaleDateString('en-CA');
       if (dStr !== machineFilterState.date) return false;
     }
 
-    // 5. Text Search
+    // 5. Text Search Multifuncional (hostname, IP, MAC, switch, porta, VLAN, grupo, local, módulos, status)
     if (query) {
-      const matchHost = (m.hostname || '').toLowerCase().includes(query);
-      const matchIp = (m.ip_address || '').toLowerCase().includes(query);
-      const matchMac = (m.mac_address || '').toLowerCase().includes(query);
-      const matchSwitch = (m.switch_name || '').toLowerCase().includes(query);
-      const matchVlan = m.vlan ? String(m.vlan).includes(query) : false;
-      const matchGroup = (m.group_id || '').toLowerCase().includes(query);
-      if (!matchHost && !matchIp && !matchMac && !matchSwitch && !matchVlan && !matchGroup) {
+      const q = query;
+      const cleanQ = q.replace(/[:-]/g, '');
+
+      const matchHost = (m.hostname || '').toLowerCase().includes(q);
+      const matchIp = (m.ip_address || '').toLowerCase().includes(q) ||
+                      (summary && summary.system_info && (summary.system_info.ip_address || '').toLowerCase().includes(q));
+
+      const rawMac = (m.mac_address || (summary && summary.system_info && summary.system_info.mac_address) || '').toLowerCase();
+      const cleanMac = rawMac.replace(/[:-]/g, '');
+      const matchMac = rawMac.includes(q) || (cleanQ.length >= 3 && cleanMac.includes(cleanQ));
+
+      const swName = (m.switch_name || (summary && summary.switch_info && summary.switch_info.switch_name) || '').toLowerCase();
+      const matchSwitchName = swName.includes(q);
+
+      const swPort = (m.switch_port || (summary && summary.switch_info && summary.switch_info.switch_port) || '').toLowerCase();
+      const matchSwitchPort = swPort.includes(q);
+
+      const swIp = (m.switch_ip || (summary && summary.switch_info && summary.switch_info.switch_ip) || '').toLowerCase();
+      const matchSwitchIp = swIp.includes(q);
+
+      const vlanVal = m.vlan || (summary && summary.vlan) || (summary && summary.switch_info && summary.switch_info.vlan) || '';
+      const matchVlan = vlanVal ? String(vlanVal).includes(q) : false;
+
+      const grp = currentGroups ? currentGroups.find(g => g.id === m.group_id) : null;
+      const grpName = grp ? grp.name.toLowerCase() : '';
+      const grpId = (m.group_id || '').toLowerCase();
+      const matchGroup = grpId.includes(q) || grpName.includes(q);
+
+      const loc = (m.location || (summary && summary.location) || '').toLowerCase();
+      const matchLocation = loc.includes(q);
+
+      let effectiveTests = [];
+      if (m.is_custom && m.custom_tests && m.custom_tests.length > 0) {
+        effectiveTests = m.custom_tests;
+      } else if (grp && grp.profile && grp.profile.tests) {
+        effectiveTests = grp.profile.tests;
+      }
+      const matchModule = effectiveTests.some(t =>
+        (t.id || '').toLowerCase().includes(q) ||
+        (t.name || '').toLowerCase().includes(q) ||
+        (t.type || '').toLowerCase().includes(q)
+      );
+
+      const statusText = isOnline ? 'online conectado ativo' : 'sem sinal offline desconectado';
+      const matchStatus = statusText.includes(q);
+
+      if (!matchHost && !matchIp && !matchMac && !matchSwitchName && !matchSwitchPort &&
+          !matchSwitchIp && !matchVlan && !matchGroup && !matchLocation && !matchModule && !matchStatus) {
         return false;
       }
     }
 
     return true;
+  });
+
+  // Ordena com o último sinal mais recente/próximo por primeiro
+  filtered.sort((a, b) => {
+    const timeA = getMachineLastSeenTimestamp(a);
+    const timeB = getMachineLastSeenTimestamp(b);
+    if (timeB !== timeA) {
+      return timeB - timeA;
+    }
+    return (a.hostname || '').localeCompare(b.hostname || '');
   });
 
   const total = filtered.length;
@@ -4219,18 +4304,7 @@ function renderMachinesTable(machines) {
 
   machinesTableBody.innerHTML = machines.map(m => {
     const summary = currentSummaries.find(s => s.node_id === m.hostname);
-    let effectiveLastDate = null;
-    if (summary && summary.last_seen) {
-      const ds = new Date(summary.last_seen);
-      if (!isNaN(ds.getTime())) effectiveLastDate = ds;
-    }
-    if (m.last_seen) {
-      const dm = new Date(m.last_seen);
-      if (!isNaN(dm.getTime()) && (!effectiveLastDate || dm > effectiveLastDate)) {
-        effectiveLastDate = dm;
-      }
-    }
-
+    const effectiveLastDate = getMachineEffectiveLastDate(m);
     const isOnline = summary ? summary.is_healthy : (effectiveLastDate && (Date.now() - effectiveLastDate.getTime()) < 15 * 60 * 1000);
     const statusClass = isOnline ? 'online' : 'stale';
     const statusText = isOnline ? 'Online' : 'Sem sinal';

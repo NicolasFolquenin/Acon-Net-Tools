@@ -41,6 +41,22 @@ Toda e qualquer lista de dados (Sondas, Máquinas, Grupos, Módulos, Usuários, 
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
+### ⏱️ Ordenação Padrão por Recência de Sinal
+- **Último Sinal Mais Próximo Primeiro:** Toda lista de máquinas e sondas (tanto no Dashboard de Telemetria quanto no Gerenciamento de Máquinas) deve obrigatoriamente ordenar os registros de forma decrescente pelo timestamp do último sinal (`timeB - timeA`). As máquinas com telemetria mais recente (ex.: há poucos segundos, há 8 min) devem aparecer no topo da tabela, e as máquinas inativas ou sem sinal há mais tempo (ex.: há 138h) devem ficar no final.
+- **Desempate:** Em caso de empate ou ausência de sinal, utiliza-se a ordem alfabética do hostname.
+
+### 🔎 Busca Multifuncional Unificada
+A caixa de busca textual (`machines-search-input` e `nodes-search-input`) não deve se limitar apenas ao hostname. Ela deve cobrir:
+- **Hostname / Nome da Máquina**
+- **Endereço IP** (IPv4 e IPv6)
+- **Endereço MAC** (com tratamento automático para aceitar formatos com dois pontos `00:11:22`, hifens `00-11-22` ou contínuo `001122`)
+- **Switch e Porta** (ex.: `ACONS0001`, `GE1/0/4`, `0/1`)
+- **VLAN**
+- **Grupo Vinculado** (tanto o identificador técnico `group_id` quanto o nome legível institucional `grp.name`)
+- **Localização / Departamento** (`location`)
+- **Módulos / Testes Ativos** (ex.: `ping`, `speedtest`, `traceroute`)
+- **Status Textual** (`online`, `sem sinal`)
+
 ---
 
 ## 🔒 3. Prevenção de Quebra de Layout e Elementos Vazando
@@ -105,9 +121,10 @@ Antes de aprovar qualquer alteração visual no Central Server, verifique cada i
 - [ ] **1. Verificação de Emojis:** Não há emojis no HTML ou no JS gerado dinamicamente (usar apenas ícones SVG e texto sóbrio).
 - [ ] **2. Contenção no Card:** Redimensione a janela do navegador para 1280px e 1024px. Nenhum botão ou cabeçalho vaza para fora do card branco/escuro.
 - [ ] **3. Barra de Rolagem Horizontal Interna:** Se a tabela for mais larga que a tela, a barra de rolagem horizontal surge **dentro** do card da tabela, e não na página inteira.
-- [ ] **4. Barra de Filtros:** Todos os selects, inputs de busca e contadores estão alinhados e utilizam as classes padrão (`.form-input-sm`).
-- [ ] **5. Filtro por Grupo em Gráficos:** O seletor de grupo nos gráficos comparativos filtra as séries apenas das máquinas do grupo selecionado, exibe a contagem de máquinas no pill e o botão "Limpar Filtro" restaura o estado global.
-- [ ] **6. Paginação Operacional:** O rodapé de paginação mostra itens por página, controles `Anterior` / `Próxima` e indicador de página atual.
-- [ ] **7. Tema Claro & Tema Escuro:** O contraste de texto e fundos das tabelas foi verificado em ambos os modos.
-- [ ] **8. Clique na Logo:** Clicar na logo da UEPG no canto superior esquerdo reseta a máquina individual, o filtro de grupo e volta ao Dashboard consolidado.
+- [ ] **4. Barra de Filtros e Busca Multifuncional:** A barra de busca filtra instantaneamente por Hostname, IP, MAC (independente de hífen/dois-pontos), Switch, Porta, Grupo e Status.
+- [ ] **5. Ordenação por Último Sinal:** Máquinas com sinal mais recente/próximo aparecem no topo por padrão em ambas as visões de lista.
+- [ ] **6. Filtro por Grupo em Gráficos:** O seletor de grupo nos gráficos comparativos filtra as séries apenas das máquinas do grupo selecionado, exibe a contagem de máquinas no pill e o botão "Limpar Filtro" restaura o estado global.
+- [ ] **7. Paginação Operacional:** O rodapé de paginação mostra itens por página, controles `Anterior` / `Próxima` e indicador de página atual.
+- [ ] **8. Tema Claro & Tema Escuro:** O contraste de texto e fundos das tabelas foi verificado em ambos os modos.
+- [ ] **9. Clique na Logo:** Clicar na logo da UEPG no canto superior esquerdo reseta a máquina individual, o filtro de grupo e volta ao Dashboard consolidado.
 

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -319,6 +320,15 @@ func (h *MachineProfileHandler) HandleAdminMachines(w http.ResponseWriter, r *ht
 				deduped = append(deduped, m)
 			}
 			deduped = append(deduped, nonMacMachines...)
+
+			// Ordena pelo último sinal mais recente/próximo primeiro
+			sort.Slice(deduped, func(i, j int) bool {
+				if !deduped[i].LastSeen.Equal(deduped[j].LastSeen) {
+					return deduped[i].LastSeen.After(deduped[j].LastSeen)
+				}
+				return deduped[i].Hostname < deduped[j].Hostname
+			})
+
 			machines = deduped
 		}
 

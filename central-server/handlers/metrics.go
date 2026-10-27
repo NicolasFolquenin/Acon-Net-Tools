@@ -544,8 +544,11 @@ func (h *MetricsHandler) computeNodeSummaries(ctx context.Context, series []mode
 		deduped = append(deduped, s)
 	}
 
-	// Ordena por NodeID alfabeticamente
+	// Ordena pelo último sinal mais recente/próximo primeiro
 	sort.Slice(deduped, func(i, j int) bool {
+		if !deduped[i].LastSeen.Equal(deduped[j].LastSeen) {
+			return deduped[i].LastSeen.After(deduped[j].LastSeen)
+		}
 		return deduped[i].NodeID < deduped[j].NodeID
 	})
 
