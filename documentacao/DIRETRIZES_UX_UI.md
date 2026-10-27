@@ -88,6 +88,11 @@ Para evitar que colunas e botões extrapolem o container da página (como aconte
 2. **Cards de Módulos & Catálogo JSON:**
    - As caixas de módulos (`.module-card`) devem possuir contorno aparente (`1.5px solid var(--border-card-prominent)`) e elevação com sombra suave (`box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08)`), para nunca se mesclarem ao fundo da página.
    - No tema claro (`[data-theme="light"]`), o contorno deve ter espessura de `1.5px solid #94a3b8` para perfeita separação dos cards em relação ao fundo branco.
+   - **Proibição de Exclusão no Frontend:** Módulos do sistema e medições registradas não devem exibir opção de exclusão no frontend. Os cards devem conter apenas ações de visualização/edição de parâmetros e download do arquivo `.json`.
+
+3. **Gráficos Comparativos & Séries Temporais:**
+   - Para evitar estouro horizontal em qualquer resolução ou corte lateral, os gráficos comparativos principais devem ser dispostos **empilhados verticalmente** (`display: flex; flex-direction: column; width: 100%; gap: 24px;`).
+   - Cada painel de gráfico (`.chart-panel`) e contêiner do canvas (`.chart-canvas-container`) deve conter estritamente `min-width: 0; max-width: 100%; box-sizing: border-box; overflow: hidden;` para que o Chart.js responda fluidamente à largura útil do contêiner.
 
 ---
 

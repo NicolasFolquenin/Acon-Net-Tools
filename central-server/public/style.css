@@ -834,6 +834,10 @@ body {
   box-shadow: var(--shadow-card);
   backdrop-filter: var(--blur);
   -webkit-backdrop-filter: var(--blur);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .section-title-row {
@@ -1115,9 +1119,10 @@ body {
    ========================================================================== */
 
 .charts-grid {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
 }
 
 .chart-panel {
@@ -1126,10 +1131,15 @@ body {
   -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 20px 24px;
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .panel-header {
@@ -1287,6 +1297,13 @@ body {
   position: relative;
   height: 290px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.chart-canvas-container canvas {
+  max-width: 100% !important;
 }
 
 /* ==========================================================================
@@ -4358,11 +4375,22 @@ body.auth-mode .dashboard-layout {
 
 .module-card-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  padding-top: 12px;
+  padding-top: 14px;
   border-top: 1px solid var(--border-subtle);
-  gap: 8px;
+  gap: 10px;
+}
+
+.module-card-footer .btn {
+  flex: 1 1 0;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.76rem;
+  padding: 6px 10px;
 }
 
 .json-dropzone {
