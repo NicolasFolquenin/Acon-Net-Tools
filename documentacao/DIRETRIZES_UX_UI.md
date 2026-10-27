@@ -93,6 +93,8 @@ Para evitar que colunas e botões extrapolem o container da página (como aconte
 3. **Gráficos Comparativos & Séries Temporais:**
    - Para evitar estouro horizontal em qualquer resolução ou corte lateral, os gráficos comparativos principais devem ser dispostos **empilhados verticalmente** (`display: flex; flex-direction: column; width: 100%; gap: 24px;`).
    - Cada painel de gráfico (`.chart-panel`) e contêiner do canvas (`.chart-canvas-container`) deve conter estritamente `min-width: 0; max-width: 100%; box-sizing: border-box; overflow: hidden;` para que o Chart.js responda fluidamente à largura útil do contêiner.
+   - **Filtro por Grupo no Dashboard:** O cabeçalho dos gráficos comparativos deve fornecer um seletor `<select id="chart-group-filter-select">` permitindo filtrar as séries por grupo de máquinas cadastrado.
+   - **Botão de Limpar e Indicador de Foco:** Quando um grupo específico estiver selecionado, deve ser exibido um botão de ação rápida "Limpar Filtro" e a badge `.chart-focus-pill` deve sinalizar `Grupo: [Nome] (N máquinas)`. Clicar na logo da UEPG ou no botão de limpar deve restaurar a visão global de todas as máquinas.
 
 ---
 
@@ -100,10 +102,12 @@ Para evitar que colunas e botões extrapolem o container da página (como aconte
 
 Antes de aprovar qualquer alteração visual no Central Server, verifique cada item abaixo:
 
-- [ ] **1. Verificação de Emojis:** Não há emojis (`📊`, `⚙️`, `⚡`, `🗑`, `✔`, `✖`) no HTML ou no JS gerado dinamicamente.
+- [ ] **1. Verificação de Emojis:** Não há emojis no HTML ou no JS gerado dinamicamente (usar apenas ícones SVG e texto sóbrio).
 - [ ] **2. Contenção no Card:** Redimensione a janela do navegador para 1280px e 1024px. Nenhum botão ou cabeçalho vaza para fora do card branco/escuro.
 - [ ] **3. Barra de Rolagem Horizontal Interna:** Se a tabela for mais larga que a tela, a barra de rolagem horizontal surge **dentro** do card da tabela, e não na página inteira.
 - [ ] **4. Barra de Filtros:** Todos os selects, inputs de busca e contadores estão alinhados e utilizam as classes padrão (`.form-input-sm`).
-- [ ] **5. Paginação Operacional:** O rodapé de paginação mostra itens por página, controles `Anterior` / `Próxima` e indicador de página atual.
-- [ ] **6. Tema Claro & Tema Escuro:** O contraste de texto e fundos das tabelas foi verificado em ambos os modos.
-- [ ] **7. Clique na Logo:** Clicar na logo da UEPG no canto superior esquerdo reseta a máquina selecionada e volta ao Dashboard.
+- [ ] **5. Filtro por Grupo em Gráficos:** O seletor de grupo nos gráficos comparativos filtra as séries apenas das máquinas do grupo selecionado, exibe a contagem de máquinas no pill e o botão "Limpar Filtro" restaura o estado global.
+- [ ] **6. Paginação Operacional:** O rodapé de paginação mostra itens por página, controles `Anterior` / `Próxima` e indicador de página atual.
+- [ ] **7. Tema Claro & Tema Escuro:** O contraste de texto e fundos das tabelas foi verificado em ambos os modos.
+- [ ] **8. Clique na Logo:** Clicar na logo da UEPG no canto superior esquerdo reseta a máquina individual, o filtro de grupo e volta ao Dashboard consolidado.
+

@@ -10,6 +10,7 @@ let currentUser = null;
 let currentSummaries = [];
 let pendingDeleteNodeId = null;
 let selectedChartNode = 'all';
+let selectedChartGroup = 'all';
 
 // Gerenciamento de Sessão JWT e Fetch Resiliente
 let authToken = '';
@@ -2372,6 +2373,28 @@ async function loadDashboardData(requestedDate) {
     const data = await res.json();
     currentSummaries = data.summaries || [];
 
+    if (currentGroups.length === 0) {
+      apiFetch('/api/v1/admin/groups')
+        .then(r => r.ok ? r.json() : apiFetch('/api/v1/groups').then(r2 => r2.ok ? r2.json() : []))
+        .then(grps => {
+          if (grps && grps.length > 0) {
+            currentGroups = grps;
+            updateChartGroupSelector();
+          }
+        }).catch(() => {});
+    }
+    if (allAdminMachines.length === 0) {
+      apiFetch('/api/v1/admin/machines')
+        .then(r => r.ok ? r.json() : [])
+        .then(machs => {
+          if (machs && machs.length > 0) {
+            allAdminMachines = machs;
+            updateChartGroupSelector();
+          }
+        }).catch(() => {});
+    }
+    updateChartGroupSelector();
+
     updateNodeSelector(data.nodes_list || []);
     renderSummaryCards(currentSummaries);
     renderComparativeCharts(data.metrics_series || [], data.nodes_list || []);
@@ -2455,19 +2478,125 @@ function selectNodeForCharts(nodeId, forceFocus = false) {
 }
 window.selectNodeForCharts = selectNodeForCharts;
 
+function getNodesInGroup(groupId) {
+  const set = new Set();
+  if (!groupId || groupId === 'all') return set;
+
+  const grp = (currentGroups || []).find(g => g.id === groupId || g.name === groupId);
+  const targetId = grp ? grp.id : groupId;
+  const targetName = grp ? (grp.name || '').toLowerCase() : groupId.toLowerCase();
+
+  (allAdminMachines || []).forEach(m => {
+    if (!m) return;
+    if (m.group_id === targetId || (m.group_id && m.group_id.toLowerCase() === targetName)) {
+      set.add((m.hostname || '').toLowerCase());
+    }
+  });
+
+  (currentSummaries || []).forEach(s => {
+    if (!s) return;
+    const sGrpName = (s.group_name || s.GroupName || '').toLowerCase();
+    if (sGrpName === targetName || sGrpName === targetId.toLowerCase()) {
+      set.add((s.node_id || s.NodeID || '').toLowerCase());
+    }
+  });
+
+  return set;
+}
+
+function updateChartGroupSelector() {
+  const selectEl = document.getElementById('chart-group-filter-select');
+  if (!selectEl) return;
+
+  const groupsMap = new Map();
+  (currentGroups || []).forEach(g => {
+    if (g && g.id) groupsMap.set(g.id, g.name || g.id);
+  });
+  (allAdminMachines || []).forEach(m => {
+    if (m && m.group_id && !groupsMap.has(m.group_id)) {
+      groupsMap.set(m.group_id, m.group_id);
+    }
+  });
+  (currentSummaries || []).forEach(s => {
+    const grpName = s.group_name || s.GroupName;
+    if (grpName && !groupsMap.has(grpName)) {
+      groupsMap.set(grpName, grpName);
+    }
+  });
+
+  const prevVal = selectedChartGroup || selectEl.value || 'all';
+  let html = `<option value="all">Todos os Grupos</option>`;
+  for (const [gid, gname] of groupsMap.entries()) {
+    html += `<option value="${escapeHtml(gid)}" ${gid === prevVal ? 'selected' : ''}>${escapeHtml(gname)}</option>`;
+  }
+  selectEl.innerHTML = html;
+  selectEl.value = groupsMap.has(prevVal) ? prevVal : 'all';
+}
+
+function handleChartGroupChange(newGroupId) {
+  selectedChartGroup = newGroupId || 'all';
+  // Se estiver focado em uma sonda individual, desmarca para analisar o grupo
+  if (selectedChartNode !== 'all') {
+    selectedChartNode = 'all';
+    if (selectNode) selectNode.value = 'all';
+    const smHeader = document.getElementById('single-machine-header');
+    const smAlert = document.getElementById('sm-offline-alert');
+    if (smHeader) smHeader.style.display = 'none';
+    if (smAlert) smAlert.style.display = 'none';
+  }
+
+  updateChartFocusUI();
+  updateMetricToggleVisibility();
+  renderComparativeCharts(cachedMetricsSeries, cachedNodesList);
+
+  if (selectedChartGroup !== 'all') {
+    const grp = (currentGroups || []).find(g => g.id === selectedChartGroup);
+    const gName = grp ? grp.name : selectedChartGroup;
+    showToast(`Filtrando gráficos pelo grupo: ${gName}`, 'toast-info');
+  } else {
+    showToast('Exibindo todas as máquinas no gráfico consolidado', 'toast-info');
+  }
+}
+window.handleChartGroupChange = handleChartGroupChange;
+
+function clearChartGroupFilter() {
+  selectedChartGroup = 'all';
+  const selectEl = document.getElementById('chart-group-filter-select');
+  if (selectEl) selectEl.value = 'all';
+  handleChartGroupChange('all');
+}
+window.clearChartGroupFilter = clearChartGroupFilter;
+
 function updateChartFocusUI() {
   const nameEl = document.getElementById('chart-focus-name');
   const resetBtn = document.getElementById('btn-reset-chart-focus');
+  const clearGroupBtn = document.getElementById('btn-clear-chart-group');
   const indicator = document.getElementById('chart-focus-indicator');
+  const groupSelect = document.getElementById('chart-group-filter-select');
 
-  if (selectedChartNode === 'all') {
-    if (nameEl) nameEl.textContent = 'Todas as Sondas (Consolidado)';
-    if (indicator) indicator.className = 'chart-focus-pill all';
-    if (resetBtn) resetBtn.style.display = 'none';
-  } else {
+  if (groupSelect && groupSelect.value !== selectedChartGroup) {
+    groupSelect.value = selectedChartGroup;
+  }
+
+  if (clearGroupBtn) {
+    clearGroupBtn.style.display = (selectedChartGroup !== 'all') ? 'inline-flex' : 'none';
+  }
+
+  if (selectedChartNode !== 'all') {
     if (nameEl) nameEl.textContent = selectedChartNode;
     if (indicator) indicator.className = 'chart-focus-pill focused';
     if (resetBtn) resetBtn.style.display = 'inline-flex';
+  } else if (selectedChartGroup !== 'all') {
+    const grp = (currentGroups || []).find(g => g.id === selectedChartGroup);
+    const gName = grp ? grp.name : selectedChartGroup;
+    const groupNodes = getNodesInGroup(selectedChartGroup);
+    if (nameEl) nameEl.textContent = `Grupo: ${gName} (${groupNodes.size} máquinas)`;
+    if (indicator) indicator.className = 'chart-focus-pill group-focused';
+    if (resetBtn) resetBtn.style.display = 'none';
+  } else {
+    if (nameEl) nameEl.textContent = 'Todas as Sondas (Consolidado)';
+    if (indicator) indicator.className = 'chart-focus-pill all';
+    if (resetBtn) resetBtn.style.display = 'none';
   }
 
   // Atualiza destaque visual das linhas da tabela
@@ -3598,12 +3727,42 @@ function renderComparativeCharts(series, nodesList) {
     return;
   }
 
-  // Modo Consolidado (Todos os Nós):
+  // Modo Consolidado (Todos os Nós ou Grupo Filtrado):
+  let effectiveSeries = series;
+  let activeGroupName = '';
+
+  if (selectedChartGroup !== 'all') {
+    const groupNodes = getNodesInGroup(selectedChartGroup);
+    const grp = (currentGroups || []).find(g => g.id === selectedChartGroup);
+    activeGroupName = grp ? grp.name : selectedChartGroup;
+
+    effectiveSeries = series.filter(item => {
+      const id = (item.node_id || item.NodeID || '').toLowerCase();
+      return groupNodes.has(id);
+    });
+
+    if (effectiveSeries.length === 0) {
+      if (bandwidthChartTitle) bandwidthChartTitle.textContent = `Histórico de Throughput - Grupo ${activeGroupName}`;
+      if (bandwidthChartDesc) bandwidthChartDesc.textContent = `Nenhuma medição recente encontrada para as máquinas do grupo "${activeGroupName}"`;
+      if (bandwidthLegendEl) bandwidthLegendEl.innerHTML = `<span class="text-subtle font-mono text-xs">Sem medições para o grupo ${escapeHtml(activeGroupName)}</span>`;
+      if (latencyLegendEl) latencyLegendEl.innerHTML = `<span class="text-subtle font-mono text-xs">Sem medições para o grupo ${escapeHtml(activeGroupName)}</span>`;
+
+      bandwidthChart.data.labels = [];
+      bandwidthChart.data.datasets = [];
+      bandwidthChart.update();
+
+      latencyChart.data.labels = [];
+      latencyChart.data.datasets = [];
+      latencyChart.update();
+      return;
+    }
+  }
+
   // Agrupa os timestamps por minuto para eliminar timestamps duplicados no eixo X
   const minuteMap = new Map();
   const byNode = {};
 
-  series.forEach(item => {
+  effectiveSeries.forEach(item => {
     const id = item.node_id || item.NodeID;
     if (!byNode[id]) byNode[id] = {};
 
@@ -3632,10 +3791,14 @@ function renderComparativeCharts(series, nodesList) {
   const metricLabel = isUploadMode ? 'Upload' : 'Download';
 
   if (bandwidthChartTitle) {
-    bandwidthChartTitle.textContent = `Histórico de Throughput (${metricLabel})`;
+    bandwidthChartTitle.textContent = activeGroupName
+      ? `Histórico de Throughput (${metricLabel}) - Grupo ${activeGroupName}`
+      : `Histórico de Throughput (${metricLabel})`;
   }
   if (bandwidthChartDesc) {
-    bandwidthChartDesc.textContent = `Taxas de ${metricLabel} por Computador (últimos 20 testes em Mbps)`;
+    bandwidthChartDesc.textContent = activeGroupName
+      ? `Taxas de ${metricLabel} por Computador do grupo ${activeGroupName} (últimos 20 testes em Mbps)`
+      : `Taxas de ${metricLabel} por Computador (últimos 20 testes em Mbps)`;
   }
 
   // Atualiza as legendas HTML com bolinhas sólidas coloridas
@@ -5033,7 +5196,10 @@ async function handleSaveModuleUploadSubmit() {
 
 function navigateToHomeDashboard() {
   selectedChartNode = 'all';
+  selectedChartGroup = 'all';
   if (selectNode) selectNode.value = 'all';
+  const chartGrpSelect = document.getElementById('chart-group-filter-select');
+  if (chartGrpSelect) chartGrpSelect.value = 'all';
   if (machinesSearchInput) machinesSearchInput.value = '';
   const nodesSearch = document.getElementById('nodes-search-input');
   if (nodesSearch) nodesSearch.value = '';
