@@ -433,23 +433,34 @@ func (h *MetricsHandler) computeNodeSummaries(ctx context.Context, series []mode
 		}
 	}
 
-	// Mapeia intervalo esperado por nó a partir do cadastro de máquinas e perfis de grupo
+	// Mapeia intervalo esperado e nome do grupo por nó a partir do cadastro de máquinas e perfis de grupo
 	nodeIntervalMap := make(map[string]int)
+	nodeGroupMap := make(map[string]string)
 	if machines, err := h.db.ListMachines(ctx); err == nil {
 		groupIntervals := make(map[string]int)
+		groupNames := make(map[string]string)
 		for _, m := range machines {
 			interval := 30
+			grpName := ""
 			if m.GroupID != "" {
-				if grpInt, ok := groupIntervals[m.GroupID]; ok {
-					interval = grpInt
+				if gName, ok := groupNames[m.GroupID]; ok {
+					grpName = gName
+					interval = groupIntervals[m.GroupID]
 				} else {
-					if grp, errG := h.db.GetMachineGroup(ctx, m.GroupID); errG == nil && grp != nil && grp.Profile.IntervalMinutes > 0 {
-						interval = grp.Profile.IntervalMinutes
+					if grp, errG := h.db.GetMachineGroup(ctx, m.GroupID); errG == nil && grp != nil {
+						grpName = grp.Name
+						groupNames[m.GroupID] = grpName
+						if grp.Profile.IntervalMinutes > 0 {
+							interval = grp.Profile.IntervalMinutes
+						}
 						groupIntervals[m.GroupID] = interval
 					}
 				}
 			}
 			nodeIntervalMap[m.Hostname] = interval
+			if grpName != "" {
+				nodeGroupMap[m.Hostname] = grpName
+			}
 		}
 	}
 
@@ -480,10 +491,15 @@ func (h *MetricsHandler) computeNodeSummaries(ctx context.Context, series []mode
 			vlan = sw.VLAN
 		}
 
+		resolvedGroupName := agg.latest.GroupName
+		if gName, ok := nodeGroupMap[agg.latest.NodeID]; ok && gName != "" {
+			resolvedGroupName = gName
+		}
+
 		summaries = append(summaries, models.NodeSummaryCard{
 			NodeID:          agg.latest.NodeID,
 			Location:        agg.latest.Location,
-			GroupName:       agg.latest.GroupName,
+			GroupName:       resolvedGroupName,
 			VLAN:            vlan,
 			LastSeen:        agg.latest.Timestamp,
 			LastDownload:    agg.latest.DownloadMbps,

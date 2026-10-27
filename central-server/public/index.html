@@ -449,6 +449,16 @@
               <span id="chart-historical-badge" class="sm-history-badge" style="display: none;">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -1px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Dados Históricos
               </span>
+              <div class="chart-group-filter-wrap" title="Filtrar gráficos por Grupo de Máquinas">
+                <label for="chart-group-filter-select" class="chart-filter-label">Grupo:</label>
+                <select id="chart-group-filter-select" class="chart-group-select" onchange="handleChartGroupChange(this.value)">
+                  <option value="all">Todos os Grupos</option>
+                </select>
+              </div>
+              <button type="button" id="btn-clear-chart-group" class="btn btn-sm btn-glass btn-clear-filter" style="display: none;" onclick="clearChartGroupFilter()" title="Limpar filtro de grupo">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <span>Limpar Grupo</span>
+              </button>
               <div id="chart-focus-indicator" class="chart-focus-pill all">
                 <span class="focus-dot"></span>
                 <span class="focus-label">Exibindo:</span>
