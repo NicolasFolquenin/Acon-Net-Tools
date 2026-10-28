@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -69,6 +70,12 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"healthy","service":"central-server","time":"` + time.Now().UTC().Format(time.RFC3339) + `"}`))
+	})
+
+	// Endpoint público de configurações do sistema (Porta, DNS, Domínio, Alvos parametrizados no .env)
+	mux.HandleFunc("/api/v1/config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(cfg)
 	})
 
 	// Speedtest endpoints para medição real das sondas
