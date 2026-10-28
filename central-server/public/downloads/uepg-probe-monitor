@@ -1,0 +1,364 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UEPG Net Tools - Monitor de Telemetria e Ondas WiFi em Tempo Real
+# Permite reabrir a animação a qualquer momento no terminal via:
+#   uepg-probe-monitor   ou   uepg-monitor
+# ==============================================================================
+
+# Cores para terminal
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Carrega configurações salvas ou padrões
+CONFIG_FILE="/etc/uepg-probe/config.json"
+SERVER_URL=""
+if [ -f "$CONFIG_FILE" ]; then
+  SERVER_URL=$(grep -o '"server_url":[[:space:]]*"[^"]*"' "$CONFIG_FILE" 2>/dev/null | cut -d'"' -f4 || true)
+fi
+if [ -z "$SERVER_URL" ]; then
+  SERVER_URL="https://akvorado.acon.dev.uepg.br"
+fi
+
+HOSTNAME=$(cat /etc/hostname 2>/dev/null || uname -n)
+
+# Detecção robusta do IP local da máquina
+LOCAL_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' | tr -d '\n')
+if [ -z "$LOCAL_IP" ]; then
+  LOCAL_IP=$(ip -4 addr show up scope global 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n1)
+fi
+if [ -z "$LOCAL_IP" ]; then
+  LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+fi
+[ -z "$LOCAL_IP" ] && LOCAL_IP="127.0.0.1"
+
+# Detecção robusta do Gateway padrão
+GATEWAY_IP=$(ip route show default 2>/dev/null | awk '/default/ {print $3}' | head -n1)
+if [ -z "$GATEWAY_IP" ]; then
+  GATEWAY_IP=$(ip route 2>/dev/null | awk '/default/ {print $3}' | head -n1)
+fi
+[ -z "$GATEWAY_IP" ] && GATEWAY_IP="Automático"
+
+# Trap para interceptar o Ctrl+C
+trap '
+  printf "\033[?25h\n\n"
+  echo -e "${GREEN}==================================================================${NC}"
+  echo -e "${GREEN}  ✓ Monitor fechado! A sonda continua em SEGUNDO PLANO (systemd).${NC}"
+  echo -e "${GREEN}==================================================================${NC}"
+  echo -e "A sonda UEPG Net Tools permanece coletando telemetria 24/7."
+  echo -e "Comandos rápidos úteis:"
+  echo -e "  • Reabrir esta animação: ${YELLOW}uepg-probe-monitor${NC} (ou ${YELLOW}uepg-monitor${NC})"
+  echo -e "  • Logs em tempo real:    ${YELLOW}journalctl -u uepg-probe -f${NC}"
+  echo -e "  • Consultar status:      ${YELLOW}systemctl status uepg-probe${NC}"
+  echo -e "  • Executar teste avulso: ${YELLOW}/usr/local/bin/uepg-probe -once${NC}\n"
+  exit 0
+' SIGINT SIGTERM
+
+# Esconde o cursor durante a animação
+printf "\033[?25l"
+echo -e "\n${BLUE}================================================================================${NC}"
+echo -e "${CYAN}   📶 UEPG NET TOOLS • MONITOR DE TELEMETRIA AO VIVO (MATH ASCII WAVES)           ${NC}"
+echo -e "${BLUE}================================================================================${NC}\n"
+F_0=(
+  '                                    '
+  '                                    '
+  '                                    '
+  '           .,,,-------,,,.          '
+  '        .,,,,,..     ..,,,,,.       '
+  '      .,,,.               .,,,.     '
+  '    ..,.                     .,..   '
+  '   ...         ,-~~~-,         ...  '
+  '  ...       ,:;=======;:,       ... '
+  '  .       ,~::~,     ,~::~,       . '
+  '         .-~-           -~-.        '
+  '         .,.     /|\\     .,.        '
+  '               ( ~@~ )              '
+  '              [=======]             '
+)
+F_1=(
+  '                                    '
+  '                                    '
+  '               .......              '
+  '          .,,,,,,,,,,,,,,,.         '
+  '       .,,,,..         ..,,,,.      '
+  '     ..,..                 ..,..    '
+  '    ...                       ...   '
+  '   ..        .-~:;;;:~-.        ..  '
+  '  ..       ,~;;;;;:;;;;;~,       .. '
+  '         .-~:~,       ,~:~-.        '
+  '         ,--.           .--,        '
+  '         ..      /|\\      ..        '
+  '               (.;o;.)              '
+  '              [=======]             '
+)
+F_2=(
+  '                                    '
+  '                                    '
+  '             ....,,,....            '
+  '         ..,,,,,,,.,,,,,,,..        '
+  '      ..,,..             ..,,..     '
+  '     ....                   ....    '
+  '   ...                         ...  '
+  '  ...       .-~;;===;;~-.       ... '
+  '  .       .-:;;:~---~:;;:-.       . '
+  '         ,~~~,         ,~~~,        '
+  '        .,-,             ,-,.       '
+  '         ..      /|\\      ..        '
+  '               (-=@=-)              '
+  '              [=======]             '
+)
+F_3=(
+  '                                    '
+  '                                    '
+  '            ...,,,,,,,...           '
+  '        ..,,,....   ....,,,..       '
+  '      ....                 ....     '
+  '    ....                     ....   '
+  '   ..          .,,-,,.          ..  '
+  '  ..       .-~;;=====;;~-.       .. '
+  '         .-~::~,.   .,~::~-.        '
+  '        .-~-,           ,-~-.       '
+  '        ,,,               ,,,       '
+  '         .      ,/|\\,      .        '
+  '               (~=o=~)              '
+  '              [=======]             '
+)
+F_4=(
+  '                                    '
+  '                                    '
+  '           .....,,,,,.....          '
+  '        ......         ......       '
+  '     ....                   ....    '
+  '    ..                         ..   '
+  '   .          ,-~~:~~-,          .  '
+  '           ,~:;;;:::;;;:~,          '
+  '         ,~:~-.       .-~:~,        '
+  '        ,--,             ,--,       '
+  '       .,,.               .,,.      '
+  '               .:/|\\:.              '
+  '               (~;@;~)              '
+  '              [=======]             '
+)
+F_5=(
+  '                                    '
+  '                  .                 '
+  '          .................         '
+  '       .....             .....      '
+  '     ...                     ...    '
+  '    .                           .   '
+  '            .,~::;;;::~,.           '
+  '          ,~::::~---~::::~,         '
+  '        .-~~-.         .-~~-.       '
+  '       .--,               ,--.      '
+  '      .,,.       .,.       .,,.     '
+  '               -=/|\\=-              '
+  '               (~~o~~)              '
+  '              [=======]             '
+)
+F_6=(
+  '                                    '
+  '                 ...                '
+  '          ......     ......         '
+  '       ...                 ...      '
+  '     ..                       ..    '
+  '                ..,..               '
+  '           .-~::;;;;;::~-.          '
+  '         .-~:~~,.. ..,~~:~-.        '
+  '        ,-~-.           .-~-,       '
+  '       ,-,.               .,-,      '
+  '      .,.       -:;:-       .,.     '
+  '              ,:!/|\\!:,             '
+  '               (-.@.-)              '
+  '              [=======]             '
+)
+F_7=(
+  '                                    '
+  '                 ...                '
+  '          ..             ..         '
+  '                                    '
+  '                                    '
+  '              .,-----,.             '
+  '          .,~:::::::::::~,.         '
+  '        .-~~~-.       .-~~~-.       '
+  '       .---.             .---.      '
+  '      .,,.                 .,,.     '
+  '      ...      -;!*!;-      ...     '
+  '              ~;!/|\\!;~             '
+  '               (. o .)              '
+  '              [=======]             '
+)
+F_8=(
+  '                                    '
+  '                                    '
+  '                                    '
+  '                                    '
+  '                                    '
+  '            .,-~~~~~~~-,.           '
+  '         .,-~::~~---~~::~-,.        '
+  '        ,-~-,.         .,-~-,       '
+  '      .,--.               .--,.     '
+  '     .,,.         .         .,,.    '
+  '     ...      ,:!*#*!:,      ...    '
+  '             ,:;;/|\\;;:,            '
+  '               (  @  )              '
+  '              [=======]             '
+)
+F_9=(
+  '                                    '
+  '                                    '
+  '                                    '
+  '                                    '
+  '                  .                 '
+  '           .,-~~:::::~~-,.          '
+  '         ,-~~~-,,...,,-~~~-,        '
+  '       .---,             ,---.      '
+  '      ,,-.                 .-,,     '
+  '     .,,        ,~~~,        ,,.    '
+  '     ..      .~=**#**=~.      ..    '
+  '            .-::-/|\\-::-.           '
+  '               (  o  )              '
+  '              [=======]             '
+)
+F_10=(
+  '                                    '
+  '                                    '
+  '                                    '
+  '                                    '
+  '              ..,,,,,..             '
+  '          .,-~~~~~~~~~~~-,.         '
+  '        .-~~-,.       .,-~~-.       '
+  '      .,--,               ,--,.     '
+  '     .,,,                   ,,,.    '
+  '    ..,.       -:;=;:-       .,..   '
+  '    ...      -;!!!!!!!;-      ...   '
+  '            ,~~- /|\\ -~~,           '
+  '               (  @  )              '
+  '              [=======]             '
+)
+F_11=(
+  '                                    '
+  '                                    '
+  '                                    '
+  '                                    '
+  '             .,,-----,,.            '
+  '         .,-~~~~~---~~~~~-,.        '
+  '       .,---,.         .,---,.      '
+  '      ,,-,                 ,-,,     '
+  '     .,,                     ,,.    '
+  '    ...       -:=!*!=:-       ...   '
+  '    ..      ,:;=;:::;=;:,      ..   '
+  '           .-~-. /|\\ .-~-.          '
+  '               (  o  )              '
+  '              [=======]             '
+)
+F_12=(
+  '                                    '
+  '                                    '
+  '                                    '
+  '                                    '
+  '           ..,--~~~~~--,..          '
+  '        .,--~--,,,,,,,--~--,.       '
+  '      .,---.             .---,.     '
+  '     .,,,.                 .,,,.    '
+  '    .,,.        .,-,.        .,,.   '
+  '    ..       ,:=!***!=:,       ..   '
+  '   ..      .-:;:-,.,-:;:-.      ..  '
+  '           ,--.  /|\\  .--,          '
+  '               (  @  )              '
+  '              [=======]             '
+)
+F_13=(
+  '                                    '
+  '                                    '
+  '                                    '
+  '               .......              '
+  '          .,,--~~~~~~~--,,.         '
+  '        .,---,..     ..,---,.       '
+  '      .,-,.               .,-,.     '
+  '     .,,.                   .,,.    '
+  '    .,.        ,~:::~,        .,.   '
+  '   ...      ,~;!!!!!!!;~,      ...  '
+  '   .       ,~::-     -::~,       .  '
+  '          .,-,   /|\\   ,-,.         '
+  '               (  o  )              '
+  '              [=======]             '
+)
+F_14=(
+  '                                    '
+  '                                    '
+  '                                    '
+  '             ..,,,,,,,..            '
+  '         .,,-------------,,.        '
+  '       .,--,,.         .,,--,.      '
+  '     .,,,.                 .,,,.    '
+  '    .,,.                     .,,.   '
+  '   ...       .-:;===;:-.       ...  '
+  '   ..      .-;==;;:;;==;-.      ..  '
+  '          .-:~,       ,~:-.         '
+  '          .,,    /|\\    ,,.         '
+  '               (  @  )              '
+  '              [=======]             '
+)
+F_15=(
+  '                                    '
+  '                                    '
+  '                                    '
+  '            ..,,,---,,,..           '
+  '        ..,---,,,,,,,,,---,..       '
+  '      .,,,,.             .,,,,.     '
+  '     .,,.                   .,,.    '
+  '   ..,.          ...          .,..  '
+  '   ..        -:;=!!!=;:-        ..  '
+  '  ..       ,:;;:~,,,~:;;:,       .. '
+  '          ,~~-         -~~,         '
+  '         .,,.    /|\\    .,,.        '
+  '               ( .o. )              '
+  '              [=======]             '
+)
+
+sec=0
+frame_idx=0
+num_frames=16
+signals=("[ ▂   ]" "[ ▂▄  ]" "[ ▂▄▆ ]" "[ ▂▄▆█]")
+
+while true; do
+  sig="${signals[$(( (frame_idx / 2) % 4 ))]}"
+  mm=$(( sec / 60 ))
+  ss=$(( sec % 60 ))
+  time_str=$(printf "%02d:%02d" $mm $ss)
+
+  eval "cur_f=(\"\${F_${frame_idx}[@]}\")"
+
+  if systemctl is-active --quiet uepg-probe 2>/dev/null; then
+    status_badge="${GREEN}● STATUS: ONLINE${NC}  ${BLUE}[ Systemd Daemon ]${NC}"
+  else
+    status_badge="${RED}○ STATUS: PARADO${NC}  ${YELLOW}[ systemctl start uepg-probe ]${NC}"
+  fi
+
+  printf "\r\033[K ${CYAN}%-36s${NC}   %b\n" "${cur_f[0]}" "${status_badge}"
+  printf "\033[K ${CYAN}%-36s${NC}   ${BLUE}──────────────────────────────────────────────${NC}\n" "${cur_f[1]}"
+  printf "\033[K ${CYAN}%-36s${NC}   • Servidor:   ${CYAN}%s${NC}\n" "${cur_f[2]}" "${SERVER_URL}"
+  printf "\033[K ${CYAN}%-36s${NC}   • Hostname:   ${YELLOW}%s${NC}\n" "${cur_f[3]}" "${HOSTNAME}"
+  printf "\033[K ${CYAN}%-36s${NC}   • IP Sonda:   ${CYAN}%s${NC}\n" "${cur_f[4]}" "${LOCAL_IP}"
+  printf "\033[K ${CYAN}%-36s${NC}   • Gateway:    ${CYAN}%s${NC}\n" "${cur_f[5]}" "${GATEWAY_IP}"
+  printf "\033[K ${CYAN}%-36s${NC}   • Conexão:    ${GREEN}%s${NC}  • Monitor: ${YELLOW}%s${NC}\n" "${cur_f[6]}" "${sig}" "${time_str}"
+  printf "\033[K ${CYAN}%-36s${NC}   • Telemetria: Coleta periódica ativa\n" "${cur_f[7]}"
+  printf "\033[K ${CYAN}%-36s${NC}   ${BLUE}──────────────────────────────────────────────${NC}\n" "${cur_f[8]}"
+  printf "\033[K ${CYAN}%-36s${NC}   ${YELLOW}👉 Pressione [ CTRL + C ] para sair${NC}\n" "${cur_f[9]}"
+  printf "\033[K ${CYAN}%-36s${NC}      ${GREEN}(a sonda continuará em segundo plano)${NC}\n" "${cur_f[10]}"
+  printf "\033[K ${CYAN}%-36s${NC}\n" "${cur_f[11]}"
+  printf "\033[K ${CYAN}%-36s${NC}\n" "${cur_f[12]}"
+  printf "\033[K ${CYAN}%-36s${NC}\n" "${cur_f[13]}"
+
+  sleep 0.15
+  if [ $(( frame_idx % 6 )) -eq 0 ]; then
+    sec=$(( sec + 1 ))
+  fi
+  frame_idx=$(( (frame_idx + 1) % num_frames ))
+
+  # Retorna 14 linhas para cima para redesenhar fluidamente o próximo frame das ondas WiFi
+  printf "\033[14A"
+done

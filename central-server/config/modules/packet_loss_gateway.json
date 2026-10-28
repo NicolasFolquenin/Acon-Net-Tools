@@ -1,0 +1,10 @@
+{
+  "id": "packet_loss_gateway",
+  "type": "packet_loss",
+  "name": "Perda de Pacotes Gateway",
+  "enabled": true,
+  "target": "auto_gateway",
+  "count": 10,
+  "timeout_ms": 1000,
+  "timeout_seconds": 20
+}

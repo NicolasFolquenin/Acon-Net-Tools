@@ -152,3 +152,82 @@ func TestRequireAdminPermission(t *testing.T) {
 		t.Fatalf("esperado 200 OK para admin, recebido %d", wAdmin.Result().StatusCode)
 	}
 }
+
+func TestListUsersDefault(t *testing.T) {
+	cfg := setupTestAuthConfig()
+	auth := NewAuthHandler(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+	w := httptest.NewRecorder()
+
+	auth.HandleUsers(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("esperado status 200, recebido %d", resp.StatusCode)
+	}
+
+	var data struct {
+		Status string `json:"status"`
+		Users  []struct {
+			Username string `json:"username"`
+			Role     string `json:"role"`
+			IsSystem bool   `json:"is_system"`
+		} `json:"users"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		t.Fatalf("falha ao decodificar JSON: %v", err)
+	}
+
+	if len(data.Users) < 2 {
+		t.Fatalf("esperado pelo menos 2 usuários do sistema, encontrados %d", len(data.Users))
+	}
+}
+
+func TestCreateUserValidation(t *testing.T) {
+	cfg := setupTestAuthConfig()
+	auth := NewAuthHandler(cfg) // sem DB para testar validação de input
+
+	// Usuário com nome curto
+	body, _ := json.Marshal(map[string]interface{}{
+		"username": "ab",
+		"password": "123",
+		"is_admin": false,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+
+	auth.HandleUsers(w, req)
+	if w.Result().StatusCode != http.StatusBadRequest {
+		t.Fatalf("esperado 400 para nome de usuário muito curto, recebido %d", w.Result().StatusCode)
+	}
+}
+
+func TestOIDCConfig(t *testing.T) {
+	cfg := setupTestAuthConfig()
+	cfg.OIDCEnabled = true
+	cfg.OIDCIssuerURL = "https://sso.acon.dev.uepg.br/realms/uepg"
+	cfg.OIDCClientID = "net-tools"
+
+	auth := NewAuthHandler(cfg)
+	oidc := NewOIDCHandler(cfg, auth, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oidc/config", nil)
+	w := httptest.NewRecorder()
+
+	oidc.ConfigHandler(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("esperado 200 para oidc config, recebido %d", resp.StatusCode)
+	}
+
+	var resData map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&resData)
+	if resData["enabled"] != true || resData["client_id"] != "net-tools" {
+		t.Fatalf("dados inesperados no config OIDC: %+v", resData)
+	}
+}
+
+

@@ -11,7 +11,7 @@ services:
     env_file:
       - .env
     environment:
-      - PORT=${PORT:-8080}
+      - PORT=${PORT:-8085}
       - MONGO_URI=${MONGO_URI:-mongodb://mongo:27017}
       - MONGO_DB=${MONGO_DB:-network_central}
       - MONGO_COLLECTION=${MONGO_COLLECTION:-metrics}
@@ -23,6 +23,10 @@ services:
       - AUTH_VIEWER_USER=${AUTH_VIEWER_USER:-operador}
       - AUTH_VIEWER_PASSWORD=${AUTH_VIEWER_PASSWORD:-operador123}
       - SESSION_SECRET=${SESSION_SECRET:-super-secret-session-key-change-in-prod-2026}
+      - PUBLIC_SERVER_URL=${PUBLIC_SERVER_URL:-}
+    volumes:
+      - ./public:/app/public:ro
+      - ./config:/app/config
     depends_on:
       mongo:
         condition: service_healthy

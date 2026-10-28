@@ -1,106 +1,112 @@
-# Sistema de Monitoramento de Rede Distribuído
+# UEPG Net Tools — Sistema Distribuído de Telemetria e Monitoramento de Rede
 
-Sistema completo de medição de throughput (Download e Upload) e latência de rede (Ping), distribuído em duas pastas autônomas:
-
-- **`/client-probe`**: Aplicação Desktop em Go com **Wails v2** para Windows, com persistência local SQLite e interface moderna em Chart.js.
-- **`/central-server`**: Servidor Central Coletor em Go 1.22+ para Linux/Debian com **MongoDB Time Series** e **Dashboard Web** responsivo com comparativos entre nós.
+Sistema corporativo completo de monitoramento distribuído e telemetria de rede para o **Anel de Conectividade da UEPG**, composto por um **Servidor Central Coletor (Linux/VM)** com **Dashboard NOC** em tempo real e **Sondas Clientes Multi-plataforma (Linux e Windows)** com descoberta automática de topologia (LLDP) e perfis dinâmicos de medição.
 
 ---
 
-## 📂 Estrutura do Repositório
+## 🏛️ Componentes do Sistema
 
 ```
 polling app/
-├── client-probe/                     # 🖥️ Client Desktop Windows (Wails v2)
-│   ├── .env                          # Variáveis de ambiente locais do client
-│   ├── .env.example                  # Modelo de variáveis de ambiente
-│   ├── frontend/                     # Interface do usuário (HTML, CSS, JS, Chart.js)
-│   │   ├── dist/                     # Assets estáticos para embed no binário Go
-│   │   ├── index.html                # UI principal com tema dark slate e glassmorphism
-│   │   ├── style.css                 # Design System (slate, ciano #06b6d4, roxo #a855f7)
-│   │   └── main.js                   # Chart.js (últimas 24 execuções), botões e eventos
-│   ├── app.go                        # Métodos expostos ao Wails, background ticker 1h
-│   ├── config.go                     # Leitura de .env e gravação de config.json
-│   ├── config.json                   # Configurações do nó geradas/persistidas
-│   ├── main.go                       # Entrypoint e configuração de janela Wails v2
-│   ├── models.go                     # Contratos JSON e structs de banco
-│   ├── probe.go                      # Medição de Ping (ICMP/TCP) e Throughput (Download/Upload)
-│   ├── storage.go                    # Persistência SQLite (probe_local.db) e envio HTTPS
-│   ├── wails.json                    # Manifesto de compilação Wails v2
-│   ├── go.mod                        # Módulo Go do client
-│   └── README.md                     # Guia de compilação e execução no Windows
+├── central-server/                   # 🐧 Servidor Central Coletor (Linux / Docker / VM)
+│   ├── deploy.sh                     # 🚀 Script de deploy automatizado em 1 comando
+│   ├── docker-compose.yml            # Go 1.22 Server + MongoDB Time Series (AVX-compatible)
+│   ├── Dockerfile                    # Build multi-stage otimizado
+│   ├── handlers/                     # REST API, Telemetria, Auth, OIDC, LLDP, Perfis e Ping
+│   ├── models/                       # Modelos de dados, Grupos de máquinas e Métricas
+│   ├── public/                       # 🌐 Dashboard Web NOC em tempo real (Chart.js + Dark Theme)
+│   │   └── downloads/                # Binários, instaladores e scripts servidos para os clients
+│   └── systemd/                      # Script de serviço nativo systemd
 │
-└── central-server/                   # 🐧 Server Central Coletor (Linux Debian)
-    ├── .env                          # Variáveis de ambiente do servidor e banco
-    ├── .env.example                  # Modelo de variáveis de ambiente
-    ├── public/                       # 🌐 Dashboard Web Central
-    │   ├── index.html                # Painel de controle responsivo NOC
-    │   ├── style.css                 # Tema Dark NOC (glassmorphism e grid responsivo)
-    │   └── app.js                    # Seletor de nós, cartões de resumo e gráficos comparativos
-    ├── config/                       # Carregador de .env e variáveis de ambiente
-    │   └── config.go
-    ├── db/                           # Driver oficial MongoDB v2 e Time Series setup
-    │   └── mongodb.go
-    ├── handlers/                     # Endpoints da API REST e middlewares de segurança
-    │   ├── metrics.go                # POST /api/v1/metrics e GET /api/v1/dashboard/metrics
-    │   ├── middleware.go             # Bearer Token Auth, CORS e Request Logger
-    │   └── speedtest.go              # Endpoints para teste real de banda dos clients
-    ├── models/                       # Structs MongoDB Time Series e DTOs de resposta
-    │   └── metric.go
-    ├── systemd/                      # Script de serviço para Debian Linux
-    │   └── network-monitor.service
-    ├── docker-compose.yml            # Go 1.22 Server + MongoDB 7 Time Series
-    ├── Dockerfile                    # Build multi-stage para Linux Debian
-    ├── main.go                       # Entrypoint do servidor HTTP e graceful shutdown
-    ├── go.mod                        # Módulo Go do servidor central
-    └── README.md                     # Guia de implantação Debian, cURL e MongoDB
+└── client-probe/                     # 🖥️ Sonda Client Multi-plataforma (Linux & Windows)
+    ├── cmd/                          # Entrypoints da aplicação CLI e Wails
+    ├── frontend/                     # Interface Desktop Windows (Wails v2 + Glassmorphism)
+    ├── app.go & main_cli.go          # Motores de execução periódica (Daemon & CLI)
+    ├── executors.go & probe.go       # Executores: Ping ICMP/TCP, Throughput Download & Upload
+    ├── lldp.go                       # Descoberta de Switch e Porta de Rede via LLDP
+    ├── profile.go                    # Sincronização de perfis dinâmicos com o Servidor Central
+    ├── storage.go                    # Buffer local SQLite resiliente a quedas de link
+    └── build/                        # Scripts de compilação Linux amd64/arm64 e instalador Windows
 ```
 
 ---
 
-## 📑 Contrato do Payload JSON (`POST /api/v1/metrics`)
+## 🚀 1. Deploy do Servidor Central na VM (1 Comando)
 
-Cabeçalho obrigatório:
-```http
-Authorization: Bearer <api_token>
-Content-Type: application/json
+Para instalar ou atualizar o Servidor Central em qualquer máquina virtual Linux (Debian 11/12, Ubuntu 20/22/24, CentOS, Rocky Linux):
+
+```bash
+# 1. Clonar o repositório
+git clone https://git.uepg.br/anelconectividade/polling-app-acon.git
+cd polling-app-acon/central-server
+
+# (Ou via GitHub: git clone https://github.com/NicolasFolquenin/Acon-Net-Tools.git && cd Acon-Net-Tools/central-server)
+
+# 2. Executar o script de deploy automatizado
+chmod +x deploy.sh
+sudo ./deploy.sh
 ```
 
-Corpo da requisição:
-```json
-{
-  "node_id": "minipc-dc-01",
-  "location": "Guarapuava-DC1",
-  "timestamp": "2026-09-11T15:00:00Z",
-  "download_mbps": 850.5,
-  "upload_mbps": 720.0,
-  "ping_gateway": 1.2
-}
+### O que o `deploy.sh` faz por você:
+- ✅ Verifica e instala automaticamente o **Docker** e o **Docker Compose** caso não estejam presentes.
+- ✅ Configura o arquivo de variáveis de ambiente (`.env`) detectando o IP e domínio da VM.
+- ✅ Garante compatibilidade de CPU em Hypervisors e VMs legadas (MongoDB Time Series 4.4 sem exigência de flags AVX).
+- ✅ Inicia os containers em segundo plano e realiza teste de saúde no endpoint `/health`.
+- ✅ Exibe na tela as URLs prontas de acesso e credenciais de administrador.
+
+### Comandos de Gestão do Servidor:
+```bash
+./deploy.sh --status    # Consulta o status dos containers e saúde do banco
+./deploy.sh --logs      # Acompanha logs do servidor Go em tempo real
+./deploy.sh --down      # Interrompe os containers com segurança (mantém os dados salvos)
+./deploy.sh -y          # Executa deploy silencioso / não-interativo (para CI/CD)
 ```
 
 ---
 
-## ⚡ Inicialização Rápida
+## 🖥️ 2. Instalação das Sondas de Telemetria (Clients)
 
-### 1. Inicializando o Servidor Central (Linux/Debian ou Docker)
+### 🐧 No Linux / Debian / Raspberry Pi (1 Comando via Terminal)
+Execute o instalador oficial na máquina cliente:
+
 ```bash
-cd central-server
-docker compose up -d --build
+curl -fsSL https://akvorado.acon.dev.uepg.br/downloads/install-probe.sh | sudo bash
 ```
-Acesse o Dashboard Web em: `http://localhost:8080`
+*(Substitua a URL pelo IP/domínio do seu Servidor Central, se aplicável)*
 
-Para gerar dados de demonstração imediatos de 24 horas:
-```bash
-curl -X POST http://localhost:8080/api/v1/seed
-```
+- Registra o daemon `systemd` (`uepg-probe.service`) com auto-start no boot.
+- Auto-registro do Hostname, IP, MAC e localização.
+- Suporte a descoberta de porta de Switch via pacote `lldpd`.
+- **Monitor com Animação WiFi:** Digite a qualquer momento no terminal:
+  ```bash
+  uepg-probe-monitor
+  ```
+  *(ou simplesmente `uepg-monitor`). Pressione `Ctrl + C` para sair a qualquer instante mantendo a sonda ativa em background.*
 
-### 2. Inicializando o Client Desktop (Windows)
-```powershell
-cd client-probe
-wails dev
-```
-Ou compilar executável `.exe` de produção:
-```powershell
-wails build -clean -platform windows/amd64
-```
-O executável será gerado em `client-probe/build/bin/probe-app.exe`.
+### 🪟 No Windows (Instalador Gráfico .exe)
+1. Acesse o Dashboard Web do Servidor Central no navegador e clique em **Downloads**.
+2. Baixe e execute o instalador `UEPG-Net-Tools-Instalador.exe`.
+3. A sonda se integra à bandeja do sistema (System Tray), inicia com o Windows e armazena histórico local em SQLite com sincronização HTTPS.
+
+---
+
+## 📊 3. Funcionalidades do Dashboard Web NOC
+
+- **Painel Comparativo de Throughput e Latência:** Gráficos interativos com séries temporais de Download, Upload, Ping ao Gateway e Ping ao Servidor Central.
+- **Perfis Dinâmicos de Medição por Máquina:** Crie grupos e configure remotamente quais testes cada máquina executa (frequência, tamanho de pacotes, alvos).
+- **Diagnóstico em Tempo Real:** Dispare testes de Ping ICMP instantâneos a partir do próprio Dashboard com visualizador de terminal e métricas instantâneas.
+- **Topologia de Rede (LLDP):** Identificação automática do Switch e Porta física onde a máquina cliente está conectada.
+- **Autenticação e Permissões:**
+  - `admin` (senha `admin123`): Gerenciamento completo de nós, grupos, perfis e exclusão de máquinas inativas.
+  - `operador` (senha `operador123`): Apenas leitura e visualização operacional.
+  - Suporte nativo a Single Sign-On (SSO) institucional via Keycloak / OpenID Connect.
+
+---
+
+## 🔄 Repositórios e Ramificações (Git)
+
+O projeto é versionado e mantido em sincronia contínua em dois repositórios oficiais:
+
+- **GitLab Institucional UEPG:** `https://git.uepg.br/anelconectividade/polling-app-acon.git`
+- **GitHub:** `https://github.com/NicolasFolquenin/Acon-Net-Tools.git`
+- **Branch Principal de Integração:** `integration/unified-modular-system`
