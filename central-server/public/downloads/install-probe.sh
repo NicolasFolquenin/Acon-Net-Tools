@@ -152,6 +152,25 @@ chmod +x "$TMP_BIN"
 mv -f "$TMP_BIN" "$TARGET_BIN"
 echo -e "${GREEN}[+] Binário instalado com sucesso em ${CYAN}${TARGET_BIN}${NC}"
 
+# 5.1 Download do utilitário de monitoramento com animação WiFi (uepg-probe-monitor)
+MONITOR_URL="${SERVER_URL}/downloads/uepg-probe-monitor"
+MONITOR_BIN="/usr/local/bin/uepg-probe-monitor"
+TMP_MONITOR="/usr/local/bin/uepg-probe-monitor.tmp.$$"
+
+echo -e "${GREEN}[+] Baixando utilitário de monitoramento em tempo real...${NC}"
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL "$MONITOR_URL" -o "$TMP_MONITOR" 2>/dev/null || true
+elif command -v wget >/dev/null 2>&1; then
+  wget -q "$MONITOR_URL" -O "$TMP_MONITOR" 2>/dev/null || true
+fi
+
+if [ -f "$TMP_MONITOR" ]; then
+  chmod +x "$TMP_MONITOR"
+  mv -f "$TMP_MONITOR" "$MONITOR_BIN"
+  ln -sf "$MONITOR_BIN" /usr/local/bin/uepg-monitor 2>/dev/null || true
+  echo -e "${GREEN}[+] Monitor instalado: use ${CYAN}uepg-probe-monitor${GREEN} a qualquer momento para ver a animação!${NC}"
+fi
+
 # 6. Criação ou atualização do arquivo de configuração /etc/uepg-probe/config.json
 CONFIG_FILE="/etc/uepg-probe/config.json"
 HOSTNAME=$(cat /etc/hostname 2>/dev/null || uname -n)
@@ -559,7 +578,9 @@ if systemctl is-active --quiet uepg-probe; then
   [ -z "$GATEWAY_IP" ] && GATEWAY_IP="Automático"
 
   # Se houver terminal disponível, inicia a animação de ondas WiFi em tempo real (ASCII math)
-  if [ -t 1 ] || [ -c /dev/tty ]; then
+  if [ -x "/usr/local/bin/uepg-probe-monitor" ] && { [ -t 1 ] || [ -c /dev/tty ]; }; then
+    /usr/local/bin/uepg-probe-monitor
+  elif [ -t 1 ] || [ -c /dev/tty ]; then
     show_wifi_animation "${SERVER_URL}" "${HOSTNAME}" "${LOCAL_IP}" "${GATEWAY_IP}"
   else
     echo -e "\n${GREEN}==================================================================${NC}"
@@ -567,6 +588,7 @@ if systemctl is-active --quiet uepg-probe; then
     echo -e "${GREEN}==================================================================${NC}"
     echo -e "A máquina já realizou o auto-registro e está visível no Dashboard central.\n"
     echo -e "Comandos úteis para gerenciar a sonda:"
+    echo -e "  • Reabrir animação: ${YELLOW}uepg-probe-monitor${NC} (ou ${YELLOW}uepg-monitor${NC})"
     echo -e "  • Ver status:       ${YELLOW}systemctl status uepg-probe${NC}"
     echo -e "  • Ver logs ao vivo: ${YELLOW}journalctl -u uepg-probe -f${NC}"
     echo -e "  • Reiniciar:        ${YELLOW}systemctl restart uepg-probe${NC}"
