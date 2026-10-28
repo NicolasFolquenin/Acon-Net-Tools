@@ -1,148 +1,148 @@
-# Central Server Coletor de Telemetria de Rede (Linux/Debian)
+# Central Server Coletor de Telemetria de Rede (Linux / VM)
 
-Servidor central coletor de alto desempenho escrito em **Go 1.22+**, integrado ao **MongoDB** com coleções **Time Series** nativas e **Dashboard Web** responsivo com **Chart.js**.
+Servidor central coletor de telemetria de alto desempenho escrito em **Go 1.22+**, integrado ao **MongoDB** com coleções **Time Series** nativas, **Dashboard Web NOC** responsivo com comparativos em tempo real, perfis dinâmicos de teste por máquina e suporte a autenticação local e institucional (Keycloak / OIDC).
 
 ---
 
-## 🏛️ Arquitetura
+## 🚀 Deploy Rápido na VM (1 Comando)
+
+Para implantar o Servidor Central em qualquer máquina virtual ou servidor físico Linux (Debian, Ubuntu, CentOS, Rocky), basta clonar o repositório e executar o script de deploy automatizado:
+
+```bash
+git clone https://git.uepg.br/anelconectividade/polling-app-acon.git
+cd polling-app-acon/central-server
+chmod +x deploy.sh
+sudo ./deploy.sh
+```
+
+*(Ou usando o repositório GitHub: `git clone https://github.com/NicolasFolquenin/Acon-Net-Tools.git && cd Acon-Net-Tools/central-server && sudo ./deploy.sh`)*
+
+### O que o `deploy.sh` faz automaticamente:
+1. **Detecção e Instalação do Docker:** Se o Docker e o Docker Compose não estiverem instalados, oferece instalação automática com o script oficial.
+2. **Configuração de Ambiente (`.env`):** Detecta o IP local da VM, sugere a URL pública e configura a porta (padrão `8085`).
+3. **Compatibilidade Ampla de CPU para VMs:** O banco de dados utiliza imagem MongoDB adaptada para rodar perfeitamente em Hypervisors (Proxmox, VMware, ESXi) mesmo sem instruções AVX.
+4. **Construção e Execução dos Containers:** Sobe o servidor Go e o MongoDB em segundo plano via Docker Compose.
+5. **Verificação de Saúde (Healthcheck):** Aguarda a inicialização e valida o endpoint `/health`.
+6. **Exibição do Resumo:** Mostra URLs de acesso, credenciais padrão e comandos de administração.
+
+---
+
+## ⚙️ Opções do Script de Deploy
+
+O script suporta flags para automação e manutenção:
+
+```bash
+# Deploy totalmente automatizado (modo não-interativo, aceita todos os padrões)
+sudo ./deploy.sh -y
+
+# Acompanhar logs do servidor em tempo real
+./deploy.sh --logs
+
+# Consultar status dos containers
+./deploy.sh --status
+
+# Parar os serviços com segurança (mantendo os dados do MongoDB preservados)
+./deploy.sh --down
+
+# Deploy nativo sem Docker (compilação direta em Go + serviço systemd)
+sudo ./deploy.sh --native
+```
+
+---
+
+## 🏛️ Arquitetura do Sistema
 
 - **Backend:** Go 1.22+ com driver oficial `go.mongodb.org/mongo-driver/v2/mongo`.
-- **Database:** MongoDB 7.0+ com coleção Time Series (`network_central.metrics`):
+- **Database:** MongoDB com coleção Time Series (`network_central.metrics`):
   - `timeField`: `timestamp`
-  - `metaField`: `metadata` (`node_id`, `location`)
+  - `metaField`: `metadata` (`node_id`, `location`, `ip_address`, `mac_address`)
   - `granularity`: `hours`
-- **Dashboard Web:** Servido diretamente em `GET /` a partir de `./public`.
-- **Autenticação:** Header HTTP `Authorization: Bearer <api_token>`.
+- **Dashboard Web NOC:** Servido diretamente em `GET /` a partir de `./public` (HTML5, Vanilla JS, Chart.js, Glassmorphism dark theme).
+- **Gerenciamento Dinâmico de Sondas:**
+  - Auto-registro no primeiro heartbeat.
+  - Alocação em Grupos de Máquinas (ex: *Default/Bootstrap*, *Laboratórios*, *Roteadores de Borda*).
+  - Perfis de tarefas dinâmicas distribuídos via JSON (`/api/v1/probes/profile/{hostname}`).
+- **Mecanismos de Autenticação:**
+  - Bearer Token HTTP para envio de telemetria das sondas (`API_TOKEN`).
+  - Sessão com Cookies HttpOnly para o Dashboard Web (`admin` / `operador`).
+  - Single Sign-On (SSO) Institucional via OpenID Connect (Keycloak).
 
 ---
 
-## 🚀 Como Executar no Debian Linux
+## 🔑 Credenciais Padrão do Dashboard
 
-### Opção 1: Via Docker Compose (Recomendado)
+Ao acessar o Dashboard em `http://<IP_DA_VM>:8085` ou no seu domínio configurado:
 
-1. Clone ou transfira a pasta `/central-server` para a máquina Debian:
-   ```bash
-   cd central-server
-   ```
-2. Inicie os containers do MongoDB e do Go Server:
-   ```bash
-   docker compose up -d --build
-   ```
-3. Verifique os logs:
-   ```bash
-   docker compose logs -f central-server
-   ```
-4. Acesse o Dashboard Web no navegador:
-   `http://<IP_DA_VM_DEBIAN>:8080`
+| Usuário | Senha Padrão | Nível de Acesso |
+| :--- | :--- | :--- |
+| **admin** | `admin123` | Administrador total (gerencia perfis, grupos, módulos e remove nós) |
+| **operador** | `operador123` | Leitura (visualização de gráficos, histórico e status) |
+
+> [!IMPORTANT]
+> Altere as senhas padrão no arquivo `.env` para ambientes de produção.
 
 ---
 
-### Opção 2: Instalação Nativa (Systemd + MongoDB)
+## 📡 Instalação das Sondas Clientes a partir do Servidor
 
-1. **Instalar MongoDB no Debian 12 (Bookworm):**
-   ```bash
-   sudo apt-get update && sudo apt-get install -y gnupg curl
-   curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
-      sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
-   echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" | \
-      sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-   sudo apt-get update && sudo apt-get install -y mongodb-org
-   sudo systemctl enable --now mongod
-   ```
+Uma vez que o Servidor Central esteja no ar, ele passa a distribuir automaticamente os instaladores:
 
-2. **Compilar e Instalar o Servidor Central:**
-   ```bash
-   cd central-server
-   go build -o central-server main.go
-   sudo mkdir -p /opt/central-server
-   sudo cp central-server /opt/central-server/
-   sudo cp -r public /opt/central-server/
-   ```
-
-3. **Configurar o Serviço Systemd:**
-   ```bash
-   sudo cp systemd/network-monitor.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now network-monitor
-   sudo systemctl status network-monitor
-   ```
-
----
-
-## 📡 Testando os Endpoints via cURL
-
-### 1. Ingestão de Métricas (`POST /api/v1/metrics`)
+### 🐧 Sonda Linux / Debian (1 Comando no Terminal)
 ```bash
-curl -X POST http://localhost:8080/api/v1/metrics \
-  -H "Authorization: Bearer super-secret-probe-token-2026" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "node_id": "minipc-dc-01",
-    "location": "Guarapuava-DC1",
-    "timestamp": "2026-09-11T15:00:00Z",
-    "download_mbps": 850.5,
-    "upload_mbps": 720.0,
-    "ping_gateway": 1.2
-  }'
+curl -fsSL http://<IP_OU_DOMINIO>:8085/downloads/install-probe.sh | sudo bash
 ```
-**Resposta (HTTP 201 Created):**
-```json
-{
-  "message": "Metrica armazenada com sucesso",
-  "status": "success",
-  "timestamp": "2026-09-11T15:00:00Z"
-}
-```
+- Instala a sonda como serviço `systemd` (`uepg-probe.service`) que roda 24/7.
+- Acompanha o comando CLI **`uepg-probe-monitor`** (ou `uepg-monitor`) para reabrir a animação matemática ASCII de ondas WiFi a qualquer momento no terminal.
 
-### 2. Consulta de Séries do Dashboard (`GET /api/v1/dashboard/metrics`)
-```bash
-curl -s http://localhost:8080/api/v1/dashboard/metrics | jq .
+### 🪟 Sonda Windows (Instalador Gráfico .exe)
+Baixe o instalador compilado diretamente pelo Dashboard Web em **Downloads** ou acesse:
 ```
-Ou filtrar por um nó específico:
-```bash
-curl -s "http://localhost:8080/api/v1/dashboard/metrics?node_id=minipc-dc-01" | jq .
-```
-
-### 3. Autenticação do Dashboard (`POST /api/v1/auth/login`)
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "admin123"}'
-```
-
-### 4. Exclusão de Computador por Admin (`DELETE /api/v1/nodes`)
-```bash
-curl -X DELETE "http://localhost:8080/api/v1/nodes?node_id=minipc-dc-01" \
-  --cookie "noc_session=<TOKEN_ADMIN>"
+http://<IP_OU_DOMINIO>:8085/api/v1/download/client
 ```
 
 ---
 
-## 🔍 Inspecionando o MongoDB Time Series
+## 🛠️ Variáveis de Ambiente (`.env`)
 
-Acesse o shell do MongoDB (`mongosh`):
-```bash
-mongosh
+Principais variáveis configuráveis no arquivo `.env`:
+
+```ini
+PORT=8085
+PUBLIC_SERVER_URL=https://akvorado.acon.dev.uepg.br
+MONGO_URI=mongodb://mongo:27017
+MONGO_DB=network_central
+MONGO_COLLECTION=metrics
+API_TOKEN=super-secret-probe-token-2026
+STATIC_DIR=/app/public
+QUERY_HOURS_LIMIT=24
+
+# Autenticação Local
+AUTH_ADMIN_USER=admin
+AUTH_ADMIN_PASSWORD=admin123
+AUTH_VIEWER_USER=operador
+AUTH_VIEWER_PASSWORD=operador123
+SESSION_SECRET=super-secret-session-key-change-in-prod-2026
+
+# Autenticação SSO (Opcional - Keycloak)
+OIDC_ENABLED=false
+OIDC_ISSUER_URL=https://sso.acon.dev.uepg.br/realms/uepg
+OIDC_CLIENT_ID=net-tools
+OIDC_CLIENT_SECRET=sua-chave-secreta
+OIDC_REDIRECT_URL=https://akvorado.acon.dev.uepg.br/api/v1/auth/oidc/callback
 ```
-Comandos:
-```javascript
-use network_central;
 
-// Verificar metadados da coleção Time Series
-db.getCollectionInfos({ name: "metrics" });
+---
 
-// Consultar as últimas 5 medições
-db.metrics.find().sort({ timestamp: -1 }).limit(5);
+## 📡 Endpoints da API REST
 
-// Agregação de média de Download por nó
-db.metrics.aggregate([
-  {
-    $group: {
-      _id: "$metadata.node_id",
-      avg_download: { $avg: "$download_mbps" },
-      avg_upload: { $avg: "$upload_mbps" },
-      avg_ping: { $avg: "$ping_gateway" }
-    }
-  }
-]);
-```
+| Método | Endpoint | Descrição |
+| :--- | :--- | :--- |
+| `GET` | `/health` | Healthcheck do servidor (retorna status HTTP 200) |
+| `POST` | `/api/v1/metrics` | Ingestão de medições enviadas pelas sondas (Bearer Token) |
+| `GET` | `/api/v1/dashboard/metrics` | Consulta séries temporais para gráficos do Dashboard |
+| `GET` | `/api/v1/probes/profile/{hostname}` | Perfil dinâmico de tarefas da máquina |
+| `POST` | `/api/v1/probes/profile/{hostname}` | Atualização de perfil da máquina (Admin) |
+| `GET` | `/api/v1/speedtest/download` | Payload binário para teste de banda de Download |
+| `POST` | `/api/v1/speedtest/upload` | Sink descartável para teste de banda de Upload |
+| `POST` | `/api/v1/auth/login` | Login no Dashboard (admin / operador) |
+| `POST` | `/api/v1/auth/logout` | Encerramento de sessão |

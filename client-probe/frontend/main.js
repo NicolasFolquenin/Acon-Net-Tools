@@ -25,6 +25,26 @@ const nextRunText = document.getElementById('next-run-text');
 const metricsTableBody = document.getElementById('metrics-table-body');
 const lastUpdatedText = document.getElementById('last-updated-text');
 
+// Elementos de Paginação e Filtro por Data da Tabela (15 itens por página)
+const historyDateFilter = document.getElementById('history-date-filter');
+const btnFilterToday = document.getElementById('btn-filter-today');
+const btnFilterAll = document.getElementById('btn-filter-all');
+const historyTotalBadge = document.getElementById('history-total-badge');
+const paginationRangeText = document.getElementById('pagination-range-text');
+const btnPrevPage = document.getElementById('btn-prev-page');
+const btnNextPage = document.getElementById('btn-next-page');
+const currentPageDisplay = document.getElementById('current-page-display');
+const totalPagesDisplay = document.getElementById('total-pages-display');
+
+// Estado de Paginação
+const historyPagination = {
+  currentPage: 1,
+  pageSize: 15,
+  dayFilter: '',
+  totalCount: 0,
+  totalPages: 1
+};
+
 // Modal Settings Elements
 const modalSettings = document.getElementById('settings-modal');
 const btnOpenSettings = document.getElementById('btn-open-settings');
@@ -48,12 +68,27 @@ const WailsApp = {
     };
   },
 
+  async getActiveProfile() {
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.GetActiveProfile) {
+      return await window.go.main.App.GetActiveProfile();
+    }
+    return null;
+  },
+
   async getHistory() {
     if (window.go && window.go.main && window.go.main.App) {
       return await window.go.main.App.GetHistory();
     }
     // Mock para desenvolvimento/preview no navegador
     return generateMockHistory(24);
+  },
+
+  async getHistoryPage(dayFilter = '', page = 1, pageSize = 15) {
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.GetHistoryPage) {
+      return await window.go.main.App.GetHistoryPage(dayFilter, page, pageSize);
+    }
+    // Mock para desenvolvimento/preview no navegador
+    return generateMockHistoryPage(dayFilter, page, pageSize);
   },
 
   async runTestNow() {
@@ -98,6 +133,7 @@ const WailsApp = {
 
 // Inicialização da aplicação
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   setupEventListeners();
   initCharts();
   await loadAppConfig();
@@ -124,6 +160,57 @@ function setupEventListeners() {
   btnCloseSettings.addEventListener('click', closeSettingsModal);
   btnCancelSettings.addEventListener('click', closeSettingsModal);
   settingsForm.addEventListener('submit', onSaveSettings);
+
+  // Paginação e Filtro por Data
+  if (historyDateFilter) {
+    historyDateFilter.addEventListener('change', async (e) => {
+      historyPagination.dayFilter = (e.target.value || '').trim();
+      historyPagination.currentPage = 1;
+      await loadHistoryTablePage();
+    });
+  }
+
+  if (btnFilterToday) {
+    btnFilterToday.addEventListener('click', async () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+
+      if (historyDateFilter) historyDateFilter.value = todayStr;
+      historyPagination.dayFilter = todayStr;
+      historyPagination.currentPage = 1;
+      await loadHistoryTablePage();
+    });
+  }
+
+  if (btnFilterAll) {
+    btnFilterAll.addEventListener('click', async () => {
+      if (historyDateFilter) historyDateFilter.value = '';
+      historyPagination.dayFilter = '';
+      historyPagination.currentPage = 1;
+      await loadHistoryTablePage();
+    });
+  }
+
+  if (btnPrevPage) {
+    btnPrevPage.addEventListener('click', async () => {
+      if (historyPagination.currentPage > 1) {
+        historyPagination.currentPage--;
+        await loadHistoryTablePage();
+      }
+    });
+  }
+
+  if (btnNextPage) {
+    btnNextPage.addEventListener('click', async () => {
+      if (historyPagination.currentPage < historyPagination.totalPages) {
+        historyPagination.currentPage++;
+        await loadHistoryTablePage();
+      }
+    });
+  }
 }
 
 // Handler do botão "Rodar Teste Agora" com estado visual de loading
@@ -163,10 +250,38 @@ function updateStatusBadge(status) {
 
   if (status.is_running) {
     statusBadge.className = 'status-badge running';
-    statusText.textContent = status.status_text || 'Executando teste...';
+    statusText.textContent = status.status_text || (status.active_task ? `Executando: ${status.active_task}...` : 'Executando teste...');
   } else {
     statusBadge.className = 'status-badge scheduled';
-    statusText.textContent = status.status_text || 'Agendado (1h)';
+    statusText.textContent = status.status_text || (status.sync_with_central ? 'Sincronizado com o servidor central' : 'Agendado');
+  }
+
+  // Atualiza badge de Grupo / VLAN
+  const groupBadge = document.getElementById('group-badge-display');
+  if (groupBadge) {
+    if (status.group_name) {
+      groupBadge.textContent = `Grupo: ${status.group_name}${status.current_vlan ? ' (VLAN ' + status.current_vlan + ')' : ''}`;
+    } else {
+      groupBadge.textContent = 'Grupo: Padrão';
+    }
+  }
+
+  // Atualiza badge de Perfil de Medição
+  const profileBadge = document.getElementById('profile-badge');
+  if (profileBadge && status.current_profile) {
+    const prof = status.current_profile;
+    const activeCount = prof.tests ? prof.tests.filter(t => t.enabled).length : 0;
+    profileBadge.textContent = `Perfil ${prof.version} (${activeCount} testes)`;
+    profileBadge.title = prof.description || `Perfil ativo com ${activeCount} tarefas`;
+  }
+
+  const footerDesc = document.getElementById('footer-agent-desc');
+  if (footerDesc) {
+    if (status.sync_with_central) {
+      footerDesc.textContent = 'Sincronizado com o servidor central (:00 e :30)';
+    } else {
+      footerDesc.textContent = 'Agente Operando em Background (Agendado)';
+    }
   }
 
   if (status.next_run) {
@@ -208,37 +323,133 @@ function updateStatusBadge(status) {
     const swPort = document.getElementById('switch-port');
     const swVlan = document.getElementById('switch-vlan');
 
-    if (swName) swName.textContent = sw.switch_name || 'Aguardando frame LLDP...';
+    if (swName) {
+      swName.textContent = sw.switch_name || 'Aguardando frame LLDP...';
+      if (sw.switch_model) swName.title = `Modelo: ${sw.switch_model}`;
+    }
     if (swPort) swPort.textContent = sw.switch_port || '--';
-    if (swVlan) swVlan.textContent = sw.vlan ? `VLAN ${sw.vlan}` : (sw.switch_model || '--');
+    if (swVlan) swVlan.textContent = sw.vlan ? `VLAN ${sw.vlan}` : '--';
   }
 }
 
-// Inicialização dos Gráficos com Chart.js
+/* ==========================================================================
+   Tema Claro / Escuro
+   ========================================================================== */
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('probe-theme') ||
+    (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  applyTheme(savedTheme);
+
+  const btnTheme = document.getElementById('btn-theme-toggle');
+  if (btnTheme) {
+    btnTheme.addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+    });
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('probe-theme', theme);
+  updateChartsTheme(theme);
+}
+
+function getChartThemeColors(theme) {
+  const isLight = theme === 'light';
+  return {
+    textColor: isLight ? '#475569' : '#9ca3af',
+    gridColor: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)',
+    tooltipBg: isLight ? '#ffffff' : '#111827',
+    tooltipTitle: isLight ? '#0f172a' : '#ffffff',
+    tooltipBody: isLight ? '#334155' : '#e5e7eb',
+    tooltipBorder: isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)'
+  };
+}
+
+function updateChartsTheme(theme) {
+  if (!throughputChart || !latencyChart) return;
+  const currentTheme = theme || document.documentElement.getAttribute('data-theme') || 'dark';
+  const colors = getChartThemeColors(currentTheme);
+
+  [throughputChart, latencyChart].forEach(chart => {
+    if (!chart) return;
+    chart.options.scales.x.grid.color = colors.gridColor;
+    chart.options.scales.x.ticks.color = colors.textColor;
+    chart.options.scales.y.grid.color = colors.gridColor;
+    chart.options.scales.y.ticks.color = colors.textColor;
+    if (chart.options.scales.y.title) {
+      chart.options.scales.y.title.color = colors.textColor;
+    }
+    chart.options.plugins.tooltip.backgroundColor = colors.tooltipBg;
+    chart.options.plugins.tooltip.titleColor = colors.tooltipTitle;
+    chart.options.plugins.tooltip.bodyColor = colors.tooltipBody;
+    chart.options.plugins.tooltip.borderColor = colors.tooltipBorder;
+    chart.update('none');
+  });
+}
+
+function createFillGradient(ctx, topColor, bottomColor, height = 240) {
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, topColor);
+  grad.addColorStop(1, bottomColor);
+  return grad;
+}
+
+// Inicialização dos Gráficos com Chart.js (Com Gradientes, Curvas Suaves e Temas)
 function initCharts() {
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  const colors = getChartThemeColors(currentTheme);
+
   const commonOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: {
+      padding: {
+        left: 8,
+        right: 32, // Garante que a linha e o rótulo do último tick (ex: 13:50) não transbordem na borda direita
+        top: 14,
+        bottom: 6
+      }
+    },
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#1f2937',
-        titleColor: '#fff',
-        bodyColor: '#e5e7eb',
-        borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: colors.tooltipBg,
+        titleColor: colors.tooltipTitle,
+        bodyColor: colors.tooltipBody,
+        borderColor: colors.tooltipBorder,
         borderWidth: 1,
-        padding: 10,
-        displayColors: false,
+        padding: 12,
+        cornerRadius: 8,
+        titleFont: { size: 12, weight: '700' },
+        bodyFont: { size: 12 },
+        displayColors: true,
+        boxWidth: 8,
+        boxHeight: 8,
+        usePointStyle: true
       }
     },
     scales: {
       x: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#9ca3af', font: { size: 10 } }
+        grid: { color: colors.gridColor, drawBorder: false },
+        ticks: {
+          color: colors.textColor,
+          font: { size: 10, family: "'JetBrains Mono', monospace" },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 12
+        }
       },
       y: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#9ca3af', font: { size: 10 } }
+        grid: { color: colors.gridColor, drawBorder: false },
+        ticks: { color: colors.textColor, font: { size: 10, family: "'JetBrains Mono', monospace" } }
       }
     }
   };
@@ -251,36 +462,51 @@ function initCharts() {
       labels: [],
       datasets: [
         {
-          label: 'Download (Mbps)',
+          label: 'Download',
           data: [],
-          borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6, 182, 212, 0.1)',
+          borderColor: '#0284c7',
+          backgroundColor: createFillGradient(ctxThroughput, 'rgba(2, 132, 199, 0.22)', 'rgba(2, 132, 199, 0.01)'),
           fill: true,
-          tension: 0.35,
-          borderWidth: 2,
+          tension: 0.38,
+          borderWidth: 2.5,
           pointRadius: 3,
-          pointHoverRadius: 6
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#0284c7',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
         },
         {
-          label: 'Upload (Mbps)',
+          label: 'Upload',
           data: [],
-          borderColor: '#a855f7',
-          backgroundColor: 'rgba(168, 85, 247, 0.08)',
+          borderColor: '#4f46e5',
+          backgroundColor: createFillGradient(ctxThroughput, 'rgba(79, 70, 229, 0.20)', 'rgba(79, 70, 229, 0.01)'),
           fill: true,
-          tension: 0.35,
-          borderWidth: 2,
+          tension: 0.38,
+          borderWidth: 2.5,
           pointRadius: 3,
-          pointHoverRadius: 6
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#4f46e5',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
         }
       ]
     },
     options: {
       ...commonOptions,
+      plugins: {
+        ...commonOptions.plugins,
+        tooltip: {
+          ...commonOptions.plugins.tooltip,
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + ' Mbps' : '--'}`
+          }
+        }
+      },
       scales: {
         ...commonOptions.scales,
         y: {
           ...commonOptions.scales.y,
-          title: { display: true, text: 'Mbps', color: '#9ca3af', font: { size: 11 } }
+          title: { display: true, text: 'Mbps', color: colors.textColor, font: { size: 11, weight: '600' } }
         }
       }
     }
@@ -294,45 +520,177 @@ function initCharts() {
       labels: [],
       datasets: [
         {
-          label: 'Ping Gateway (ms)',
+          label: 'Ping Gateway',
           data: [],
           borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+          backgroundColor: createFillGradient(ctxLatency, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
           fill: true,
-          tension: 0.3,
-          borderWidth: 2,
+          tension: 0.38,
+          borderWidth: 2.5,
           pointRadius: 3,
-          pointHoverRadius: 6
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#10b981',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
         }
       ]
     },
     options: {
       ...commonOptions,
+      plugins: {
+        ...commonOptions.plugins,
+        tooltip: {
+          ...commonOptions.plugins.tooltip,
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + ' ms' : '--'}`
+          }
+        }
+      },
       scales: {
         ...commonOptions.scales,
         y: {
           ...commonOptions.scales.y,
-          title: { display: true, text: 'ms', color: '#9ca3af', font: { size: 11 } }
+          title: { display: true, text: 'ms', color: colors.textColor, font: { size: 11, weight: '600' } }
         }
       }
     }
   });
 }
 
-// Atualiza Dashboard com métricas do SQLite
+// Avalia quais medições estão de fato ativas e configuradas no perfil da máquina
+let currentCapabilities = {
+  hasDownload: true,
+  hasUpload: true,
+  hasThroughput: true,
+  hasPing: true,
+  hasDNS: false,
+  hasPacketLoss: false,
+  hasLLDP: true,
+};
+
+function getProfileCapabilities(profile, history) {
+  if (profile && Array.isArray(profile.tests) && profile.tests.length > 0) {
+    const enabledTests = profile.tests.filter(t => t.enabled !== false);
+    const hasDownload = enabledTests.some(t =>
+      t.type === 'http_throughput_download' || t.id === 'throughput_download'
+    );
+    const hasUpload = enabledTests.some(t =>
+      t.type === 'http_throughput_upload' || t.id === 'throughput_upload'
+    );
+    const hasPing = enabledTests.some(t =>
+      t.type === 'ping' || t.id.startsWith('ping_')
+    );
+    const hasPacketLoss = enabledTests.some(t =>
+      t.type === 'packet_loss' || t.id.startsWith('packet_loss_')
+    );
+    const hasDNS = enabledTests.some(t =>
+      t.type === 'dns_lookup' || t.id.startsWith('dns_')
+    );
+    const hasLLDP = enabledTests.some(t =>
+      t.type === 'discovery_protocol' || t.id.includes('discovery') || t.id.includes('lldp')
+    );
+
+    return {
+      hasDownload,
+      hasUpload,
+      hasThroughput: hasDownload || hasUpload,
+      hasPing,
+      hasPacketLoss,
+      hasDNS,
+      hasLLDP,
+    };
+  }
+
+  // Fallback: se não há perfil definido ainda, verifica histórico de medições reais
+  const hasHistoryThroughput = Array.isArray(history) && history.some(r => (r.download_mbps > 0 || r.upload_mbps > 0));
+  return {
+    hasDownload: hasHistoryThroughput,
+    hasUpload: hasHistoryThroughput,
+    hasThroughput: hasHistoryThroughput,
+    hasPing: true,
+    hasPacketLoss: false,
+    hasDNS: false,
+    hasLLDP: true,
+  };
+}
+
+function applyCapabilitiesToUI(caps) {
+  currentCapabilities = caps;
+
+  // 1. Cards de métricas no topo
+  const cardDownload = document.getElementById('card-download');
+  const cardUpload = document.getElementById('card-upload');
+  const cardPing = document.getElementById('card-ping');
+
+  if (cardDownload) cardDownload.style.display = caps.hasDownload ? '' : 'none';
+  if (cardUpload) cardUpload.style.display = caps.hasUpload ? '' : 'none';
+  if (cardPing) cardPing.style.display = caps.hasPing ? '' : 'none';
+
+  // 2. Gráficos (se o perfil não mede Throughput, oculta o card e expande o Ping)
+  const chartsContainer = document.getElementById('charts-container');
+  const throughputChartCard = document.getElementById('throughput-chart-card');
+  const latencyChartCard = document.getElementById('latency-chart-card');
+  const legendDownload = document.getElementById('legend-download');
+  const legendUpload = document.getElementById('legend-upload');
+
+  if (throughputChartCard) {
+    const wasHidden = throughputChartCard.style.display === 'none';
+    throughputChartCard.style.display = caps.hasThroughput ? '' : 'none';
+    if (caps.hasThroughput && wasHidden && throughputChart) {
+      setTimeout(() => {
+        try { throughputChart.resize(); throughputChart.update(); } catch (_) {}
+      }, 50);
+    }
+  }
+
+  if (legendDownload) legendDownload.style.display = caps.hasDownload ? '' : 'none';
+  if (legendUpload) legendUpload.style.display = caps.hasUpload ? '' : 'none';
+
+  if (latencyChartCard) {
+    latencyChartCard.style.display = caps.hasPing ? '' : 'none';
+  }
+
+  if (chartsContainer) {
+    if (!caps.hasThroughput && caps.hasPing) {
+      chartsContainer.classList.add('single-chart');
+      chartsContainer.style.display = '';
+    } else if (!caps.hasThroughput && !caps.hasPing) {
+      chartsContainer.style.display = 'none';
+    } else {
+      chartsContainer.classList.remove('single-chart');
+      chartsContainer.style.display = '';
+    }
+  }
+
+  // 3. Colunas da tabela de execuções recentes
+  const thDownload = document.getElementById('th-download');
+  const thUpload = document.getElementById('th-upload');
+  const thPing = document.getElementById('th-ping');
+
+  if (thDownload) thDownload.style.display = caps.hasDownload ? '' : 'none';
+  if (thUpload) thUpload.style.display = caps.hasUpload ? '' : 'none';
+  if (thPing) thPing.style.display = caps.hasPing ? '' : 'none';
+}
+
+// Atualiza Dashboard com métricas do SQLite e adaptação dinâmica ao Perfil
 async function refreshDashboard() {
   const history = await WailsApp.getHistory();
   const status = await WailsApp.getStatus();
+
+  // Avalia capacidades do perfil ativo e adapta interface
+  const profile = status.current_profile || (await WailsApp.getActiveProfile()) || null;
+  const capabilities = getProfileCapabilities(profile, history);
+  applyCapabilitiesToUI(capabilities);
 
   updateStatusBadge(status);
 
   if (history && history.length > 0) {
     const latest = history[history.length - 1];
 
-    // Atualiza cards numéricos
-    statDownload.textContent = latest.download_mbps.toFixed(1);
-    statUpload.textContent = latest.upload_mbps.toFixed(1);
-    statPing.textContent = latest.ping_gateway.toFixed(1);
+    // Atualiza cards numéricos somente dos itens ativos
+    if (capabilities.hasDownload) statDownload.textContent = latest.download_mbps.toFixed(1);
+    if (capabilities.hasUpload) statUpload.textContent = latest.upload_mbps.toFixed(1);
+    if (capabilities.hasPing) statPing.textContent = latest.ping_gateway.toFixed(1);
 
     // Formata timestamps e alimenta gráficos (últimas 24 execuções)
     const labels = history.map(item => {
@@ -344,30 +702,89 @@ async function refreshDashboard() {
     const uploads = history.map(item => item.upload_mbps);
     const pings = history.map(item => item.ping_gateway);
 
-    // Atualiza Chart Throughput
-    throughputChart.data.labels = labels;
-    throughputChart.data.datasets[0].data = downloads;
-    throughputChart.data.datasets[1].data = uploads;
-    throughputChart.update();
+    // Atualiza Chart Throughput somente se habilitado
+    if (capabilities.hasThroughput && throughputChart) {
+      throughputChart.data.labels = labels;
+      throughputChart.data.datasets[0].data = capabilities.hasDownload ? downloads : [];
+      throughputChart.data.datasets[1].data = capabilities.hasUpload ? uploads : [];
+      throughputChart.update();
+    }
 
-    // Atualiza Chart Latência
-    latencyChart.data.labels = labels;
-    latencyChart.data.datasets[0].data = pings;
-    latencyChart.update();
+    // Atualiza Chart Latência somente se habilitado
+    if (capabilities.hasPing && latencyChart) {
+      latencyChart.data.labels = labels;
+      latencyChart.data.datasets[0].data = pings;
+      latencyChart.update();
+    }
 
-    // Renderiza tabela de log recente (inversa para mostrar mais novo no topo)
-    renderTable([...history].reverse());
     lastUpdatedText.textContent = `Última leitura: ${new Date(latest.timestamp).toLocaleTimeString()}`;
   } else {
     statDownload.textContent = '--';
     statUpload.textContent = '--';
     statPing.textContent = '--';
   }
+
+  // Carrega a página da tabela de execuções com o filtro atual
+  await loadHistoryTablePage();
 }
 
-function renderTable(records) {
+// Carrega página específica da tabela de execuções recentes (15 itens por página com filtro de data)
+async function loadHistoryTablePage() {
+  try {
+    const res = await WailsApp.getHistoryPage(
+      historyPagination.dayFilter,
+      historyPagination.currentPage,
+      historyPagination.pageSize
+    );
+
+    const records = (res && res.records) ? res.records : [];
+    historyPagination.totalCount = (res && typeof res.total_count === 'number') ? res.total_count : 0;
+    historyPagination.totalPages = Math.max(1, (res && typeof res.total_pages === 'number') ? res.total_pages : 1);
+    historyPagination.currentPage = Math.min(Math.max(1, (res && typeof res.page === 'number') ? res.page : 1), historyPagination.totalPages);
+
+    renderTable(records, currentCapabilities);
+    updatePaginationUI();
+  } catch (err) {
+    console.error('Erro ao carregar página de histórico:', err);
+    metricsTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Erro ao carregar histórico: ${err.message || err}</td></tr>`;
+  }
+}
+
+function updatePaginationUI() {
+  if (currentPageDisplay) currentPageDisplay.textContent = historyPagination.currentPage;
+  if (totalPagesDisplay) totalPagesDisplay.textContent = historyPagination.totalPages;
+
+  if (btnPrevPage) {
+    btnPrevPage.disabled = (historyPagination.currentPage <= 1);
+  }
+  if (btnNextPage) {
+    btnNextPage.disabled = (historyPagination.currentPage >= historyPagination.totalPages);
+  }
+
+  const start = historyPagination.totalCount === 0 ? 0 : (historyPagination.currentPage - 1) * historyPagination.pageSize + 1;
+  const end = Math.min(historyPagination.currentPage * historyPagination.pageSize, historyPagination.totalCount);
+
+  if (paginationRangeText) {
+    paginationRangeText.textContent = `Exibindo ${start} a ${end} de ${historyPagination.totalCount}`;
+  }
+
+  if (historyTotalBadge) {
+    const dayLabel = historyPagination.dayFilter ? ` (${historyPagination.dayFilter})` : '';
+    historyTotalBadge.textContent = `${historyPagination.totalCount} execuções${dayLabel}`;
+  }
+}
+
+function renderTable(records, caps = currentCapabilities) {
+  let colSpan = 2; // Data & Hora + Status Sync
+  if (caps.hasDownload) colSpan++;
+  if (caps.hasUpload) colSpan++;
+  if (caps.hasPing) colSpan++;
+
   if (!records || records.length === 0) {
-    metricsTableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum teste registrado ainda.</td></tr>';
+    const emptyMsg = historyPagination.dayFilter
+      ? `Nenhuma execução encontrada para a data ${historyPagination.dayFilter}.`
+      : 'Nenhum teste registrado ainda.';
+    metricsTableBody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted">${emptyMsg}</td></tr>`;
     return;
   }
 
@@ -378,15 +795,32 @@ function renderTable(records) {
       ? '<span class="sync-badge ok">✓ Sincronizado</span>'
       : '<span class="sync-badge fail" title="' + (r.error_message || 'Falha de conexão') + '">✕ Pendente</span>';
 
-    return `
-      <tr>
-        <td>${dateFormatted}</td>
-        <td><strong style="color: var(--cyan-light)">${r.download_mbps.toFixed(1)}</strong> Mbps</td>
-        <td><strong style="color: var(--purple-light)">${r.upload_mbps.toFixed(1)}</strong> Mbps</td>
-        <td><strong style="color: var(--emerald-light)">${r.ping_gateway.toFixed(1)}</strong> ms</td>
-        <td>${syncBadge}</td>
-      </tr>
-    `;
+    let extraBadges = '';
+    if (r.metrics) {
+      if (r.metrics.dns_uepg && r.metrics.dns_uepg.value > 0) {
+        extraBadges += `<span class="mono-badge" style="font-size: 0.68rem; margin-left: 4px;" title="Resolução DNS UEPG">DNS ${r.metrics.dns_uepg.value.toFixed(1)}ms</span>`;
+      }
+      if (r.metrics.ping_nti_core && r.metrics.ping_nti_core.value > 0) {
+        extraBadges += `<span class="mono-badge" style="font-size: 0.68rem; margin-left: 4px; color: #c084fc; border-color: rgba(192, 132, 252, 0.3);" title="Ping Core NTI">NTI ${r.metrics.ping_nti_core.value.toFixed(1)}ms</span>`;
+      }
+      if (r.metrics.packet_loss && r.metrics.packet_loss.value >= 0) {
+        extraBadges += `<span class="mono-badge" style="font-size: 0.68rem; margin-left: 4px; color: #f87171;" title="Perda de Pacotes">Perda ${r.metrics.packet_loss.value.toFixed(0)}%</span>`;
+      }
+    }
+
+    let cells = `<td>${dateFormatted} ${extraBadges}</td>`;
+    if (caps.hasDownload) {
+      cells += `<td><strong style="color: var(--cyan-light)">${r.download_mbps.toFixed(1)}</strong> Mbps</td>`;
+    }
+    if (caps.hasUpload) {
+      cells += `<td><strong style="color: var(--purple-light)">${r.upload_mbps.toFixed(1)}</strong> Mbps</td>`;
+    }
+    if (caps.hasPing) {
+      cells += `<td><strong style="color: var(--emerald-light)">${r.ping_gateway.toFixed(1)}</strong> ms</td>`;
+    }
+    cells += `<td>${syncBadge}</td>`;
+
+    return `<tr>${cells}</tr>`;
   }).join('');
 }
 
@@ -400,8 +834,14 @@ async function loadAppConfig() {
   document.getElementById('cfg-location').value = cfg.location || '';
   document.getElementById('cfg-server-url').value = cfg.server_url || '';
   document.getElementById('cfg-api-token').value = cfg.api_token || '';
-  document.getElementById('cfg-interval').value = cfg.interval_minutes || 60;
+  document.getElementById('cfg-interval').value = cfg.interval_minutes || 30;
   document.getElementById('cfg-ping-target').value = cfg.ping_target || '192.168.1.1';
+
+  const isSync = (cfg.sync_with_central !== false) && (cfg.server_url && cfg.server_url.trim() !== '');
+  const hintEl = document.getElementById('cfg-interval-hint');
+  if (hintEl) {
+    hintEl.style.display = isSync ? 'block' : 'none';
+  }
 }
 
 function openSettingsModal() {
@@ -414,13 +854,15 @@ function closeSettingsModal() {
 
 async function onSaveSettings(e) {
   e.preventDefault();
+  const serverUrl = document.getElementById('cfg-server-url').value.trim();
   const cfg = {
     node_id: document.getElementById('cfg-node-id').value.trim(),
     location: document.getElementById('cfg-location').value.trim(),
-    server_url: document.getElementById('cfg-server-url').value.trim(),
+    server_url: serverUrl,
     api_token: document.getElementById('cfg-api-token').value.trim(),
-    interval_minutes: parseInt(document.getElementById('cfg-interval').value, 10) || 60,
-    ping_target: document.getElementById('cfg-ping-target').value.trim()
+    interval_minutes: parseInt(document.getElementById('cfg-interval').value, 10) || 30,
+    ping_target: document.getElementById('cfg-ping-target').value.trim(),
+    sync_with_central: serverUrl !== ''
   };
 
   try {
@@ -452,3 +894,44 @@ function generateMockHistory(count) {
   }
   return list;
 }
+
+function generateMockHistoryPage(dayFilter, page, pageSize) {
+  const all = [];
+  const now = Date.now();
+  for (let i = 44; i >= 0; i--) {
+    const time = new Date(now - i * 3600000 * 2);
+    all.push({
+      id: 45 - i,
+      node_id: 'minipc-dc-01',
+      location: 'Guarapuava-DC1',
+      timestamp: time.toISOString(),
+      download_mbps: +(810 + Math.sin(i) * 60 + Math.random() * 20).toFixed(2),
+      upload_mbps: +(715 + Math.cos(i) * 45 + Math.random() * 15).toFixed(2),
+      ping_gateway: +(1.2 + Math.random() * 0.7).toFixed(2),
+      synced: true
+    });
+  }
+
+  let filtered = all;
+  if (dayFilter && dayFilter.trim() !== '') {
+    filtered = all.filter(r => r.timestamp.startsWith(dayFilter.trim()));
+  }
+
+  // Mais recentes primeiro
+  filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  const totalCount = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const validPage = Math.min(Math.max(1, page), totalPages);
+  const start = (validPage - 1) * pageSize;
+  const records = filtered.slice(start, start + pageSize);
+
+  return {
+    records,
+    total_count: totalCount,
+    page: validPage,
+    page_size: pageSize,
+    total_pages: totalPages
+  };
+}
+

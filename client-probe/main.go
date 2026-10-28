@@ -1,3 +1,5 @@
+//go:build !cli
+
 package main
 
 import (
@@ -19,11 +21,11 @@ func main() {
 
 	// Configuração do Wails v2
 	err := wails.Run(&options.App{
-		Title:             "Network Probe Agent - Monitoramento Distribuído",
+		Title:             "UEPG-Net-Tools - Monitoramento Distribuído",
 		Width:             1200,
 		Height:            800,
-		MinWidth:          980,
-		MinHeight:         680,
+		MinWidth:          640,
+		MinHeight:         520,
 		DisableResize:     false,
 		Fullscreen:        false,
 		Frameless:         false,

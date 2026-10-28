@@ -1,0 +1,8 @@
+{
+  "id": "http_check_portal",
+  "type": "http_check",
+  "name": "Disponibilidade Portal UEPG",
+  "enabled": true,
+  "endpoint": "https://www.uepg.br",
+  "timeout_seconds": 15
+}

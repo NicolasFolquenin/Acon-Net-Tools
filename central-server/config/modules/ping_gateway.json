@@ -1,0 +1,10 @@
+{
+  "id": "ping_gateway",
+  "type": "ping",
+  "name": "Latência Gateway Local",
+  "enabled": true,
+  "target": "auto_gateway",
+  "count": 3,
+  "timeout_ms": 1000,
+  "timeout_seconds": 15
+}

@@ -1,9 +1,12 @@
+//go:build !cli
+
 package main
 
 import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,20 +19,23 @@ type App struct {
 	cancelWorker context.CancelFunc
 	storage      *StorageService
 	probe        *NetworkProbe
+	profileMgr   *ProfileManager
 	isRunning    bool
 	statusText   string
+	activeTask   string
 	lastRun      *time.Time
 	nextRun      *time.Time
-	lastMetric    *LocalMetricRecord
-	currentPC     *SystemInfo
+	lastMetric   *LocalMetricRecord
+	currentPC    *SystemInfo
 	currentSwitch *SwitchInfo
-	mu            sync.Mutex
+	mu           sync.Mutex
 }
 
 // NewApp cria uma nova instância de App
 func NewApp() *App {
 	return &App{
 		probe:      NewNetworkProbe(),
+		profileMgr: NewProfileManager(),
 		statusText: "Inicializando sonda...",
 	}
 }
@@ -38,6 +44,20 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	log.Println("[APP] Inicializando Desktop Probe...")
+
+	// Limpeza de arquivos residuais de atualizações anteriores (.old / .new)
+	CleanupOldBinaries()
+
+	// Checagem assíncrona de auto-update com o servidor central
+	go func() {
+		time.Sleep(3 * time.Second)
+		upCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		cfg := GetCurrentConfig()
+		if cfg.ServerURL != "" && cfg.ServerURL != "none" {
+			_, _ = CheckAndApplyAutoUpdate(upCtx, cfg.ServerURL, cfg.APIToken)
+		}
+	}()
 
 	// 1. Carrega configurações
 	cfg, err := LoadConfig("")
@@ -60,8 +80,18 @@ func (a *App) startup(ctx context.Context) {
 		if a.lastMetric.SystemInfo != nil {
 			a.currentPC = a.lastMetric.SystemInfo
 		}
-		if a.lastMetric.SwitchInfo != nil {
-			a.currentSwitch = a.lastMetric.SwitchInfo
+	}
+	// Restaura o switch válido mais recente do histórico local para exibição instantânea
+	if validSw := a.storage.GetLastValidSwitchInfo(); validSw != nil {
+		a.currentSwitch = validSw
+		log.Printf("[APP] Switch restaurado do cache local: %s (Porta %s)", validSw.SwitchName, validSw.SwitchPort)
+	} else if len(history) > 0 && a.lastMetric.SwitchInfo != nil && a.lastMetric.SwitchInfo.IsRealSwitch() {
+		a.currentSwitch = a.lastMetric.SwitchInfo
+	} else {
+		a.currentSwitch = &SwitchInfo{
+			SwitchName: "Aguardando frame LLDP...",
+			SwitchPort: "--",
+			Protocol:   "LLDP",
 		}
 	}
 
@@ -74,34 +104,67 @@ func (a *App) startup(ctx context.Context) {
 		a.emitStatus()
 
 		// Busca inicial de LLDP em background (captura resiliente)
-		lldpCtx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
-		defer cancel()
-		sw := DiscoverSwitchLLDP(lldpCtx)
-		a.mu.Lock()
-		a.currentSwitch = &sw
-		a.mu.Unlock()
-		a.emitStatus()
+		// Faz até 3 tentativas (45s cada) até capturar o anúncio do switch corporativo (que emite a cada 30-60s)
+		for attempt := 1; attempt <= 3; attempt++ {
+			if a.currentSwitch != nil && a.currentSwitch.IsRealSwitch() {
+				break
+			}
+			log.Printf("[APP] LLDP: Tentativa %d de escuta do switch corporativo (45s)...", attempt)
+			timeout := 50 * time.Second
+			if attempt == 1 {
+				timeout = 75 * time.Second
+			}
+			lldpCtx, cancel := context.WithTimeout(context.Background(), timeout)
+			sw := DiscoverSwitchLLDP(lldpCtx)
+			cancel()
+			if sw.IsRealSwitch() {
+				a.mu.Lock()
+				a.currentSwitch = &sw
+				a.mu.Unlock()
+				log.Printf("[APP] Switch corporativo identificado via LLDP: %s (Porta %s)", sw.SwitchName, sw.SwitchPort)
+				a.emitStatus()
+				break
+			}
+			time.Sleep(3 * time.Second)
+		}
 	}()
 
-	interval := time.Duration(cfg.IntervalMinutes) * time.Minute
-	if interval < 1*time.Minute {
-		interval = 60 * time.Minute
+	var next time.Time
+	if cfg.IsCentralSynced() {
+		next = getNextSyncSlot(time.Now())
+		a.statusText = "Sincronizado com o servidor central"
+	} else {
+		interval := time.Duration(cfg.IntervalMinutes) * time.Minute
+		if interval < 1*time.Minute {
+			interval = 60 * time.Minute
+		}
+		next = time.Now().Add(interval)
+		a.statusText = fmt.Sprintf("Agendado (%dh)", int(interval.Hours()))
 	}
-	next := time.Now().Add(interval)
 	a.nextRun = &next
-	a.statusText = fmt.Sprintf("Agendado (%dh)", int(interval.Hours()))
 
-	// 4. Inicia goroutine de agendamento em segundo plano (a cada 1 hora)
+	// 4. Inicia goroutine de agendamento em segundo plano (:00 e :30 se sincronizado com servidor central)
 	workerCtx, cancel := context.WithCancel(context.Background())
 	a.cancelWorker = cancel
-	go a.backgroundScheduler(workerCtx, interval)
+	go a.backgroundScheduler(workerCtx)
 
 	// Sincroniza medições que porventura ficaram pendentes offline
 	go func() {
 		time.Sleep(2 * time.Second)
-		syncCtx, syncCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		syncCtx, syncCancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer syncCancel()
 		if count := a.storage.SyncPendingMetrics(syncCtx, cfg.ServerURL, cfg.APIToken); count > 0 {
+			a.emitStatus()
+		}
+	}()
+
+	// Busca o perfil de medição mais recente do servidor central em segundo plano
+	go func() {
+		fetchCtx, cancelFetch := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelFetch()
+		hostInfo := a.getHostBootstrapInfo()
+		if prof, err := a.profileMgr.FetchRemoteProfileForHost(fetchCtx, cfg.ServerURL, cfg.APIToken, hostInfo); err == nil {
+			log.Printf("[APP] Perfil dinâmico carregado do servidor para %s: versão %s (%d testes)", hostInfo.Hostname, prof.Version, len(prof.Tests))
 			a.emitStatus()
 		}
 	}()
@@ -120,24 +183,58 @@ func (a *App) shutdown(ctx context.Context) {
 	}
 }
 
-// backgroundScheduler roda em background disparando testes no intervalo configurado (1 hora)
-func (a *App) backgroundScheduler(ctx context.Context, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
+// backgroundScheduler gerencia a execução periódica de testes.
+// Quando configurado para sincronizar com o Servidor Central, todos os clientes disparam nos mesmos horários (:00 e :30).
+func (a *App) backgroundScheduler(ctx context.Context) {
 	for {
+		cfg := GetCurrentConfig()
+		var next time.Time
+		var statusLabel string
+
+		if cfg.IsCentralSynced() {
+			next = getNextSyncSlot(time.Now())
+			statusLabel = "Sincronizado com o servidor central"
+		} else {
+			interval := time.Duration(cfg.IntervalMinutes) * time.Minute
+			if interval < 1*time.Minute {
+				interval = 60 * time.Minute
+			}
+			next = time.Now().Add(interval)
+			statusLabel = fmt.Sprintf("Agendado (%dh)", int(interval.Hours()))
+		}
+
+		a.mu.Lock()
+		a.nextRun = &next
+		if !a.isRunning {
+			a.statusText = statusLabel
+		}
+		a.mu.Unlock()
+		a.emitStatus()
+
+		waitDuration := time.Until(next)
+		if waitDuration < 0 {
+			waitDuration = 50 * time.Millisecond
+		}
+
+		timer := time.NewTimer(waitDuration)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			log.Println("[SCHEDULER] Goroutine em segundo plano finalizada.")
 			return
-		case <-ticker.C:
-			log.Println("[SCHEDULER] Intervalo atingido! Executando teste programado...")
+		case <-timer.C:
+			log.Printf("[SCHEDULER] Horário de medição atingido (%s)! Executando teste programado...", time.Now().Format("15:04:05"))
 			_, _ = a.ExecuteTest("Agendado")
-			next := time.Now().Add(interval)
-			a.mu.Lock()
-			a.nextRun = &next
-			a.mu.Unlock()
-			a.emitStatus()
+
+			// Checagem assíncrona de nova versão publicada no Central Server
+			go func() {
+				upCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				defer cancel()
+				curCfg := GetCurrentConfig()
+				if curCfg.ServerURL != "" && curCfg.ServerURL != "none" {
+					_, _ = CheckAndApplyAutoUpdate(upCtx, curCfg.ServerURL, curCfg.APIToken)
+				}
+			}()
 		}
 	}
 }
@@ -162,33 +259,57 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 	defer func() {
 		a.mu.Lock()
 		a.isRunning = false
+		a.activeTask = ""
 		cfg := GetCurrentConfig()
-		interval := time.Duration(cfg.IntervalMinutes) * time.Minute
-		a.statusText = fmt.Sprintf("Agendado (%dh)", int(interval.Hours()))
+		if cfg.IsCentralSynced() {
+			a.statusText = "Sincronizado com o servidor central"
+		} else {
+			interval := time.Duration(cfg.IntervalMinutes) * time.Minute
+			a.statusText = fmt.Sprintf("Agendado (%dh)", int(interval.Hours()))
+		}
 		a.mu.Unlock()
 		a.emitStatus()
 	}()
 
 	cfg := GetCurrentConfig()
 
-	// 1. Executa medição de rede (Ping, Download, Upload)
-	measureCtx, cancelMeasure := context.WithTimeout(context.Background(), 45*time.Second)
+	// 1. Tenta atualizar o perfil de testes antes de executar se o servidor estiver acessível
+	fetchCtx, cancelFetch := context.WithTimeout(context.Background(), 5*time.Second)
+	hostInfo := a.getHostBootstrapInfo()
+	_, _ = a.profileMgr.FetchRemoteProfileForHost(fetchCtx, cfg.ServerURL, cfg.APIToken, hostInfo)
+	cancelFetch()
+
+	activeProfile := a.profileMgr.GetActiveProfile()
+
+	// 2. Executa a bateria de medições dinâmicas definidas no perfil
+	measureCtx, cancelMeasure := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancelMeasure()
 
-	payload, err := a.probe.MeasureAll(measureCtx, cfg)
+	payload, err := a.probe.RunProfile(measureCtx, activeProfile, cfg, a.currentSwitch, func(taskName string) {
+		a.mu.Lock()
+		a.activeTask = taskName
+		a.statusText = fmt.Sprintf("Executando: %s...", taskName)
+		a.mu.Unlock()
+		a.emitStatus()
+	})
 	if err != nil {
 		log.Printf("[APP] Erro na medicao: %v", err)
 		return nil, err
 	}
 
-	// Se a sonda já possuía o switch detectado e a medição rápida não capturou, preserva o switch conhecido
-	if (payload.SwitchInfo == nil || payload.SwitchInfo.SwitchName == "" || payload.SwitchInfo.SwitchName == "Aguardando frame LLDP") &&
-		a.currentSwitch != nil && a.currentSwitch.SwitchName != "" && a.currentSwitch.SwitchName != "Aguardando frame LLDP" {
-		payload.SwitchInfo = a.currentSwitch
-	} else if payload.SwitchInfo != nil && payload.SwitchInfo.SwitchName != "" && payload.SwitchInfo.SwitchName != "Aguardando frame LLDP" {
+	// Preserva o switch corporativo conhecido se a medição capturou apenas telefone ou vazio
+	if payload.SwitchInfo != nil && payload.SwitchInfo.IsRealSwitch() {
 		a.mu.Lock()
 		a.currentSwitch = payload.SwitchInfo
 		a.mu.Unlock()
+	} else if a.currentSwitch != nil && a.currentSwitch.IsRealSwitch() {
+		payload.SwitchInfo = a.currentSwitch
+	} else if payload.SwitchInfo != nil && payload.SwitchInfo.IsValid() {
+		a.mu.Lock()
+		a.currentSwitch = payload.SwitchInfo
+		a.mu.Unlock()
+	} else if a.currentSwitch != nil && a.currentSwitch.IsValid() {
+		payload.SwitchInfo = a.currentSwitch
 	}
 
 	// 2. Envia para o servidor central (POST com Bearer token)
@@ -216,7 +337,7 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 	// Se esta leitura sincronizou e há leituras pendentes antigas, sincroniza-as em background
 	if synced {
 		go func() {
-			syncCtx, syncCancel := context.WithTimeout(context.Background(), 20*time.Second)
+			syncCtx, syncCancel := context.WithTimeout(context.Background(), 3*time.Minute)
 			defer syncCancel()
 			if count := a.storage.SyncPendingMetrics(syncCtx, cfg.ServerURL, cfg.APIToken); count > 0 {
 				a.emitStatus()
@@ -246,6 +367,15 @@ func (a *App) GetHistory() ([]LocalMetricRecord, error) {
 	return a.storage.GetRecentMetrics(24)
 }
 
+// GetHistoryPage retorna as medições paginadas (15 itens por página) com filtro por dia para a tabela
+func (a *App) GetHistoryPage(dayFilter string, page int, pageSize int) (HistoryPageResult, error) {
+	if a.storage == nil {
+		return HistoryPageResult{Records: []LocalMetricRecord{}, Page: 1, PageSize: 15, TotalPages: 1}, nil
+	}
+	return a.storage.GetHistoryPage(dayFilter, page, pageSize)
+}
+
+
 // GetStatus retorna o estado geral da sonda
 func (a *App) GetStatus() ProbeStatus {
 	a.mu.Lock()
@@ -261,18 +391,64 @@ func (a *App) GetStatus() ProbeStatus {
 		serverStatus = "Desconectado (offline)"
 	}
 
-	return ProbeStatus{
-		IsRunning:     a.isRunning,
-		StatusText:    a.statusText,
-		LastRun:       a.lastRun,
-		NextRun:       a.nextRun,
-		LastMetric:    a.lastMetric,
-		ServerStatus:  serverStatus,
-		TotalSynced:   syncedCount,
-		TotalPending:  pendingCount,
-		CurrentPC:     a.currentPC,
-		CurrentSwitch: a.currentSwitch,
+	cfg := GetCurrentConfig()
+	isSynced := cfg.IsCentralSynced()
+	statusText := a.statusText
+	if !a.isRunning && isSynced && (statusText == "" || strings.HasPrefix(statusText, "Agendado")) {
+		statusText = "Sincronizado com o servidor central"
 	}
+
+	groupCfg := GetCurrentGroupConfig()
+	groupName := groupCfg.GroupName
+	currentVlan := 0
+	if a.currentSwitch != nil {
+		currentVlan = a.currentSwitch.VLAN
+	}
+	if a.lastMetric != nil && a.lastMetric.GroupName != "" {
+		groupName = a.lastMetric.GroupName
+	}
+
+	return ProbeStatus{
+		IsRunning:       a.isRunning,
+		StatusText:      statusText,
+		ActiveTask:      a.activeTask,
+		GroupName:       groupName,
+		CurrentVLAN:     currentVlan,
+		LastRun:         a.lastRun,
+		NextRun:         a.nextRun,
+		LastMetric:      a.lastMetric,
+		ServerStatus:    serverStatus,
+		TotalSynced:     syncedCount,
+		TotalPending:    pendingCount,
+		CurrentPC:       a.currentPC,
+		CurrentSwitch:   a.currentSwitch,
+		CurrentProfile:  a.profileMgr.GetActiveProfile(),
+		SyncWithCentral: isSynced,
+	}
+}
+
+// GetActiveProfile expõe o perfil de medição ativo para a interface Wails
+func (a *App) GetActiveProfile() *MeasurementProfile {
+	if a.profileMgr == nil {
+		return nil
+	}
+	return a.profileMgr.GetActiveProfile()
+}
+
+// RefreshProfile força a busca do perfil mais recente junto ao Servidor Central
+func (a *App) RefreshProfile() (*MeasurementProfile, error) {
+	if a.profileMgr == nil {
+		return nil, fmt.Errorf("profile manager não inicializado")
+	}
+	cfg := GetCurrentConfig()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	hostInfo := a.getHostBootstrapInfo()
+	prof, err := a.profileMgr.FetchRemoteProfileForHost(ctx, cfg.ServerURL, cfg.APIToken, hostInfo)
+	if err == nil {
+		a.emitStatus()
+	}
+	return prof, err
 }
 
 // GetConfig expõe a configuração para a UI
@@ -284,6 +460,15 @@ func (a *App) GetConfig() Config {
 func (a *App) SaveConfig(cfg Config) error {
 	err := SaveConfig(cfg)
 	if err == nil {
+		a.mu.Lock()
+		if a.cancelWorker != nil {
+			a.cancelWorker()
+		}
+		workerCtx, cancel := context.WithCancel(context.Background())
+		a.cancelWorker = cancel
+		go a.backgroundScheduler(workerCtx)
+		a.mu.Unlock()
+
 		go func() {
 			syncCtx, syncCancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer syncCancel()
@@ -300,3 +485,26 @@ func (a *App) emitStatus() {
 		runtime.EventsEmit(a.ctx, "status_updated", a.GetStatus())
 	}
 }
+
+// getHostBootstrapInfo coleta os dados locais do host e switch para identificação e auto-registro
+func (a *App) getHostBootstrapInfo() HostBootstrapInfo {
+	sys := CollectSystemInfo()
+	hostname := GetSystemHostname()
+	info := HostBootstrapInfo{
+		Hostname:   hostname,
+		IPAddress:  sys.IPAddress,
+		MACAddress: sys.MACAddress,
+	}
+
+	a.mu.Lock()
+	sw := a.currentSwitch
+	a.mu.Unlock()
+
+	if sw != nil {
+		info.VLAN = sw.VLAN
+		info.SwitchName = sw.SwitchName
+		info.SwitchPort = sw.SwitchPort
+	}
+	return info
+}
+
