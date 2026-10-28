@@ -198,6 +198,12 @@ fi
 CURRENT_PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "8085")
 [ -z "$CURRENT_PORT" ] && CURRENT_PORT="8085"
 
+CURRENT_DNS_SERVER=$(grep -E '^DNS_SERVER_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "177.101.22.40")
+[ -z "$CURRENT_DNS_SERVER" ] && CURRENT_DNS_SERVER="177.101.22.40"
+
+CURRENT_DNS_DOMAIN=$(grep -E '^DNS_DOMAIN_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "uepg.br")
+[ -z "$CURRENT_DNS_DOMAIN" ] && CURRENT_DNS_DOMAIN="uepg.br"
+
 CURRENT_PUBLIC_URL=$(grep -E '^PUBLIC_SERVER_URL=' .env 2>/dev/null | cut -d'=' -f2- | tr -d ' "' || true)
 SUGGESTED_PUBLIC_URL="$CURRENT_PUBLIC_URL"
 if [ -z "$SUGGESTED_PUBLIC_URL" ] || [ "$SUGGESTED_PUBLIC_URL" = "http://localhost:8080" ] || [ "$SUGGESTED_PUBLIC_URL" = "http://localhost:8085" ]; then
@@ -213,9 +219,19 @@ if [ "$NON_INTERACTIVE" = false ] && [ -c /dev/tty ]; then
   echo -e "\nInforme a URL Pública ou Domínio de Acesso (ex: ${CYAN}https://akvorado.acon.dev.uepg.br${NC} ou ${CYAN}http://${LOCAL_IP}:${TARGET_PORT}${NC}):"
   read -rp "URL Pública [${SUGGESTED_PUBLIC_URL}]: " USER_URL < /dev/tty
   TARGET_URL="${USER_URL:-$SUGGESTED_PUBLIC_URL}"
+
+  echo -e "\nInforme o IP do Servidor DNS Institucional/Primário [Padrão: ${CYAN}${CURRENT_DNS_SERVER}${NC}]:"
+  read -rp "DNS Server IP [${CURRENT_DNS_SERVER}]: " USER_DNS < /dev/tty
+  TARGET_DNS="${USER_DNS:-$CURRENT_DNS_SERVER}"
+
+  echo -e "\nInforme o Domínio para testes de resolução DNS [Padrão: ${CYAN}${CURRENT_DNS_DOMAIN}${NC}]:"
+  read -rp "Domínio DNS [${CURRENT_DNS_DOMAIN}]: " USER_DOMAIN < /dev/tty
+  TARGET_DOMAIN="${USER_DOMAIN:-$CURRENT_DNS_DOMAIN}"
 else
   TARGET_PORT="$CURRENT_PORT"
   TARGET_URL="$SUGGESTED_PUBLIC_URL"
+  TARGET_DNS="$CURRENT_DNS_SERVER"
+  TARGET_DOMAIN="$CURRENT_DNS_DOMAIN"
 fi
 
 # Garante protocolo http/https na URL pública
@@ -227,6 +243,8 @@ TARGET_URL="${TARGET_URL%/}"
 # Atualiza .env com as definições finais
 sed -i "s|^PORT=.*|PORT=${TARGET_PORT}|g" .env 2>/dev/null || true
 sed -i "s|^PUBLIC_SERVER_URL=.*|PUBLIC_SERVER_URL=${TARGET_URL}|g" .env 2>/dev/null || true
+sed -i "s|^DNS_SERVER_TARGET=.*|DNS_SERVER_TARGET=${TARGET_DNS}|g" .env 2>/dev/null || true
+sed -i "s|^DNS_DOMAIN_TARGET=.*|DNS_DOMAIN_TARGET=${TARGET_DOMAIN}|g" .env 2>/dev/null || true
 
 # Gera Session Secret seguro se ainda estiver o valor de exemplo
 if grep -q "super-secret-session-key-change-in-prod-2026" .env 2>/dev/null; then
@@ -234,7 +252,7 @@ if grep -q "super-secret-session-key-change-in-prod-2026" .env 2>/dev/null; then
   sed -i "s|SESSION_SECRET=super-secret-session-key-change-in-prod-2026|SESSION_SECRET=${NEW_SECRET}|g" .env 2>/dev/null || true
 fi
 
-echo -e "${GREEN}[✓] Configurações salvas: Porta=${CYAN}${TARGET_PORT}${GREEN}, URL=${CYAN}${TARGET_URL}${NC}\n"
+echo -e "${GREEN}[✓] Configurações salvas: Porta=${CYAN}${TARGET_PORT}${GREEN}, URL=${CYAN}${TARGET_URL}${GREEN}, DNS=${CYAN}${TARGET_DNS}${GREEN} (${CYAN}${TARGET_DOMAIN}${GREEN})${NC}\n"
 
 # ==============================================================================
 # 3. PREPARAÇÃO DOS DIRETÓRIOS E PERMISSÕES

@@ -12,6 +12,37 @@ let pendingDeleteNodeId = null;
 let selectedChartNode = 'all';
 let selectedChartGroup = 'all';
 
+// Configurações globais dinâmicas puxadas do .env através da API /api/v1/config
+window.APP_CONFIG = {
+  port: '8085',
+  public_server_url: '',
+  dns_server_target: '177.101.22.40',
+  dns_domain_target: 'uepg.br',
+  dns_server_name: 'DNS Institucional',
+  ping_core_target: '177.101.22.40',
+  ping_core_name: 'Core NTI (Anel)',
+  default_ping_target: 'auto_gateway',
+  speedtest_download_mb: 5,
+  speedtest_upload_mb: 2
+};
+
+async function loadSystemConfig() {
+  try {
+    const res = await fetch('/api/v1/config');
+    if (res.ok) {
+      const data = await res.json();
+      window.APP_CONFIG = { ...window.APP_CONFIG, ...data };
+      const smDnsLabel = document.querySelector('#sm-dns-meta .sm-meta-label');
+      if (smDnsLabel && window.APP_CONFIG.dns_server_name) {
+        smDnsLabel.textContent = `${window.APP_CONFIG.dns_server_name}:`;
+      }
+    }
+  } catch (e) {
+    console.warn('[CONFIG] Usando configurações padrão de ambiente:', e);
+  }
+}
+loadSystemConfig();
+
 // Gerenciamento de Sessão JWT e Fetch Resiliente
 let authToken = '';
 try {
@@ -2710,7 +2741,8 @@ function renderSingleMachineHeaderAndAlert(diagnostic, summaries) {
   if (smDnsMeta && smDnsVal) {
     if (modResults && modResults.multi_dns && modResults.multi_dns.probes && modResults.multi_dns.probes.length > 0) {
       smDnsMeta.style.display = 'inline-flex';
-      const uepgProbe = modResults.multi_dns.probes.find(p => p.server_ip && p.server_ip.startsWith('177.101.22.'));
+      const instDnsIp = (window.APP_CONFIG && window.APP_CONFIG.dns_server_target) || '177.101.22.40';
+      const uepgProbe = modResults.multi_dns.probes.find(p => p.server_ip && (p.server_ip === instDnsIp || p.server_ip.startsWith(instDnsIp)));
       if (uepgProbe && uepgProbe.status === 'success') {
         smDnsVal.textContent = `${uepgProbe.latency_ms.toFixed(1)} ms`;
       } else if (modResults.multi_dns.fastest_server) {
@@ -3262,8 +3294,10 @@ function openPCDetailsModal(s) {
       dnsTbody.innerHTML = mdns.probes.map(probe => {
         const isFastest = (probe.server_ip === fastestIp && probe.status === 'success');
         let providerName = 'Servidor DNS';
-        if (probe.server_ip && probe.server_ip.startsWith('177.101.22.')) {
-          providerName = 'UEPG Institucional';
+        const instDnsIp = (window.APP_CONFIG && window.APP_CONFIG.dns_server_target) || '177.101.22.40';
+        const instDnsName = (window.APP_CONFIG && window.APP_CONFIG.dns_server_name) || 'DNS Institucional';
+        if (probe.server_ip && (probe.server_ip === instDnsIp || probe.server_ip.startsWith(instDnsIp))) {
+          providerName = instDnsName;
         } else if (probe.server_ip === '1.1.1.1' || probe.server_ip === '1.0.0.1') {
           providerName = 'Cloudflare';
         } else if (probe.server_ip === '8.8.8.8' || probe.server_ip === '8.8.4.4') {
@@ -4581,17 +4615,26 @@ function closeMachineMetricsModal() {
 function getAllAvailableModules() {
   const modMap = new Map();
 
-  // 1. Módulos padrão do sistema (garante que nunca venha vazio)
+  // 1. Módulos padrão do sistema (puxados dinamicamente do .env através de window.APP_CONFIG)
+  const instDnsIp = (window.APP_CONFIG && window.APP_CONFIG.dns_server_target) || '177.101.22.40';
+  const instDnsDomain = (window.APP_CONFIG && window.APP_CONFIG.dns_domain_target) || 'uepg.br';
+  const instDnsName = (window.APP_CONFIG && window.APP_CONFIG.dns_server_name) || 'Resolução DNS Institucional';
+  const coreTarget = (window.APP_CONFIG && window.APP_CONFIG.ping_core_target) || '177.101.22.40';
+  const coreName = (window.APP_CONFIG && window.APP_CONFIG.ping_core_name) || 'Latência Core NTI (Anel)';
+  const defaultPing = (window.APP_CONFIG && window.APP_CONFIG.default_ping_target) || 'auto_gateway';
+  const dlMb = (window.APP_CONFIG && window.APP_CONFIG.speedtest_download_mb) || 5;
+  const ulMb = (window.APP_CONFIG && window.APP_CONFIG.speedtest_upload_mb) || 2;
+
   const systemDefaults = [
-    { id: 'ping_gateway', name: 'Latência Gateway Local', type: 'ping', target: 'auto_gateway', timeout_seconds: 15 },
-    { id: 'ping_nti_core', name: 'Latência Core NTI (Anel)', type: 'ping', target: '177.101.22.40', timeout_seconds: 15 },
-    { id: 'packet_loss_gateway', name: 'Perda de Pacotes Gateway', type: 'packet_loss', target: 'auto_gateway', timeout_seconds: 20 },
-    { id: 'dns_uepg', name: 'Resolução DNS Institucional', type: 'dns_lookup', domain: 'uepg.br', timeout_seconds: 10 },
-    { id: 'throughput_download', name: 'Throughput Download ACON', type: 'http_throughput_download', endpoint: '/api/v1/speedtest/download', size_mb: 5, timeout_seconds: 45 },
-    { id: 'throughput_upload', name: 'Throughput Upload ACON', type: 'http_throughput_upload', endpoint: '/api/v1/speedtest/upload', size_mb: 2, timeout_seconds: 45 },
+    { id: 'ping_gateway', name: 'Latência Gateway Local', type: 'ping', target: defaultPing, timeout_seconds: 15 },
+    { id: 'ping_nti_core', name: coreName, type: 'ping', target: coreTarget, timeout_seconds: 15 },
+    { id: 'packet_loss_gateway', name: 'Perda de Pacotes Gateway', type: 'packet_loss', target: defaultPing, timeout_seconds: 20 },
+    { id: 'dns_uepg', name: instDnsName, type: 'dns_lookup', domain: instDnsDomain, timeout_seconds: 10 },
+    { id: 'throughput_download', name: 'Throughput Download', type: 'http_throughput_download', endpoint: '/api/v1/speedtest/download', size_mb: dlMb, timeout_seconds: 45 },
+    { id: 'throughput_upload', name: 'Throughput Upload', type: 'http_throughput_upload', endpoint: '/api/v1/speedtest/upload', size_mb: ulMb, timeout_seconds: 45 },
     { id: 'switch_discovery', name: 'Descoberta de Switch LLDP/CDP', type: 'discovery_protocol', protocol: 'LLDP_CDP', timeout_seconds: 60 },
-    { id: 'ping_central_server', name: 'Ping Servidor Central', type: 'ping', target: 'auto_gateway', timeout_seconds: 10 },
-    { id: 'http_check_portal', name: 'Disponibilidade Portal UEPG', type: 'http_check', endpoint: 'https://www.uepg.br', timeout_seconds: 15 }
+    { id: 'ping_central_server', name: 'Ping Servidor Central', type: 'ping', target: defaultPing, timeout_seconds: 10 },
+    { id: 'http_check_portal', name: 'Disponibilidade Portal Web', type: 'http_check', endpoint: `https://${instDnsDomain}`, timeout_seconds: 15 }
   ];
   systemDefaults.forEach(m => modMap.set(m.id, m));
 
