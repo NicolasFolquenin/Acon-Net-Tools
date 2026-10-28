@@ -1,4 +1,4 @@
-# Probe Agent (Client Desktop Wails v2 - Windows)
+# UEPG-Net-Tools (Client Desktop Wails v2 - Windows)
 
 Agente de monitoramento contínuo de throughput e latência de rede desenvolvido em **Go 1.22+** e **Wails v2**, projetado para rodar em mini PCs e servidores locais no Windows.
 
@@ -47,21 +47,33 @@ O arquivo `config.json` fica no mesmo diretório do executável:
 
 ---
 
-## 🛠️ Como Executar
+## 🛠️ Como Executar e Testar
 
-### Modo Desenvolvimento (Live Reload)
-```powershell
-cd client-probe
-wails dev
-```
+### 1. Teste Rápido com Live Reload (Sem Reinstalar)
+Para testar alterações na hora sem precisar recompilar ou reinstalar:
+- **Pelo Windows Explorer:** Basta dar duplo clique no script `testar.bat`.
+- **Ou pelo Terminal:**
+  ```powershell
+  cd client-probe
+  wails dev
+  ```
+> 💡 **Live Reload:** Qualquer alteração salva nos arquivos `frontend/` (HTML, CSS, JS) atualiza instantaneamente na janela do aplicativo aberto, sem precisar fechar nem reinstalar.
 
-### Compilação do Executável Windows (`.exe`)
-```powershell
-cd client-probe
-wails build -clean -platform windows/amd64
-```
-O executável final estará disponível em:
-`client-probe/build/bin/probe-app.exe`
+---
+
+### 2. Gerar Executável ou Instalador Oficial Windows (`.exe`)
+
+- **Com 1 clique:** Dê duplo clique em `gerar-instalador.bat`.
+- **Ou pelo Terminal:**
+  ```powershell
+  # Apenas o executável portátil:
+  wails build -clean -platform windows/amd64
+
+  # Instalador Oficial Windows (Setup .exe com assistente e atalhos):
+  wails build -clean -platform windows/amd64 -nsis
+  ```
+> 📌 *Dica para o Instalador Oficial:* Para gerar o instalador com assistente (.exe instalável), certifique-se de ter o NSIS instalado (`winget install NSIS.NSIS`).
+> Os arquivos finais ficam na pasta `client-probe/build/bin/`.
 
 ---
 

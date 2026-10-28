@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -45,10 +46,26 @@ func LoadEnvFile(filename string) {
 	}
 }
 
+// GetSystemHostname obtém e força estritamente o hostname do computador real.
+// Impede qualquer alteração manual pelo usuário, arquivo de configuração ou variáveis de ambiente.
+func GetSystemHostname() string {
+	if h, err := os.Hostname(); err == nil && strings.TrimSpace(h) != "" {
+		return strings.TrimSpace(h)
+	}
+	if h := os.Getenv("COMPUTERNAME"); strings.TrimSpace(h) != "" {
+		return strings.TrimSpace(h)
+	}
+	if h := os.Getenv("HOSTNAME"); strings.TrimSpace(h) != "" {
+		return strings.TrimSpace(h)
+	}
+	return "pc-windows"
+}
+
 // LoadConfig carrega as configurações com a seguinte prioridade:
 // 1. Variáveis de ambiente (ou arquivo .env)
 // 2. Arquivo config.json (se existir)
 // 3. Valores padrão
+// NOTA: O NodeID é SEMPRE forçado para o hostname real do computador.
 func LoadConfig(customPath string) (*Config, error) {
 	configMu.Lock()
 	defer configMu.Unlock()
@@ -73,17 +90,18 @@ func LoadConfig(customPath string) (*Config, error) {
 	cfg := &Config{
 		IntervalMinutes: 60,
 		PingTarget:      "1.1.1.1",
+		SyncWithCentral: true,
 	}
 
 	// 1. Tenta carregar do config.json se ele existir
+	var rawData map[string]interface{}
 	if data, err := os.ReadFile(targetPath); err == nil {
 		_ = json.Unmarshal(data, cfg)
+		_ = json.Unmarshal(data, &rawData)
 	}
 
 	// 2. Sobrescreve com variáveis do .env / Ambiente (têm prioridade)
-	if v := os.Getenv("PROBE_NODE_ID"); v != "" {
-		cfg.NodeID = v
-	}
+	// PROBE_NODE_ID é ignorado intencionalmente para garantir integridade do hostname
 	if v := os.Getenv("PROBE_LOCATION"); v != "" {
 		cfg.Location = v
 	}
@@ -101,15 +119,23 @@ func LoadConfig(customPath string) (*Config, error) {
 			cfg.IntervalMinutes = intVal
 		}
 	}
-
-	// Fallbacks finais caso nem config.json nem .env tenham preenchido
-	if cfg.NodeID == "" {
-		if hostname, _ := os.Hostname(); hostname != "" {
-			cfg.NodeID = hostname
+	if v := os.Getenv("PROBE_SYNC_WITH_CENTRAL"); v != "" {
+		cfg.SyncWithCentral = (v == "true" || v == "1" || v == "yes")
+	} else if cfg.ServerURL != "" && cfg.ServerURL != "none" && rawData != nil {
+		if val, exists := rawData["sync_with_central"]; exists {
+			if b, ok := val.(bool); ok {
+				cfg.SyncWithCentral = b
+			}
 		} else {
-			cfg.NodeID = "meu-pc-windows"
+			cfg.SyncWithCentral = true
 		}
+	} else if cfg.ServerURL != "" && cfg.ServerURL != "none" {
+		cfg.SyncWithCentral = true
 	}
+
+	// 3. Força ESTRITAMENTE o Hostname real do SO como NodeID (não pode mais ser alterado)
+	cfg.NodeID = GetSystemHostname()
+
 	if cfg.Location == "" {
 		cfg.Location = "Escritorio-Local"
 	}
@@ -133,8 +159,8 @@ func LoadConfig(customPath string) (*Config, error) {
 	}
 
 	appConfig = cfg
-	log.Printf("[CONFIG] Configurações ativas: NodeID=%s, Location=%s, Server=%s, Interval=%dm, Ping=%s",
-		cfg.NodeID, cfg.Location, cfg.ServerURL, cfg.IntervalMinutes, cfg.PingTarget)
+	log.Printf("[CONFIG] Configurações ativas: NodeID=%s (Hostname Fixo), Location=%s, Server=%s, Interval=%dm, SyncCentral=%v, Ping=%s",
+		cfg.NodeID, cfg.Location, cfg.ServerURL, cfg.IntervalMinutes, cfg.SyncWithCentral, cfg.PingTarget)
 
 	return appConfig, nil
 }
@@ -143,23 +169,30 @@ func LoadConfig(customPath string) (*Config, error) {
 func GetCurrentConfig() Config {
 	configMu.RLock()
 	defer configMu.RUnlock()
+	hostname := GetSystemHostname()
 	if appConfig == nil {
 		return Config{
-			NodeID:          "meu-pc-windows",
+			NodeID:          hostname,
 			Location:        "Escritorio-Local",
 			ServerURL:       "http://localhost:8090",
 			APIToken:        "super-secret-probe-token-2026",
 			IntervalMinutes: 60,
 			PingTarget:      "1.1.1.1",
+			SyncWithCentral: true,
 		}
 	}
-	return *appConfig
+	cfg := *appConfig
+	cfg.NodeID = hostname
+	return cfg
 }
 
 // SaveConfig atualiza o arquivo config.json e o arquivo .env
 func SaveConfig(cfg Config) error {
 	configMu.Lock()
 	defer configMu.Unlock()
+
+	// Preserva estritamente o hostname real da máquina (NodeID não pode ser alterado por ninguém)
+	cfg.NodeID = GetSystemHostname()
 
 	// 1. Atualiza config.json
 	data, err := json.MarshalIndent(cfg, "", "  ")
@@ -184,6 +217,7 @@ func SaveConfig(cfg Config) error {
 		"PROBE_SERVER_URL=" + cfg.ServerURL,
 		"PROBE_API_TOKEN=" + cfg.APIToken,
 		"PROBE_INTERVAL_MINUTES=" + strconv.Itoa(cfg.IntervalMinutes),
+		"PROBE_SYNC_WITH_CENTRAL=" + strconv.FormatBool(cfg.SyncWithCentral),
 		"PROBE_PING_TARGET=" + cfg.PingTarget,
 		"",
 	}, "\n")
@@ -197,4 +231,19 @@ func SaveConfig(cfg Config) error {
 	appConfig = &cfg
 	log.Printf("[CONFIG] Configurações e .env atualizados com sucesso")
 	return nil
+}
+
+// getNextSyncSlot calcula o próximo horário fixo (:00 ou :30) do relógio de parede
+func getNextSyncSlot(now time.Time) time.Time {
+	var target time.Time
+	if now.Minute() < 30 {
+		target = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 30, 0, 0, now.Location())
+	} else {
+		nextHour := now.Add(1 * time.Hour)
+		target = time.Date(nextHour.Year(), nextHour.Month(), nextHour.Day(), nextHour.Hour(), 0, 0, 0, now.Location())
+	}
+	if !target.After(now) {
+		target = target.Add(30 * time.Minute)
+	}
+	return target
 }

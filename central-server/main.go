@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -41,13 +42,28 @@ func main() {
 
 	// 3. Inicializa Handlers
 	metricsHandler := handlers.NewMetricsHandler(mongoClient, cfg)
-	authHandler := handlers.NewAuthHandler(cfg)
+	authHandler := handlers.NewAuthHandler(cfg, mongoClient)
+	oidcHandler := handlers.NewOIDCHandler(cfg, authHandler, mongoClient)
+	profileHandler := handlers.NewProfileHandler(cfg)
+	machineProfileHandler := handlers.NewMachineProfileHandler(cfg, mongoClient)
+	groupsHandler := handlers.NewGroupsHandler(mongoClient, cfg)
+	modulesHandler := handlers.NewModulesHandler(cfg, mongoClient)
+	pingHandler := handlers.NewPingHandler(mongoClient)
+	downloadHandler := handlers.NewDownloadHandler(cfg)
 
 	mux := http.NewServeMux()
 
-	// Rota estática GET / serve a pasta ./public
+	// Rota estática GET / serve a pasta ./public com headers no-cache para assets dinâmicos
 	fileServer := http.FileServer(http.Dir(cfg.StaticDir))
-	mux.Handle("/", fileServer)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if path == "/" || strings.HasSuffix(path, ".html") || strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".css") {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 
 	// Health check
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +79,52 @@ func main() {
 	mux.HandleFunc("/api/v1/auth/login", authHandler.Login)
 	mux.HandleFunc("/api/v1/auth/logout", authHandler.Logout)
 	mux.HandleFunc("/api/v1/auth/me", authHandler.Me)
+
+	// Endpoints de Autenticação Institucional (OpenID Connect / Keycloak)
+	mux.HandleFunc("/api/v1/auth/oidc/config", oidcHandler.ConfigHandler)
+	mux.HandleFunc("/api/v1/auth/oidc/login", oidcHandler.LoginHandler)
+	mux.HandleFunc("/api/v1/auth/oidc/callback", oidcHandler.CallbackHandler)
+
+	// Download público do Instalador / Executável da Sonda Client
+	mux.HandleFunc("/api/v1/download/client", downloadHandler.HandleDownloadClient)
+	mux.HandleFunc("/api/v1/download/client/info", downloadHandler.HandleClientInfo)
+	mux.HandleFunc("/api/v1/download/version", downloadHandler.HandleVersionInfo)
+	mux.HandleFunc("/api/v1/download/binary/", downloadHandler.HandleDownloadBinary)
+	mux.HandleFunc("/download/client", downloadHandler.HandleDownloadClient)
+	mux.HandleFunc("/downloads/install-probe.sh", downloadHandler.HandleInstallScript)
+
+	// Endpoints de Gerenciamento de Usuários (Apenas Administrador)
+	mux.HandleFunc("/api/v1/users", authHandler.RequireAdmin(authHandler.HandleUsers))
+
+	// Endpoints de Perfil Dinâmico de Medição das Sondas
+	// 1. GET /api/v1/probes/profile/{hostname} -> perfil individual por máquina
+	// 2. GET /api/v1/probes/profile -> perfil legado global
+	// 3. PUT /api/v1/probes/profile -> atualização do perfil global pelo admin
+	mux.HandleFunc("/api/v1/probes/profile/", machineProfileHandler.HandleGetProfileByHostname)
+	mux.HandleFunc("/api/v1/probes/profile", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			authHandler.RequireAdmin(profileHandler.UpdateProfile)(w, r)
+			return
+		}
+		profileHandler.GetProfile(w, r)
+	})
+
+	// Auto-registro de novas sondas (quando 404 no perfil)
+	mux.HandleFunc("/api/v1/probes/register", handlers.RequireBearerToken(cfg.APIToken, machineProfileHandler.HandleRegisterProbe))
+
+	// Endpoints Administrativos para Máquinas, Grupos e Módulos
+	mux.HandleFunc("/api/v1/admin/machines", authHandler.RequireAdmin(machineProfileHandler.HandleAdminMachines))
+	mux.HandleFunc("/api/v1/admin/machines/", authHandler.RequireAdmin(machineProfileHandler.HandleAdminMachines))
+	mux.HandleFunc("/api/v1/admin/groups", authHandler.RequireAdmin(machineProfileHandler.HandleAdminGroups))
+	mux.HandleFunc("/api/v1/admin/groups/", authHandler.RequireAdmin(machineProfileHandler.HandleAdminGroups))
+	mux.HandleFunc("/api/v1/admin/modules", authHandler.RequireAdmin(modulesHandler.HandleModules))
+	mux.HandleFunc("/api/v1/admin/modules/", authHandler.RequireAdmin(modulesHandler.HandleModules))
+	mux.HandleFunc("/api/v1/admin/ping", authHandler.RequireAdmin(pingHandler.AdminPing))
+
+	// Endpoints de Grupos de Testes e VLANs (compatibilidade com dashboard e sondas legadas)
+	mux.HandleFunc("/api/v1/config/probe", handlers.RequireBearerToken(cfg.APIToken, groupsHandler.GetProbeConfig))
+	mux.HandleFunc("/api/v1/groups", authHandler.RequireAdmin(groupsHandler.HandleGroups))
+	mux.HandleFunc("/api/v1/groups/", authHandler.RequireAdmin(groupsHandler.HandleGroups))
 
 	// Endpoints da API oficial
 	// POST /api/v1/metrics protegido por Bearer Token

@@ -1,7 +1,7 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "probe-app",
-  "outputfilename": "probe-app",
+  "name": "uepg-net-tools",
+  "outputfilename": "uepg-net-tools",
   "frontend:dir": "frontend",
   "frontend:install": "",
   "frontend:build": "",
@@ -12,10 +12,10 @@
     "email": "noc@empresa.com"
   },
   "info": {
-    "companyName": "Network Monitoring Inc",
-    "productName": "Distributed Probe Agent",
+    "companyName": "UEPG Conectividade",
+    "productName": "UEPG-Net-Tools",
     "productVersion": "1.0.0",
     "copyright": "Copyright 2026",
-    "comments": "Agente de monitoramento de latência e throughput"
+    "comments": "Agente de monitoramento de latência e throughput UEPG-Net-Tools"
   }
 }
