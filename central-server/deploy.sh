@@ -198,11 +198,11 @@ fi
 CURRENT_PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "8085")
 [ -z "$CURRENT_PORT" ] && CURRENT_PORT="8085"
 
-CURRENT_DNS_SERVER=$(grep -E '^DNS_SERVER_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "177.101.22.40")
-[ -z "$CURRENT_DNS_SERVER" ] && CURRENT_DNS_SERVER="177.101.22.40"
+CURRENT_DNS_SERVER=$(grep -E '^DNS_SERVER_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "1.1.1.1")
+[ -z "$CURRENT_DNS_SERVER" ] && CURRENT_DNS_SERVER="1.1.1.1"
 
-CURRENT_DNS_DOMAIN=$(grep -E '^DNS_DOMAIN_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "uepg.br")
-[ -z "$CURRENT_DNS_DOMAIN" ] && CURRENT_DNS_DOMAIN="uepg.br"
+CURRENT_DNS_DOMAIN=$(grep -E '^DNS_DOMAIN_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "google.com")
+[ -z "$CURRENT_DNS_DOMAIN" ] && CURRENT_DNS_DOMAIN="google.com"
 
 CURRENT_PUBLIC_URL=$(grep -E '^PUBLIC_SERVER_URL=' .env 2>/dev/null | cut -d'=' -f2- | tr -d ' "' || true)
 SUGGESTED_PUBLIC_URL="$CURRENT_PUBLIC_URL"
@@ -216,7 +216,7 @@ if [ "$NON_INTERACTIVE" = false ] && [ -c /dev/tty ]; then
   read -rp "Porta [${CURRENT_PORT}]: " USER_PORT < /dev/tty
   TARGET_PORT="${USER_PORT:-$CURRENT_PORT}"
 
-  echo -e "\nInforme a URL Pública ou Domínio de Acesso (ex: ${CYAN}https://akvorado.acon.dev.uepg.br${NC} ou ${CYAN}http://${LOCAL_IP}:${TARGET_PORT}${NC}):"
+  echo -e "\nInforme a URL Pública ou Domínio de Acesso (ex: ${CYAN}https://net-tools.suaempresa.com.br${NC} ou ${CYAN}http://${LOCAL_IP}:${TARGET_PORT}${NC}):"
   read -rp "URL Pública [${SUGGESTED_PUBLIC_URL}]: " USER_URL < /dev/tty
   TARGET_URL="${USER_URL:-$SUGGESTED_PUBLIC_URL}"
 
