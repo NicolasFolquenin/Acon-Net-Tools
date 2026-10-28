@@ -109,7 +109,7 @@ Todas as variáveis do sistema são configuráveis centralizadamente pelo arquiv
 ```ini
 # Porta e Endereço de Acesso
 PORT=8085
-PUBLIC_SERVER_URL=https://akvorado.acon.dev.uepg.br
+PUBLIC_SERVER_URL=https://net-tools.suaempresa.com.br
 
 # Banco de Dados MongoDB
 MONGO_URI=mongodb://mongo:27017
@@ -120,11 +120,11 @@ STATIC_DIR=/app/public
 QUERY_HOURS_LIMIT=24
 
 # 🌐 Alvos de Medição, Rede e DNS (Customizáveis para qualquer instituição/empresa)
-DNS_SERVER_TARGET=177.101.22.40               # IP do servidor DNS principal (ex: 8.8.8.8, 1.1.1.1)
-DNS_DOMAIN_TARGET=uepg.br                     # Domínio para resolução de teste (ex: google.com, suaempresa.com)
-DNS_SERVER_NAME=DNS Institucional             # Nome exibido no Dashboard e relatórios
-PING_CORE_TARGET=177.101.22.40                # IP ou Hostname do roteador central/backbone
-PING_CORE_NAME=Core NTI (Anel)                # Rótulo da métrica do Core
+DNS_SERVER_TARGET=1.1.1.1                     # IP do servidor DNS principal (ex: 1.1.1.1, 8.8.8.8)
+DNS_DOMAIN_TARGET=google.com                  # Domínio para resolução de teste (ex: google.com, suaempresa.com)
+DNS_SERVER_NAME=DNS Primário                  # Nome exibido no Dashboard e relatórios
+PING_CORE_TARGET=1.1.1.1                      # IP ou Hostname do roteador central/backbone
+PING_CORE_NAME=Roteador Central (Core)        # Rótulo da métrica do Core
 DEFAULT_PING_TARGET=auto_gateway              # Alvo de ping local ('auto_gateway' detecta o gateway do nó)
 SPEEDTEST_DOWNLOAD_MB=5                       # Volume do teste de throughput de download (MB)
 SPEEDTEST_UPLOAD_MB=2                         # Volume do teste de throughput de upload (MB)
@@ -138,10 +138,10 @@ SESSION_SECRET=super-secret-session-key-change-in-prod-2026
 
 # Autenticação SSO (Opcional - Keycloak)
 OIDC_ENABLED=false
-OIDC_ISSUER_URL=https://sso.acon.dev.uepg.br/realms/uepg
+OIDC_ISSUER_URL=https://sso.suaempresa.com.br/realms/instituicao
 OIDC_CLIENT_ID=net-tools
 OIDC_CLIENT_SECRET=sua-chave-secreta
-OIDC_REDIRECT_URL=https://akvorado.acon.dev.uepg.br/api/v1/auth/oidc/callback
+OIDC_REDIRECT_URL=https://net-tools.suaempresa.com.br/api/v1/auth/oidc/callback
 ```
 
 ---
