@@ -53,9 +53,9 @@ ENV PORT=8080 \
     API_TOKEN=super-secret-probe-token-2026 \
     STATIC_DIR=/app/public
 
-EXPOSE 8080
+EXPOSE 8080 8085
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8085}/health || curl -f http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["/app/central-server"]
