@@ -11,7 +11,7 @@ services:
     env_file:
       - .env
     environment:
-      - PORT=${PORT:-8080}
+      - PORT=${PORT:-8085}
       - MONGO_URI=${MONGO_URI:-mongodb://mongo:27017}
       - MONGO_DB=${MONGO_DB:-network_central}
       - MONGO_COLLECTION=${MONGO_COLLECTION:-metrics}
