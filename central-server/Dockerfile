@@ -27,6 +27,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -34,12 +35,13 @@ WORKDIR /app
 # Cria usuário não-root por segurança
 RUN useradd -u 1001 -r -s /bin/false appuser
 
-# Copia o executável e a pasta de frontend estático
+# Copia o executável, frontend estático e configurações padrão
 COPY --from=builder /app/central-server /app/central-server
 COPY --from=builder /app/public /app/public
+COPY --from=builder /app/config /app/config
 
 # Ajusta permissões
-RUN chown -R appuser:appuser /app
+RUN mkdir -p /app/config/machines && chown -R appuser:appuser /app
 
 USER appuser
 
@@ -51,9 +53,9 @@ ENV PORT=8080 \
     API_TOKEN=super-secret-probe-token-2026 \
     STATIC_DIR=/app/public
 
-EXPOSE 8080
+EXPOSE 8080 8085
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8085}/health || curl -f http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["/app/central-server"]

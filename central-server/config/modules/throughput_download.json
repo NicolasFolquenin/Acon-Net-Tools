@@ -1,0 +1,9 @@
+{
+  "id": "throughput_download",
+  "type": "http_throughput_download",
+  "name": "Throughput Download ACON",
+  "enabled": true,
+  "endpoint": "/api/v1/speedtest/download",
+  "size_mb": 5,
+  "timeout_seconds": 45
+}

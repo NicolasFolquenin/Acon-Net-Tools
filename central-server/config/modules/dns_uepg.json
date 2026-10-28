@@ -1,0 +1,9 @@
+{
+  "id": "dns_uepg",
+  "type": "dns_lookup",
+  "name": "Resolução DNS Institucional",
+  "enabled": true,
+  "domain": "uepg.br",
+  "timeout_ms": 2000,
+  "timeout_seconds": 10
+}

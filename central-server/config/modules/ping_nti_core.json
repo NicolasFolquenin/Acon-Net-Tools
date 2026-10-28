@@ -1,0 +1,10 @@
+{
+  "id": "ping_nti_core",
+  "type": "ping",
+  "name": "Latência Core NTI (Anel)",
+  "enabled": true,
+  "target": "177.101.22.40",
+  "count": 3,
+  "timeout_ms": 1000,
+  "timeout_seconds": 15
+}

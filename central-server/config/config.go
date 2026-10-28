@@ -22,6 +22,13 @@ type AppConfig struct {
 	ViewerUser      string
 	ViewerPass      string
 	SessionSecret   string
+	OIDCEnabled      bool
+	OIDCIssuerURL    string
+	OIDCClientID     string
+	OIDCClientSecret string
+	OIDCRedirectURL  string
+	OIDCAdminGroup   string
+	PublicServerURL  string
 }
 
 // LoadEnvFile faz o parse de um arquivo .env simples (chave=valor) sem dependências externas
@@ -64,22 +71,29 @@ func LoadConfig() *AppConfig {
 	}
 
 	cfg := &AppConfig{
-		Port:            getEnv("PORT", "8080"),
-		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017"),
-		DatabaseName:    getEnv("MONGO_DB", "network_central"),
-		CollectionName:  getEnv("MONGO_COLLECTION", "metrics"),
-		APIToken:        getEnv("API_TOKEN", "super-secret-probe-token-2026"),
-		StaticDir:       staticDir,
-		QueryHoursLimit: getEnvAsInt("QUERY_HOURS_LIMIT", 24),
-		AdminUser:       getEnv("AUTH_ADMIN_USER", "admin"),
-		AdminPass:       getEnv("AUTH_ADMIN_PASSWORD", "admin123"),
-		ViewerUser:      getEnv("AUTH_VIEWER_USER", "operador"),
-		ViewerPass:      getEnv("AUTH_VIEWER_PASSWORD", "operador123"),
-		SessionSecret:   getEnv("SESSION_SECRET", "super-secret-session-key-change-in-prod-2026"),
+		Port:             getEnv("PORT", "8080"),
+		MongoURI:         getEnv("MONGO_URI", "mongodb://localhost:27017"),
+		DatabaseName:     getEnv("MONGO_DB", "network_central"),
+		CollectionName:   getEnv("MONGO_COLLECTION", "metrics"),
+		APIToken:         getEnv("API_TOKEN", "super-secret-probe-token-2026"),
+		StaticDir:        staticDir,
+		QueryHoursLimit:  getEnvAsInt("QUERY_HOURS_LIMIT", 24),
+		AdminUser:        getEnv("AUTH_ADMIN_USER", "admin"),
+		AdminPass:        getEnv("AUTH_ADMIN_PASSWORD", "admin123"),
+		ViewerUser:       getEnv("AUTH_VIEWER_USER", "operador"),
+		ViewerPass:       getEnv("AUTH_VIEWER_PASSWORD", "operador123"),
+		SessionSecret:    getEnv("SESSION_SECRET", "super-secret-session-key-change-in-prod-2026"),
+		OIDCEnabled:      getEnvAsBool("OIDC_ENABLED", false),
+		OIDCIssuerURL:    strings.TrimSuffix(getEnv("OIDC_ISSUER_URL", ""), "/"),
+		OIDCClientID:     getEnv("OIDC_CLIENT_ID", ""),
+		OIDCClientSecret: getEnv("OIDC_CLIENT_SECRET", ""),
+		OIDCRedirectURL:  getEnv("OIDC_REDIRECT_URL", ""),
+		OIDCAdminGroup:   getEnv("OIDC_ADMIN_GROUP", "noc-admins"),
+		PublicServerURL:  strings.TrimSuffix(getEnv("PUBLIC_SERVER_URL", getEnv("SERVER_EXTERNAL_URL", "")), "/"),
 	}
 
-	log.Printf("[CONFIG] Servidor configurado: Port=%s, MongoURI=%s, DB=%s, Collection=%s",
-		cfg.Port, cfg.MongoURI, cfg.DatabaseName, cfg.CollectionName)
+	log.Printf("[CONFIG] Servidor configurado: Port=%s, MongoURI=%s, DB=%s, Collection=%s, OIDC=%t",
+		cfg.Port, cfg.MongoURI, cfg.DatabaseName, cfg.CollectionName, cfg.OIDCEnabled)
 	return cfg
 }
 
@@ -95,6 +109,14 @@ func getEnvAsInt(key string, defaultVal int) int {
 		if intVal, err := strconv.Atoi(val); err == nil {
 			return intVal
 		}
+	}
+	return defaultVal
+}
+
+func getEnvAsBool(key string, defaultVal bool) bool {
+	if val := os.Getenv(key); val != "" {
+		lower := strings.ToLower(strings.TrimSpace(val))
+		return lower == "true" || lower == "1" || lower == "yes" || lower == "sim"
 	}
 	return defaultVal
 }
