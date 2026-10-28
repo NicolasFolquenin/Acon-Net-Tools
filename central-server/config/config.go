@@ -10,25 +10,43 @@ import (
 
 // AppConfig armazena as configurações do Servidor Central
 type AppConfig struct {
-	Port            string
-	MongoURI        string
-	DatabaseName    string
-	CollectionName  string
-	APIToken        string
-	StaticDir       string
-	QueryHoursLimit int
-	AdminUser       string
-	AdminPass       string
-	ViewerUser      string
-	ViewerPass      string
-	SessionSecret   string
-	OIDCEnabled      bool
-	OIDCIssuerURL    string
-	OIDCClientID     string
-	OIDCClientSecret string
-	OIDCRedirectURL  string
-	OIDCAdminGroup   string
-	PublicServerURL  string
+	Port                string `json:"port"`
+	MongoURI            string `json:"-"`
+	DatabaseName        string `json:"-"`
+	CollectionName      string `json:"-"`
+	APIToken            string `json:"-"`
+	StaticDir           string `json:"-"`
+	QueryHoursLimit     int    `json:"query_hours_limit"`
+	AdminUser           string `json:"-"`
+	AdminPass           string `json:"-"`
+	ViewerUser          string `json:"-"`
+	ViewerPass          string `json:"-"`
+	SessionSecret       string `json:"-"`
+	OIDCEnabled         bool   `json:"oidc_enabled"`
+	OIDCIssuerURL       string `json:"oidc_issuer_url,omitempty"`
+	OIDCClientID        string `json:"oidc_client_id,omitempty"`
+	OIDCClientSecret    string `json:"-"`
+	OIDCRedirectURL     string `json:"oidc_redirect_url,omitempty"`
+	OIDCAdminGroup      string `json:"oidc_admin_group,omitempty"`
+	PublicServerURL     string `json:"public_server_url"`
+	DNSServerTarget     string `json:"dns_server_target"`
+	DNSDomainTarget     string `json:"dns_domain_target"`
+	DNSServerName       string `json:"dns_server_name"`
+	PingCoreTarget      string `json:"ping_core_target"`
+	PingCoreName        string `json:"ping_core_name"`
+	DefaultPingTarget   string `json:"default_ping_target"`
+	SpeedtestDownloadMB int    `json:"speedtest_download_mb"`
+	SpeedtestUploadMB   int    `json:"speedtest_upload_mb"`
+}
+
+var currentConfig *AppConfig
+
+// GetConfig retorna a instância ativa da configuração carregada ou carrega se nulo
+func GetConfig() *AppConfig {
+	if currentConfig == nil {
+		return LoadConfig()
+	}
+	return currentConfig
 }
 
 // LoadEnvFile faz o parse de um arquivo .env simples (chave=valor) sem dependências externas
@@ -71,29 +89,39 @@ func LoadConfig() *AppConfig {
 	}
 
 	cfg := &AppConfig{
-		Port:             getEnv("PORT", "8080"),
-		MongoURI:         getEnv("MONGO_URI", "mongodb://localhost:27017"),
-		DatabaseName:     getEnv("MONGO_DB", "network_central"),
-		CollectionName:   getEnv("MONGO_COLLECTION", "metrics"),
-		APIToken:         getEnv("API_TOKEN", "super-secret-probe-token-2026"),
-		StaticDir:        staticDir,
-		QueryHoursLimit:  getEnvAsInt("QUERY_HOURS_LIMIT", 24),
-		AdminUser:        getEnv("AUTH_ADMIN_USER", "admin"),
-		AdminPass:        getEnv("AUTH_ADMIN_PASSWORD", "admin123"),
-		ViewerUser:       getEnv("AUTH_VIEWER_USER", "operador"),
-		ViewerPass:       getEnv("AUTH_VIEWER_PASSWORD", "operador123"),
-		SessionSecret:    getEnv("SESSION_SECRET", "super-secret-session-key-change-in-prod-2026"),
-		OIDCEnabled:      getEnvAsBool("OIDC_ENABLED", false),
-		OIDCIssuerURL:    strings.TrimSuffix(getEnv("OIDC_ISSUER_URL", ""), "/"),
-		OIDCClientID:     getEnv("OIDC_CLIENT_ID", ""),
-		OIDCClientSecret: getEnv("OIDC_CLIENT_SECRET", ""),
-		OIDCRedirectURL:  getEnv("OIDC_REDIRECT_URL", ""),
-		OIDCAdminGroup:   getEnv("OIDC_ADMIN_GROUP", "noc-admins"),
-		PublicServerURL:  strings.TrimSuffix(getEnv("PUBLIC_SERVER_URL", getEnv("SERVER_EXTERNAL_URL", "")), "/"),
+		Port:                getEnv("PORT", "8085"),
+		MongoURI:            getEnv("MONGO_URI", "mongodb://localhost:27017"),
+		DatabaseName:        getEnv("MONGO_DB", "network_central"),
+		CollectionName:      getEnv("MONGO_COLLECTION", "metrics"),
+		APIToken:            getEnv("API_TOKEN", "super-secret-probe-token-2026"),
+		StaticDir:           staticDir,
+		QueryHoursLimit:     getEnvAsInt("QUERY_HOURS_LIMIT", 24),
+		AdminUser:           getEnv("AUTH_ADMIN_USER", "admin"),
+		AdminPass:           getEnv("AUTH_ADMIN_PASSWORD", "admin123"),
+		ViewerUser:          getEnv("AUTH_VIEWER_USER", "operador"),
+		ViewerPass:          getEnv("AUTH_VIEWER_PASSWORD", "operador123"),
+		SessionSecret:       getEnv("SESSION_SECRET", "super-secret-session-key-change-in-prod-2026"),
+		OIDCEnabled:         getEnvAsBool("OIDC_ENABLED", false),
+		OIDCIssuerURL:       strings.TrimSuffix(getEnv("OIDC_ISSUER_URL", ""), "/"),
+		OIDCClientID:        getEnv("OIDC_CLIENT_ID", ""),
+		OIDCClientSecret:    getEnv("OIDC_CLIENT_SECRET", ""),
+		OIDCRedirectURL:     getEnv("OIDC_REDIRECT_URL", ""),
+		OIDCAdminGroup:      getEnv("OIDC_ADMIN_GROUP", "noc-admins"),
+		PublicServerURL:     strings.TrimSuffix(getEnv("PUBLIC_SERVER_URL", getEnv("SERVER_EXTERNAL_URL", "")), "/"),
+		DNSServerTarget:     getEnv("DNS_SERVER_TARGET", "177.101.22.40"),
+		DNSDomainTarget:     getEnv("DNS_DOMAIN_TARGET", "uepg.br"),
+		DNSServerName:       getEnv("DNS_SERVER_NAME", "Resolução DNS Institucional"),
+		PingCoreTarget:      getEnv("PING_CORE_TARGET", "177.101.22.40"),
+		PingCoreName:        getEnv("PING_CORE_NAME", "Latência Core NTI (Anel)"),
+		DefaultPingTarget:   getEnv("DEFAULT_PING_TARGET", "auto_gateway"),
+		SpeedtestDownloadMB: getEnvAsInt("SPEEDTEST_DOWNLOAD_MB", 5),
+		SpeedtestUploadMB:   getEnvAsInt("SPEEDTEST_UPLOAD_MB", 2),
 	}
 
-	log.Printf("[CONFIG] Servidor configurado: Port=%s, MongoURI=%s, DB=%s, Collection=%s, OIDC=%t",
-		cfg.Port, cfg.MongoURI, cfg.DatabaseName, cfg.CollectionName, cfg.OIDCEnabled)
+	currentConfig = cfg
+
+	log.Printf("[CONFIG] Servidor configurado: Port=%s, MongoURI=%s, DB=%s, DNS_Server=%s, DNS_Domain=%s, Core_Target=%s",
+		cfg.Port, cfg.MongoURI, cfg.DatabaseName, cfg.DNSServerTarget, cfg.DNSDomainTarget, cfg.PingCoreTarget)
 	return cfg
 }
 

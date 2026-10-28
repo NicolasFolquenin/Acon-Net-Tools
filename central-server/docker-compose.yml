@@ -24,6 +24,14 @@ services:
       - AUTH_VIEWER_PASSWORD=${AUTH_VIEWER_PASSWORD:-operador123}
       - SESSION_SECRET=${SESSION_SECRET:-super-secret-session-key-change-in-prod-2026}
       - PUBLIC_SERVER_URL=${PUBLIC_SERVER_URL:-}
+      - DNS_SERVER_TARGET=${DNS_SERVER_TARGET:-177.101.22.40}
+      - DNS_DOMAIN_TARGET=${DNS_DOMAIN_TARGET:-uepg.br}
+      - DNS_SERVER_NAME=${DNS_SERVER_NAME:-DNS Institucional}
+      - PING_CORE_TARGET=${PING_CORE_TARGET:-177.101.22.40}
+      - PING_CORE_NAME=${PING_CORE_NAME:-Core NTI (Anel)}
+      - DEFAULT_PING_TARGET=${DEFAULT_PING_TARGET:-auto_gateway}
+      - SPEEDTEST_DOWNLOAD_MB=${SPEEDTEST_DOWNLOAD_MB:-5}
+      - SPEEDTEST_UPLOAD_MB=${SPEEDTEST_UPLOAD_MB:-2}
     volumes:
       - ./public:/app/public:ro
       - ./config:/app/config

@@ -211,47 +211,61 @@ func (pm *ProfileManager) saveToDisk(prof *MeasurementProfile) {
 
 // GetBuiltinFallback entrega perfil seguro se nem rede nem disco responderem
 func (pm *ProfileManager) GetBuiltinFallback() *MeasurementProfile {
+	dnsServer := os.Getenv("PROBE_DNS_SERVER")
+	if dnsServer == "" {
+		dnsServer = "1.1.1.1"
+	}
+	dnsDomain := os.Getenv("PROBE_DNS_DOMAIN")
+	if dnsDomain == "" {
+		dnsDomain = "google.com"
+	}
+	pingTarget := os.Getenv("PROBE_PING_TARGET")
+	if pingTarget == "" {
+		pingTarget = "auto_gateway"
+	}
+
 	return &MeasurementProfile{
 		Version:         "2026.1-local-fallback",
 		UpdatedAt:       time.Now().UTC(),
 		IntervalMinutes: 30,
 		SyncSchedule:    "fixed_half_hour",
-		Description:     "Perfil padrão de fallback local da sonda UEPG",
+		Description:     "Perfil padrão de fallback local configurável via .env",
 		Tests: []TestTaskConfig{
 			{
 				ID:        "ping_gateway",
 				Type:      TaskTypePing,
 				Name:      "Latência Gateway Local",
 				Enabled:   true,
-				Target:    "auto_gateway",
+				Target:    pingTarget,
 				Count:     3,
 				TimeoutMS: 1000,
 			},
 			{
-				ID:        "ping_nti_core",
+				ID:        "ping_dns",
 				Type:      TaskTypePing,
-				Name:      "Latência Core NTI (Anel)",
+				Name:      "Latência Servidor DNS",
 				Enabled:   true,
-				Target:    "177.101.22.40",
+				Target:    dnsServer,
 				Count:     3,
 				TimeoutMS: 1000,
 			},
 			{
-				ID:        "packet_loss_core",
+				ID:        "packet_loss_dns",
 				Type:      TaskTypePacketLoss,
-				Name:      "Perda de Pacotes Core NTI",
+				Name:      "Perda de Pacotes DNS",
 				Enabled:   true,
-				Target:    "177.101.22.40",
+				Target:    dnsServer,
 				Count:     10,
 				TimeoutMS: 1000,
 			},
 			{
-				ID:        "dns_uepg",
-				Type:      TaskTypeDNSLookup,
-				Name:      "Resolução DNS Institucional",
-				Enabled:   true,
-				Domain:    "uepg.br",
-				TimeoutMS: 2000,
+				ID:         "dns_lookup",
+				Type:       TaskTypeDNSLookup,
+				Name:       "Resolução DNS",
+				Enabled:    true,
+				Domain:     dnsDomain,
+				DNSServers: []string{"auto", dnsServer},
+				TimeoutMS:  2000,
 			},
 			{
 				ID:             "throughput_download",

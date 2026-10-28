@@ -61,38 +61,75 @@ func (h *ProfileHandler) reloadProfileFromDisk() error {
 
 // getBuiltinProfile retorna um perfil de medição seguro caso o arquivo json não esteja acessível
 func (h *ProfileHandler) getBuiltinProfile() *models.MeasurementProfile {
+	dnsDomain := "uepg.br"
+	dnsServer := "177.101.22.40"
+	dnsName := "Resolução DNS Institucional"
+	coreTarget := "177.101.22.40"
+	coreName := "Latência Core NTI (Anel)"
+	defaultPingTarget := "auto_gateway"
+	downloadMB := 5
+	uploadMB := 2
+
+	if h.cfg != nil {
+		if h.cfg.DNSDomainTarget != "" {
+			dnsDomain = h.cfg.DNSDomainTarget
+		}
+		if h.cfg.DNSServerTarget != "" {
+			dnsServer = h.cfg.DNSServerTarget
+		}
+		if h.cfg.DNSServerName != "" {
+			dnsName = h.cfg.DNSServerName
+		}
+		if h.cfg.PingCoreTarget != "" {
+			coreTarget = h.cfg.PingCoreTarget
+		}
+		if h.cfg.PingCoreName != "" {
+			coreName = h.cfg.PingCoreName
+		}
+		if h.cfg.DefaultPingTarget != "" {
+			defaultPingTarget = h.cfg.DefaultPingTarget
+		}
+		if h.cfg.SpeedtestDownloadMB > 0 {
+			downloadMB = h.cfg.SpeedtestDownloadMB
+		}
+		if h.cfg.SpeedtestUploadMB > 0 {
+			uploadMB = h.cfg.SpeedtestUploadMB
+		}
+	}
+
 	return &models.MeasurementProfile{
 		Version:         "2026.1-fallback",
 		UpdatedAt:       time.Now().UTC(),
 		IntervalMinutes: 30,
 		SyncSchedule:    "fixed_half_hour",
-		Description:     "Perfil padrão de fallback UEPG",
+		Description:     "Perfil padrão de fallback configurado via .env",
 		Tests: []models.TestTaskConfig{
 			{
 				ID:        "ping_gateway",
 				Type:      models.TaskTypePing,
 				Name:      "Latência Gateway Local",
 				Enabled:   true,
-				Target:    "auto_gateway",
+				Target:    defaultPingTarget,
 				Count:     3,
 				TimeoutMS: 1000,
 			},
 			{
 				ID:        "ping_nti_core",
 				Type:      models.TaskTypePing,
-				Name:      "Latência Core NTI (Anel)",
+				Name:      coreName,
 				Enabled:   true,
-				Target:    "177.101.22.40",
+				Target:    coreTarget,
 				Count:     3,
 				TimeoutMS: 1000,
 			},
 			{
-				ID:        "dns_uepg",
-				Type:      models.TaskTypeDNSLookup,
-				Name:      "Resolução DNS Institucional",
-				Enabled:   true,
-				Domain:    "uepg.br",
-				TimeoutMS: 2000,
+				ID:         "dns_uepg",
+				Type:       models.TaskTypeDNSLookup,
+				Name:       dnsName,
+				Enabled:    true,
+				Domain:     dnsDomain,
+				DNSServers: []string{"auto", dnsServer},
+				TimeoutMS:  2000,
 			},
 			{
 				ID:             "throughput_download",
@@ -100,7 +137,7 @@ func (h *ProfileHandler) getBuiltinProfile() *models.MeasurementProfile {
 				Name:           "Throughput Download",
 				Enabled:        true,
 				Endpoint:       "/api/v1/speedtest/download",
-				SizeMB:         5,
+				SizeMB:         downloadMB,
 				TimeoutSeconds: 15,
 			},
 			{
@@ -109,7 +146,7 @@ func (h *ProfileHandler) getBuiltinProfile() *models.MeasurementProfile {
 				Name:           "Throughput Upload",
 				Enabled:        true,
 				Endpoint:       "/api/v1/speedtest/upload",
-				SizeMB:         2,
+				SizeMB:         uploadMB,
 				TimeoutSeconds: 15,
 			},
 			{

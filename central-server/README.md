@@ -104,11 +104,14 @@ http://<IP_OU_DOMINIO>:8085/api/v1/download/client
 
 ## 🛠️ Variáveis de Ambiente (`.env`)
 
-Principais variáveis configuráveis no arquivo `.env`:
+Todas as variáveis do sistema são configuráveis centralizadamente pelo arquivo `.env`. Ao alterar uma variável no `.env`, ela se propaga automaticamente para os perfis das sondas, catálogo de módulos e interface do Dashboard:
 
 ```ini
+# Porta e Endereço de Acesso
 PORT=8085
 PUBLIC_SERVER_URL=https://akvorado.acon.dev.uepg.br
+
+# Banco de Dados MongoDB
 MONGO_URI=mongodb://mongo:27017
 MONGO_DB=network_central
 MONGO_COLLECTION=metrics
@@ -116,7 +119,17 @@ API_TOKEN=super-secret-probe-token-2026
 STATIC_DIR=/app/public
 QUERY_HOURS_LIMIT=24
 
-# Autenticação Local
+# 🌐 Alvos de Medição, Rede e DNS (Customizáveis para qualquer instituição/empresa)
+DNS_SERVER_TARGET=177.101.22.40               # IP do servidor DNS principal (ex: 8.8.8.8, 1.1.1.1)
+DNS_DOMAIN_TARGET=uepg.br                     # Domínio para resolução de teste (ex: google.com, suaempresa.com)
+DNS_SERVER_NAME=DNS Institucional             # Nome exibido no Dashboard e relatórios
+PING_CORE_TARGET=177.101.22.40                # IP ou Hostname do roteador central/backbone
+PING_CORE_NAME=Core NTI (Anel)                # Rótulo da métrica do Core
+DEFAULT_PING_TARGET=auto_gateway              # Alvo de ping local ('auto_gateway' detecta o gateway do nó)
+SPEEDTEST_DOWNLOAD_MB=5                       # Volume do teste de throughput de download (MB)
+SPEEDTEST_UPLOAD_MB=2                         # Volume do teste de throughput de upload (MB)
+
+# Autenticação Local do Dashboard
 AUTH_ADMIN_USER=admin
 AUTH_ADMIN_PASSWORD=admin123
 AUTH_VIEWER_USER=operador

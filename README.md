@@ -49,7 +49,8 @@ sudo ./deploy.sh
 
 ### O que o `deploy.sh` faz por você:
 - ✅ Verifica e instala automaticamente o **Docker** e o **Docker Compose** caso não estejam presentes.
-- ✅ Configura o arquivo de variáveis de ambiente (`.env`) detectando o IP e domínio da VM.
+- ✅ Configura o arquivo de variáveis de ambiente (`.env`) detectando o IP, porta, DNS e domínio da VM.
+- ✅ Customização total via `.env`: Porta, IP/Domínio do DNS, Core de rede e limites de teste podem ser alterados para qualquer instituição/empresa sem tocar em código.
 - ✅ Garante compatibilidade de CPU em Hypervisors e VMs legadas (MongoDB Time Series 4.4 sem exigência de flags AVX).
 - ✅ Inicia os containers em segundo plano e realiza teste de saúde no endpoint `/health`.
 - ✅ Exibe na tela as URLs prontas de acesso e credenciais de administrador.

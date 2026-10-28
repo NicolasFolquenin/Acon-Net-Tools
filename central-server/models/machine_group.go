@@ -1,6 +1,11 @@
 package models
 
-import "time"
+import (
+	"fmt"
+	"time"
+
+	"central-server/config"
+)
 
 // GroupAutoRules define as regras para auto-associação de novas máquinas ao grupo
 type GroupAutoRules struct {
@@ -19,9 +24,46 @@ type MachineGroup struct {
 	UpdatedAt   time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
-// GetInitialGroups retorna os grupos padrão do sistema: default, reitoria e acon
+// GetInitialGroups retorna os grupos padrão do sistema: default, reitoria e acon parametrizados via .env
 func GetInitialGroups() []MachineGroup {
 	now := time.Now().UTC()
+	cfg := config.GetConfig()
+
+	dnsDomain := "uepg.br"
+	dnsServer := "177.101.22.40"
+	dnsName := "Resolução DNS Institucional"
+	coreTarget := "177.101.22.40"
+	coreName := "Latência Core NTI (Anel)"
+	defaultPingTarget := "auto_gateway"
+	downloadMB := 5
+	uploadMB := 2
+
+	if cfg != nil {
+		if cfg.DNSDomainTarget != "" {
+			dnsDomain = cfg.DNSDomainTarget
+		}
+		if cfg.DNSServerTarget != "" {
+			dnsServer = cfg.DNSServerTarget
+		}
+		if cfg.DNSServerName != "" {
+			dnsName = cfg.DNSServerName
+		}
+		if cfg.PingCoreTarget != "" {
+			coreTarget = cfg.PingCoreTarget
+		}
+		if cfg.PingCoreName != "" {
+			coreName = cfg.PingCoreName
+		}
+		if cfg.DefaultPingTarget != "" {
+			defaultPingTarget = cfg.DefaultPingTarget
+		}
+		if cfg.SpeedtestDownloadMB > 0 {
+			downloadMB = cfg.SpeedtestDownloadMB
+		}
+		if cfg.SpeedtestUploadMB > 0 {
+			uploadMB = cfg.SpeedtestUploadMB
+		}
+	}
 
 	return []MachineGroup{
 		{
@@ -41,7 +83,7 @@ func GetInitialGroups() []MachineGroup {
 						Type:           TaskTypePing,
 						Name:           "Latência Gateway Local",
 						Enabled:        true,
-						Target:         "auto_gateway",
+						Target:         defaultPingTarget,
 						Count:          3,
 						TimeoutMS:      1000,
 						TimeoutSeconds: 15,
@@ -52,7 +94,7 @@ func GetInitialGroups() []MachineGroup {
 						Name:           "Throughput Download",
 						Enabled:        true,
 						Endpoint:       "/api/v1/speedtest/download",
-						SizeMB:         5,
+						SizeMB:         downloadMB,
 						TimeoutSeconds: 30,
 					},
 					{
@@ -61,16 +103,16 @@ func GetInitialGroups() []MachineGroup {
 						Name:           "Throughput Upload",
 						Enabled:        true,
 						Endpoint:       "/api/v1/speedtest/upload",
-						SizeMB:         2,
+						SizeMB:         uploadMB,
 						TimeoutSeconds: 30,
 					},
 					{
 						ID:             "dns_uepg",
 						Type:           TaskTypeDNSLookup,
-						Name:           "Resolução DNS Institucional",
+						Name:           dnsName,
 						Enabled:        true,
-						Domain:         "uepg.br",
-						DNSServers:     []string{"auto", "177.101.22.40"},
+						Domain:         dnsDomain,
+						DNSServers:     []string{"auto", dnsServer},
 						TimeoutMS:      2000,
 						TimeoutSeconds: 10,
 					},
@@ -89,24 +131,24 @@ func GetInitialGroups() []MachineGroup {
 		{
 			ID:          "reitoria",
 			Name:        "Grupo Reitoria",
-			Description: "Máquinas administrativas e gabinetes da Reitoria UEPG",
+			Description: "Perfil de medição da Reitoria: Gateway, Core de Rede, Perda de Pacotes e DNS",
 			Rules: GroupAutoRules{
 				VLANs:     []int{10, 11},
-				IPSubnets: []string{"10.10.10.0/24", "10.10.11.0/24"},
+				IPSubnets: []string{"10.10.10.0/24"},
 			},
 			Profile: MeasurementProfile{
 				Version:         "2026.group-reitoria",
 				UpdatedAt:       now,
 				IntervalMinutes: 30,
 				SyncSchedule:    "fixed_half_hour",
-				Description:     "Perfil de medição da Reitoria: Gateway, Core NTI, Perda de Pacotes e DNS UEPG",
+				Description:     fmt.Sprintf("Perfil de medição: Gateway, %s, Perda de Pacotes e %s", coreName, dnsName),
 				Tests: []TestTaskConfig{
 					{
 						ID:             "ping_gateway",
 						Type:           TaskTypePing,
 						Name:           "Latência Gateway Local",
 						Enabled:        true,
-						Target:         "auto_gateway",
+						Target:         defaultPingTarget,
 						Count:          3,
 						TimeoutMS:      1000,
 						TimeoutSeconds: 15,
@@ -114,9 +156,9 @@ func GetInitialGroups() []MachineGroup {
 					{
 						ID:             "ping_nti_core",
 						Type:           TaskTypePing,
-						Name:           "Latência Core NTI (Anel)",
+						Name:           coreName,
 						Enabled:        true,
-						Target:         "177.101.22.40",
+						Target:         coreTarget,
 						Count:          3,
 						TimeoutMS:      1000,
 						TimeoutSeconds: 15,
@@ -124,9 +166,9 @@ func GetInitialGroups() []MachineGroup {
 					{
 						ID:             "packet_loss_core",
 						Type:           TaskTypePacketLoss,
-						Name:           "Perda de Pacotes Core NTI",
+						Name:           fmt.Sprintf("Perda de Pacotes %s", coreName),
 						Enabled:        true,
-						Target:         "177.101.22.40",
+						Target:         coreTarget,
 						Count:          10,
 						TimeoutMS:      1000,
 						TimeoutSeconds: 20,
@@ -134,10 +176,10 @@ func GetInitialGroups() []MachineGroup {
 					{
 						ID:             "dns_uepg",
 						Type:           TaskTypeDNSLookup,
-						Name:           "Resolução DNS Institucional",
+						Name:           dnsName,
 						Enabled:        true,
-						Domain:         "uepg.br",
-						DNSServers:     []string{"auto", "177.101.22.40"},
+						Domain:         dnsDomain,
+						DNSServers:     []string{"auto", dnsServer},
 						TimeoutMS:      2000,
 						TimeoutSeconds: 10,
 					},
@@ -173,7 +215,7 @@ func GetInitialGroups() []MachineGroup {
 						Type:           TaskTypePing,
 						Name:           "Latência Gateway Local",
 						Enabled:        true,
-						Target:         "auto_gateway",
+						Target:         defaultPingTarget,
 						Count:          3,
 						TimeoutMS:      1000,
 						TimeoutSeconds: 15,
@@ -181,9 +223,9 @@ func GetInitialGroups() []MachineGroup {
 					{
 						ID:             "ping_nti_core",
 						Type:           TaskTypePing,
-						Name:           "Latência Core NTI",
+						Name:           coreName,
 						Enabled:        true,
-						Target:         "177.101.22.40",
+						Target:         coreTarget,
 						Count:          3,
 						TimeoutMS:      1000,
 						TimeoutSeconds: 15,
@@ -193,7 +235,7 @@ func GetInitialGroups() []MachineGroup {
 						Type:           TaskTypePacketLoss,
 						Name:           "Perda de Pacotes Gateway",
 						Enabled:        true,
-						Target:         "auto_gateway",
+						Target:         defaultPingTarget,
 						Count:          10,
 						TimeoutMS:      1000,
 						TimeoutSeconds: 20,
@@ -201,10 +243,10 @@ func GetInitialGroups() []MachineGroup {
 					{
 						ID:             "dns_uepg",
 						Type:           TaskTypeDNSLookup,
-						Name:           "Resolução DNS Institucional",
+						Name:           dnsName,
 						Enabled:        true,
-						Domain:         "uepg.br",
-						DNSServers:     []string{"auto", "177.101.22.40"},
+						Domain:         dnsDomain,
+						DNSServers:     []string{"auto", dnsServer},
 						TimeoutMS:      2000,
 						TimeoutSeconds: 10,
 					},
@@ -221,7 +263,7 @@ func GetInitialGroups() []MachineGroup {
 						Name:           "Throughput Download ACON",
 						Enabled:        true,
 						Endpoint:       "/api/v1/speedtest/download",
-						SizeMB:         5,
+						SizeMB:         downloadMB,
 						TimeoutSeconds: 45,
 					},
 					{
@@ -230,7 +272,7 @@ func GetInitialGroups() []MachineGroup {
 						Name:           "Throughput Upload ACON",
 						Enabled:        true,
 						Endpoint:       "/api/v1/speedtest/upload",
-						SizeMB:         2,
+						SizeMB:         uploadMB,
 						TimeoutSeconds: 45,
 					},
 					{
