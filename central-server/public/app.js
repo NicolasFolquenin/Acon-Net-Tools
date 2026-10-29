@@ -2424,24 +2424,20 @@ async function loadDashboardData(requestedDate) {
     currentSummaries = data.summaries || [];
 
     if (currentGroups.length === 0) {
-      apiFetch('/api/v1/admin/groups')
-        .then(r => r.ok ? r.json() : apiFetch('/api/v1/groups').then(r2 => r2.ok ? r2.json() : []))
-        .then(grps => {
-          if (grps && grps.length > 0) {
-            currentGroups = grps;
-            updateChartGroupSelector();
-          }
-        }).catch(() => {});
+      try {
+        const grpRes = await apiFetch('/api/v1/admin/groups');
+        if (grpRes.ok) currentGroups = (await grpRes.json()) || [];
+        else {
+          const fallbackRes = await apiFetch('/api/v1/groups');
+          if (fallbackRes.ok) currentGroups = (await fallbackRes.json()) || [];
+        }
+      } catch (e) {}
     }
     if (allAdminMachines.length === 0) {
-      apiFetch('/api/v1/admin/machines')
-        .then(r => r.ok ? r.json() : [])
-        .then(machs => {
-          if (machs && machs.length > 0) {
-            allAdminMachines = machs;
-            updateChartGroupSelector();
-          }
-        }).catch(() => {});
+      try {
+        const machRes = await apiFetch('/api/v1/admin/machines');
+        if (machRes.ok) allAdminMachines = (await machRes.json()) || [];
+      } catch (e) {}
     }
     updateChartGroupSelector();
 
@@ -5015,7 +5011,10 @@ async function handleSaveMachineConfigSubmit(e) {
 
     showToast(`Configuração da máquina "${hostname}" salva com sucesso!`, 'toast-success');
     closeMachineConfigModal();
+    allAdminMachines = [];
+    currentGroups = [];
     await loadAdminMachines();
+    await loadDashboardData();
   } catch (err) {
     showToast(`Erro ao salvar: ${err.message}`, 'toast-error');
   } finally {
@@ -5673,7 +5672,23 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
     effectiveTests = [];
   }
 
-  if (profileBadgeEl) {
+  const actionsWrap = document.getElementById('sm-panel-modules-actions');
+  if (actionsWrap) {
+    actionsWrap.innerHTML = 
+      '<span id="sm-panel-modules-profile-badge" class="' + (isCustomMachine ? 'badge-pill warning' : 'badge-pill success') + '">' +
+        (isCustomMachine ? ('Customizado (' + effectiveTests.length + ' módulo' + (effectiveTests.length === 1 ? '' : 's') + ')') : ('Padrão do Grupo (' + effectiveTests.length + ' módulo' + (effectiveTests.length === 1 ? '' : 's') + ')')) +
+      '</span>' +
+      (isCustomMachine ? (
+        '<button type="button" class="btn btn-sm btn-glass" onclick="resetCurrentMachineToGroup()" title="Remover customização e restaurar para o padrão do grupo" style="padding: 2px 8px; font-size: 0.72rem; color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); display: flex; align-items: center; gap: 4px;">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>' +
+          '<span>Restaurar Grupo</span>' +
+        '</button>'
+      ) : '') +
+      '<button type="button" id="btn-edit-probe-modules" class="btn btn-sm btn-outline-cyan" onclick="openMachineConfigFromPanel()" title="Personalizar módulos ativos desta sonda" style="padding: 2px 8px; font-size: 0.72rem; display: flex; align-items: center; gap: 4px;">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>' +
+        '<span>Editar Módulos</span>' +
+      '</button>';
+  } else if (profileBadgeEl) {
     if (isCustomMachine) {
       profileBadgeEl.textContent = 'Customizado (' + effectiveTests.length + ' módulo' + (effectiveTests.length === 1 ? '' : 's') + ')';
       profileBadgeEl.className = 'badge-pill warning';
@@ -5966,3 +5981,34 @@ function openMachineConfigFromPanel() {
   }
 }
 window.openMachineConfigFromPanel = openMachineConfigFromPanel;
+
+async function resetCurrentMachineToGroup() {
+  if (!selectedChartNode || selectedChartNode === 'all') return;
+  const hostname = selectedChartNode;
+  const mach = (allAdminMachines || []).find(m => m.hostname === hostname);
+  const targetGroupId = (mach && mach.group_id) || 'default';
+
+  try {
+    const res = await apiFetch('/api/v1/admin/machines/' + encodeURIComponent(hostname), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        group_id: targetGroupId,
+        is_custom: false,
+        custom_tests: []
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Falha ao redefinir máquina');
+    }
+    showToast('Máquina "' + hostname + '" restaurada para o padrão do grupo (' + targetGroupId + ')!', 'toast-success');
+    allAdminMachines = [];
+    currentGroups = [];
+    await loadAdminMachines();
+    await loadDashboardData();
+  } catch (err) {
+    showToast('Erro ao redefinir: ' + err.message, 'toast-error');
+  }
+}
+window.resetCurrentMachineToGroup = resetCurrentMachineToGroup;
