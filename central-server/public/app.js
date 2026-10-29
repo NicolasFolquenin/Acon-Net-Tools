@@ -5647,39 +5647,56 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
     }
   }
 
-  // 2. Módulos Carregados na Sonda
+  // 2. Módulos Carregados na Sonda (Resolução Dinâmica do Grupo / Customizado)
   const modulesListEl = document.getElementById('sm-panel-modules-list');
   const profileBadgeEl = document.getElementById('sm-panel-modules-profile-badge');
   const machAdmin = (allAdminMachines || []).find(m => m.hostname === nodeName);
 
+  // Determina o grupo da máquina
+  const targetGroupId = (machAdmin && machAdmin.group_id) || (summary && summary.group_id) || (diagnostic && diagnostic.group_name) || 'default';
+  const grp = (currentGroups || []).find(g => g.id === targetGroupId || g.name === targetGroupId);
+  const grpName = grp ? grp.name : targetGroupId;
+  const grpTests = (grp && grp.profile && grp.profile.tests) ? grp.profile.tests : [];
+
+  // Módulos efetivos: apenas é customizado se is_custom for explicitamente true E custom_tests tiver itens
+  const isCustomMachine = !!(machAdmin && machAdmin.is_custom && machAdmin.custom_tests && machAdmin.custom_tests.length > 0);
+  let effectiveTests = [];
+
+  if (isCustomMachine) {
+    effectiveTests = machAdmin.custom_tests;
+  } else if (grpTests.length > 0) {
+    effectiveTests = grpTests;
+  } else if (machAdmin && machAdmin.custom_tests && machAdmin.custom_tests.length > 0) {
+    // Se não for customizado mas o grupo tiver zero testes em memória, fallback nos testes do registro
+    effectiveTests = machAdmin.custom_tests;
+  } else {
+    effectiveTests = [];
+  }
+
   if (profileBadgeEl) {
-    if (machAdmin && machAdmin.custom_tests && machAdmin.custom_tests.length > 0) {
-      profileBadgeEl.textContent = 'Customizado (+' + machAdmin.custom_tests.length + ')';
+    if (isCustomMachine) {
+      profileBadgeEl.textContent = 'Customizado (' + effectiveTests.length + ' módulo' + (effectiveTests.length === 1 ? '' : 's') + ')';
       profileBadgeEl.className = 'badge-pill warning';
     } else {
-      profileBadgeEl.textContent = 'Padrão do Grupo';
+      profileBadgeEl.textContent = 'Padrão do Grupo (' + effectiveTests.length + ' módulo' + (effectiveTests.length === 1 ? '' : 's') + ')';
       profileBadgeEl.className = 'badge-pill success';
     }
   }
 
   if (modulesListEl) {
-    const activeModules = [
-      { id: 'throughput_download', name: 'Throughput Download' },
-      { id: 'throughput_upload', name: 'Throughput Upload' },
-      { id: 'ping_gateway', name: 'Ping Gateway Local' },
-      { id: 'ping_nti_core', name: 'Ping Core NTI (Anel)' },
-      { id: 'packet_loss_gateway', name: 'Perda de Pacotes Gateway' },
-      { id: 'switch_discovery', name: 'Descoberta Switch LLDP' },
-      { id: 'wifi_status', name: 'Telemetria Wi-Fi & RSSI' },
-      { id: 'dns_uepg', name: 'Resolução DNS UEPG' }
-    ];
-
-    modulesListEl.innerHTML = activeModules.map(mod => 
-      '<div class="sm-module-chip active" title="Módulo ativo no ciclo agendado da sonda">' +
-        '<span class="sm-module-dot"></span>' +
-        '<span>' + escapeHtml(mod.name) + '</span>' +
-      '</div>'
-    ).join('');
+    if (effectiveTests.length === 0) {
+      modulesListEl.innerHTML = '<span class="text-xs text-muted">Nenhum módulo de teste ativo configurado no perfil deste grupo.</span>';
+    } else {
+      modulesListEl.innerHTML = effectiveTests.map(mod => {
+        const testName = mod.name || mod.id || 'Módulo';
+        return (
+          '<div class="sm-module-chip active" title="Módulo ativo: ' + escapeHtml(mod.id || '') + '">' +
+            '<span class="sm-module-dot"></span>' +
+            '<span>' + escapeHtml(testName) + '</span>' +
+          '</div>'
+        );
+      }).join('');
+    }
   }
 
   // 3. Switch LLDP & Conexão de Rede
@@ -5928,3 +5945,24 @@ function handleSwitchRowFocus(btn) {
   closeSwitchMachinesModal();
 }
 window.handleSwitchRowFocus = handleSwitchRowFocus;
+
+function openMachineConfigFromPanel() {
+  if (!selectedChartNode || selectedChartNode === 'all') return;
+  const targetNode = selectedChartNode;
+
+  // Garante que lista de máquinas esteja carregada
+  if (!allAdminMachines || allAdminMachines.length === 0) {
+    apiFetch('/api/v1/admin/machines')
+      .then(r => r.ok ? r.json() : [])
+      .then(machs => {
+        allAdminMachines = machs || [];
+        openMachineConfigModal(targetNode);
+      })
+      .catch(() => {
+        openMachineConfigModal(targetNode);
+      });
+  } else {
+    openMachineConfigModal(targetNode);
+  }
+}
+window.openMachineConfigFromPanel = openMachineConfigFromPanel;
