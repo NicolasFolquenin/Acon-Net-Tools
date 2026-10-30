@@ -297,35 +297,34 @@ func pingViaExecLoss(target string, count int, timeoutMs int) (float64, float64,
 	var lossPercent float64 = -1
 	var avgMs float64
 
-	// 1. Parser Linux: "X packets transmitted, Y received, ... Z% packet loss"
-	reLinuxLoss := regexp.MustCompile(`(\d+)\s+packets transmitted,\s*(\d+)\s+(?:packets\s+)?received.*?(?:([0-9.]+)\s*%\s*packet loss)`)
-	if m := reLinuxLoss.FindStringSubmatch(outputStr); len(m) >= 4 {
-		sent, _ := strconv.Atoi(m[1])
-		recv, _ := strconv.Atoi(m[2])
-		if sent > 0 {
-			lossPercent = (float64(sent-recv) / float64(sent)) * 100.0
-		} else if val, errP := strconv.ParseFloat(m[3], 64); errP == nil {
-			lossPercent = val
-		}
-	}
-
-	// 2. Parser Windows: "Enviados = X, Recebidos = Y ... (Z% de perda)" ou inglês
-	if lossPercent < 0 {
-		reWinLoss := regexp.MustCompile(`(?i)(?:Enviados|Sent)\s*=\s*(\d+).*?(?:Recebidos|Received)\s*=\s*(\d+).*?(?:(?:Perdidos|Lost)\s*=\s*\d+\s*)?\(\s*([0-9.]+)\s*%\s*(?:de perda|loss)`)
-		if m := reWinLoss.FindStringSubmatch(outputStr); len(m) >= 4 {
-			sent, _ := strconv.Atoi(m[1])
-			recv, _ := strconv.Atoi(m[2])
+	// 1. Parser Windows: "Enviados = X" e "Recebidos = Y" (imune a quebras de linha em "(0% de perda)")
+	reWinSent := regexp.MustCompile(`(?i)(?:Enviados|Sent)\s*=\s*(\d+)`)
+	reWinRecv := regexp.MustCompile(`(?i)(?:Recebidos|Received)\s*=\s*(\d+)`)
+	if mSent := reWinSent.FindStringSubmatch(outputStr); len(mSent) > 1 {
+		if mRecv := reWinRecv.FindStringSubmatch(outputStr); len(mRecv) > 1 {
+			sent, _ := strconv.Atoi(mSent[1])
+			recv, _ := strconv.Atoi(mRecv[1])
 			if sent > 0 {
 				lossPercent = (float64(sent-recv) / float64(sent)) * 100.0
-			} else if val, errP := strconv.ParseFloat(m[3], 64); errP == nil {
-				lossPercent = val
 			}
 		}
 	}
 
-	// 3. Fallback genérico por regex de porcentagem
+	// 2. Parser Linux: "X packets transmitted, Y received"
 	if lossPercent < 0 {
-		reGenericLoss := regexp.MustCompile(`(?i)([0-9.]+)\s*%\s*(?:packet loss|de perda|loss)`)
+		reLinuxLoss := regexp.MustCompile(`(\d+)\s+packets transmitted,\s*(\d+)\s+(?:packets\s+)?received`)
+		if m := reLinuxLoss.FindStringSubmatch(outputStr); len(m) >= 3 {
+			sent, _ := strconv.Atoi(m[1])
+			recv, _ := strconv.Atoi(m[2])
+			if sent > 0 {
+				lossPercent = (float64(sent-recv) / float64(sent)) * 100.0
+			}
+		}
+	}
+
+	// 3. Fallback genérico por regex de porcentagem (suporta quebras de linha via (?s))
+	if lossPercent < 0 {
+		reGenericLoss := regexp.MustCompile(`(?s)(?i)([0-9.]+)\s*%\s*(?:packet loss|de\s+perda|loss)`)
 		if m := reGenericLoss.FindStringSubmatch(outputStr); len(m) > 1 {
 			if val, errP := strconv.ParseFloat(m[1], 64); errP == nil {
 				lossPercent = val
@@ -335,7 +334,7 @@ func pingViaExecLoss(target string, count int, timeoutMs int) (float64, float64,
 
 	// 4. Fallback contando respostas individuais recebidas
 	if lossPercent < 0 && count > 0 {
-		reReplies := regexp.MustCompile(`(?i)(?:bytes from|resposta de|reply from)`)
+		reReplies := regexp.MustCompile(`(?i)(?:bytes[ =]|resposta de|reply from)`)
 		matches := reReplies.FindAllString(outputStr, -1)
 		receivedCount := len(matches)
 		if receivedCount > count {
@@ -361,8 +360,8 @@ func pingViaExecLoss(target string, count int, timeoutMs int) (float64, float64,
 	if m := reLinuxRtt.FindStringSubmatch(outputStr); len(m) >= 4 {
 		avgMs, _ = strconv.ParseFloat(m[2], 64)
 	} else {
-		// Windows: Média = 1ms ou Average = 1ms
-		reWinRtt := regexp.MustCompile(`(?i)(?:M[ée]dia|Average)\s*=\s*([0-9.]+)\s*ms`)
+		// Windows: Média = 1ms ou Average = 1ms (suporta encoding OEM de 'Média')
+		reWinRtt := regexp.MustCompile(`(?i)(?:m.*?dia|average)\s*=\s*([0-9.]+)\s*ms`)
 		if m := reWinRtt.FindStringSubmatch(outputStr); len(m) > 1 {
 			avgMs, _ = strconv.ParseFloat(m[1], 64)
 		} else {
