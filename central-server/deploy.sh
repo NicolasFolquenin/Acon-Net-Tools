@@ -217,10 +217,23 @@ if [ -z "$SUGGESTED_PUBLIC_URL" ] || [ "$SUGGESTED_PUBLIC_URL" = "http://localho
   SUGGESTED_PUBLIC_URL="http://${LOCAL_IP}:${CURRENT_PORT}"
 fi
 
-# Configuração interativa (Assistente de Instalação no Terminal)
-if [ "$NON_INTERACTIVE" = false ] && [ -c /dev/tty ]; then
+# Verifica se o setup já foi concluído anteriormente
+SETUP_ALREADY_DONE=false
+if grep -q "^SETUP_COMPLETED=true" .env 2>/dev/null || [ -f "config/.setup_done" ]; then
+  SETUP_ALREADY_DONE=true
+fi
+
+SHOULD_RUN_WIZARD=false
+if [ "$ACTION" = "wizard" ]; then
+  SHOULD_RUN_WIZARD=true
+elif [ "$SETUP_ALREADY_DONE" = false ] && [ "$NON_INTERACTIVE" = false ] && [ -c /dev/tty ]; then
+  SHOULD_RUN_WIZARD=true
+fi
+
+# Configuração interativa (Apenas no primeiro deploy na VM ou com flag --wizard)
+if [ "$SHOULD_RUN_WIZARD" = true ]; then
   echo -e "${CYAN}┌────────────────────────────────────────────────────────────────────────┐${NC}"
-  echo -e "${CYAN}│${BOLD}   🛠️  ASSISTENTE INTERATIVO DE CONFIGURAÇÃO (SETUP WIZARD)            ${NC}${CYAN}│${NC}"
+  echo -e "${CYAN}│${BOLD}   🛠️  ASSISTENTE DE CONFIGURAÇÃO DO SERVIDOR CENTRAL NA VM            ${NC}${CYAN}│${NC}"
   echo -e "${CYAN}│   Pressione [ENTER] para aceitar os valores sugeridos entre colchetes. │${NC}"
   echo -e "${CYAN}└────────────────────────────────────────────────────────────────────────┘${NC}\n"
 
@@ -253,7 +266,12 @@ else
   TARGET_DNS="$CURRENT_DNS_SERVER"
   TARGET_DOMAIN="$CURRENT_DNS_DOMAIN"
   TARGET_CORE="$CURRENT_PING_CORE"
-  TARGET_PASS="admin123"
+  TARGET_PASS=$(grep -E '^AUTH_ADMIN_PASSWORD=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "admin123")
+  [ -z "$TARGET_PASS" ] && TARGET_PASS="admin123"
+
+  echo -e "${GREEN}[✓] Configurações persistentes carregadas do .env:${NC}"
+  echo -e "    Porta: ${CYAN}${TARGET_PORT}${NC} | URL: ${CYAN}${TARGET_URL}${NC} | DNS: ${CYAN}${TARGET_DNS}${NC} | Core: ${CYAN}${TARGET_CORE}${NC}"
+  echo -e "${YELLOW}    (Para alterar parâmetros na VM a qualquer momento, execute: ./deploy.sh --wizard)${NC}\n"
 fi
 
 # Garante protocolo http/https na URL pública
