@@ -51,6 +51,7 @@ func main() {
 	modulesHandler := handlers.NewModulesHandler(cfg, mongoClient)
 	pingHandler := handlers.NewPingHandler(mongoClient)
 	downloadHandler := handlers.NewDownloadHandler(cfg)
+	setupHandler := handlers.NewSetupHandler(cfg, mongoClient)
 
 	mux := http.NewServeMux()
 
@@ -58,6 +59,17 @@ func main() {
 	fileServer := http.FileServer(http.Dir(cfg.StaticDir))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
+
+		// Redirecionamento automático do Assistente de Primeiro Acesso
+		if !cfg.SetupCompleted && (path == "/" || path == "/index.html") {
+			http.Redirect(w, r, "/setup.html", http.StatusFound)
+			return
+		}
+		if cfg.SetupCompleted && path == "/setup.html" {
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
+
 		if path == "/" || strings.HasSuffix(path, ".html") || strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".css") {
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			w.Header().Set("Pragma", "no-cache")
@@ -77,6 +89,10 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(cfg)
 	})
+
+	// Endpoints do Assistente de Primeiro Acesso (Setup Wizard)
+	mux.HandleFunc("/api/v1/setup/status", setupHandler.HandleStatus)
+	mux.HandleFunc("/api/v1/setup/complete", setupHandler.HandleComplete)
 
 	// Speedtest endpoints para medição real das sondas
 	mux.HandleFunc("/api/v1/speedtest/download", handlers.SpeedtestDownloadHandler)

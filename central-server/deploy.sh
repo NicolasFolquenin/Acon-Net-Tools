@@ -41,12 +41,16 @@ for arg in "$@"; do
     --down|--stop)
       ACTION="down"
       ;;
+    --wizard)
+      ACTION="wizard"
+      ;;
     -h|--help)
       echo -e "${CYAN}${BOLD}UEPG Net Tools - Deploy do Servidor Central${NC}"
       echo -e "Uso: ${YELLOW}./deploy.sh [OPÇÕES]${NC}\n"
       echo -e "Opções:"
       echo -e "  ${GREEN}-y, --yes${NC}             Modo não-interativo (aceita todos os valores padrão automaticamente)"
       echo -e "  ${GREEN}-n, --native${NC}          Executar deploy nativo em Go + Systemd (sem Docker)"
+      echo -e "  ${GREEN}--wizard${NC}              Executar o Assistente Interativo de Configuração do .env"
       echo -e "  ${GREEN}--status${NC}              Exibe status dos serviços em execução"
       echo -e "  ${GREEN}--logs${NC}                Acompanha logs em tempo real dos containers"
       echo -e "  ${GREEN}--down${NC}                Para os serviços com segurança (preserva dados do MongoDB)"
@@ -204,34 +208,52 @@ CURRENT_DNS_SERVER=$(grep -E '^DNS_SERVER_TARGET=' .env 2>/dev/null | cut -d'=' 
 CURRENT_DNS_DOMAIN=$(grep -E '^DNS_DOMAIN_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "google.com")
 [ -z "$CURRENT_DNS_DOMAIN" ] && CURRENT_DNS_DOMAIN="google.com"
 
+CURRENT_PING_CORE=$(grep -E '^PING_CORE_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "1.1.1.1")
+[ -z "$CURRENT_PING_CORE" ] && CURRENT_PING_CORE="1.1.1.1"
+
 CURRENT_PUBLIC_URL=$(grep -E '^PUBLIC_SERVER_URL=' .env 2>/dev/null | cut -d'=' -f2- | tr -d ' "' || true)
 SUGGESTED_PUBLIC_URL="$CURRENT_PUBLIC_URL"
 if [ -z "$SUGGESTED_PUBLIC_URL" ] || [ "$SUGGESTED_PUBLIC_URL" = "http://localhost:8080" ] || [ "$SUGGESTED_PUBLIC_URL" = "http://localhost:8085" ]; then
   SUGGESTED_PUBLIC_URL="http://${LOCAL_IP}:${CURRENT_PORT}"
 fi
 
-# Configuração interativa se permitido
+# Configuração interativa (Assistente de Instalação no Terminal)
 if [ "$NON_INTERACTIVE" = false ] && [ -c /dev/tty ]; then
-  echo -e "Informe a porta TCP onde o servidor responderá [Padrão: ${CYAN}${CURRENT_PORT}${NC}]:"
-  read -rp "Porta [${CURRENT_PORT}]: " USER_PORT < /dev/tty
+  echo -e "${CYAN}┌────────────────────────────────────────────────────────────────────────┐${NC}"
+  echo -e "${CYAN}│${BOLD}   🛠️  ASSISTENTE INTERATIVO DE CONFIGURAÇÃO (SETUP WIZARD)            ${NC}${CYAN}│${NC}"
+  echo -e "${CYAN}│   Pressione [ENTER] para aceitar os valores sugeridos entre colchetes. │${NC}"
+  echo -e "${CYAN}└────────────────────────────────────────────────────────────────────────┘${NC}\n"
+
+  echo -e "1. Porta TCP onde o servidor responderá [Padrão: ${CYAN}${CURRENT_PORT}${NC}]:"
+  read -rp "   Porta [${CURRENT_PORT}]: " USER_PORT < /dev/tty
   TARGET_PORT="${USER_PORT:-$CURRENT_PORT}"
 
-  echo -e "\nInforme a URL Pública ou Domínio de Acesso (ex: ${CYAN}https://net-tools.suaempresa.com.br${NC} ou ${CYAN}http://${LOCAL_IP}:${TARGET_PORT}${NC}):"
-  read -rp "URL Pública [${SUGGESTED_PUBLIC_URL}]: " USER_URL < /dev/tty
+  echo -e "\n2. URL Pública ou Domínio de Acesso das sondas [Padrão: ${CYAN}${SUGGESTED_PUBLIC_URL}${NC}]:"
+  read -rp "   URL Pública [${SUGGESTED_PUBLIC_URL}]: " USER_URL < /dev/tty
   TARGET_URL="${USER_URL:-$SUGGESTED_PUBLIC_URL}"
 
-  echo -e "\nInforme o IP do Servidor DNS Institucional/Primário [Padrão: ${CYAN}${CURRENT_DNS_SERVER}${NC}]:"
-  read -rp "DNS Server IP [${CURRENT_DNS_SERVER}]: " USER_DNS < /dev/tty
+  echo -e "\n3. IP do Servidor DNS Principal para testes [Padrão: ${CYAN}${CURRENT_DNS_SERVER}${NC}]:"
+  read -rp "   DNS Server IP [${CURRENT_DNS_SERVER}]: " USER_DNS < /dev/tty
   TARGET_DNS="${USER_DNS:-$CURRENT_DNS_SERVER}"
 
-  echo -e "\nInforme o Domínio para testes de resolução DNS [Padrão: ${CYAN}${CURRENT_DNS_DOMAIN}${NC}]:"
-  read -rp "Domínio DNS [${CURRENT_DNS_DOMAIN}]: " USER_DOMAIN < /dev/tty
+  echo -e "\n4. Domínio para testes de resolução DNS [Padrão: ${CYAN}${CURRENT_DNS_DOMAIN}${NC}]:"
+  read -rp "   Domínio DNS [${CURRENT_DNS_DOMAIN}]: " USER_DOMAIN < /dev/tty
   TARGET_DOMAIN="${USER_DOMAIN:-$CURRENT_DNS_DOMAIN}"
+
+  echo -e "\n5. IP do Roteador Central (Core/Backbone) [Padrão: ${CYAN}${CURRENT_PING_CORE}${NC}]:"
+  read -rp "   IP do Core [${CURRENT_PING_CORE}]: " USER_CORE < /dev/tty
+  TARGET_CORE="${USER_CORE:-$CURRENT_PING_CORE}"
+
+  echo -e "\n6. Senha do Administrador Web (admin) [Pressione ENTER para manter admin123]:"
+  read -rp "   Nova Senha: " USER_PASS < /dev/tty
+  TARGET_PASS="${USER_PASS:-admin123}"
 else
   TARGET_PORT="$CURRENT_PORT"
   TARGET_URL="$SUGGESTED_PUBLIC_URL"
   TARGET_DNS="$CURRENT_DNS_SERVER"
   TARGET_DOMAIN="$CURRENT_DNS_DOMAIN"
+  TARGET_CORE="$CURRENT_PING_CORE"
+  TARGET_PASS="admin123"
 fi
 
 # Garante protocolo http/https na URL pública
@@ -245,6 +267,13 @@ sed -i "s|^PORT=.*|PORT=${TARGET_PORT}|g" .env 2>/dev/null || true
 sed -i "s|^PUBLIC_SERVER_URL=.*|PUBLIC_SERVER_URL=${TARGET_URL}|g" .env 2>/dev/null || true
 sed -i "s|^DNS_SERVER_TARGET=.*|DNS_SERVER_TARGET=${TARGET_DNS}|g" .env 2>/dev/null || true
 sed -i "s|^DNS_DOMAIN_TARGET=.*|DNS_DOMAIN_TARGET=${TARGET_DOMAIN}|g" .env 2>/dev/null || true
+sed -i "s|^PING_CORE_TARGET=.*|PING_CORE_TARGET=${TARGET_CORE}|g" .env 2>/dev/null || true
+sed -i "s|^AUTH_ADMIN_PASSWORD=.*|AUTH_ADMIN_PASSWORD=${TARGET_PASS}|g" .env 2>/dev/null || true
+sed -i "s|^SETUP_COMPLETED=.*|SETUP_COMPLETED=true|g" .env 2>/dev/null || true
+
+# Cria marcador em disco indicando setup concluído
+mkdir -p config
+touch config/.setup_done 2>/dev/null || true
 
 # Gera Session Secret seguro se ainda estiver o valor de exemplo
 if grep -q "super-secret-session-key-change-in-prod-2026" .env 2>/dev/null; then
@@ -252,7 +281,8 @@ if grep -q "super-secret-session-key-change-in-prod-2026" .env 2>/dev/null; then
   sed -i "s|SESSION_SECRET=super-secret-session-key-change-in-prod-2026|SESSION_SECRET=${NEW_SECRET}|g" .env 2>/dev/null || true
 fi
 
-echo -e "${GREEN}[✓] Configurações salvas: Porta=${CYAN}${TARGET_PORT}${GREEN}, URL=${CYAN}${TARGET_URL}${GREEN}, DNS=${CYAN}${TARGET_DNS}${GREEN} (${CYAN}${TARGET_DOMAIN}${GREEN})${NC}\n"
+echo -e "\n${GREEN}[✓] Configurações salvas no .env com sucesso!${NC}"
+echo -e "    Porta: ${CYAN}${TARGET_PORT}${NC} | URL: ${CYAN}${TARGET_URL}${NC} | DNS: ${CYAN}${TARGET_DNS}${NC} (${CYAN}${TARGET_DOMAIN}${NC}) | Core: ${CYAN}${TARGET_CORE}${NC}\n"
 
 # ==============================================================================
 # 3. PREPARAÇÃO DOS DIRETÓRIOS E PERMISSÕES
