@@ -19,11 +19,31 @@ sudo ./deploy.sh
 
 ### O que o `deploy.sh` faz automaticamente:
 1. **Detecção e Instalação do Docker:** Se o Docker e o Docker Compose não estiverem instalados, oferece instalação automática com o script oficial.
-2. **Configuração de Ambiente (`.env`):** Detecta o IP local da VM, sugere a URL pública e configura a porta (padrão `8085`).
+2. **Assistente Interativo de Setup (`.env`):** No primeiro deploy, guia passo a passo pelo terminal perguntando a porta, URL pública, IP do DNS institucional, domínio de teste, roteador core e senha do administrador — ou permite abrir o navegador para configurar tudo via Web Wizard visual.
 3. **Compatibilidade Ampla de CPU para VMs:** O banco de dados utiliza imagem MongoDB adaptada para rodar perfeitamente em Hypervisors (Proxmox, VMware, ESXi) mesmo sem instruções AVX.
 4. **Construção e Execução dos Containers:** Sobe o servidor Go e o MongoDB em segundo plano via Docker Compose.
 5. **Verificação de Saúde (Healthcheck):** Aguarda a inicialização e valida o endpoint `/health`.
 6. **Exibição do Resumo:** Mostra URLs de acesso, credenciais padrão e comandos de administração.
+
+---
+
+## 🧙‍♂️ Assistente de Primeiro Acesso (Setup Wizard)
+
+Ao rodar o Servidor Central pela primeira vez, você não precisa editar manualmente o `.env`. O sistema oferece duas formas práticas:
+
+### 1. Via Navegador Web (Recomendado)
+Ao abrir a URL do servidor pela primeira vez (ex: `http://<IP-DA-VM>:8085`), o sistema detecta que o setup ainda não foi realizado e redireciona automaticamente para `/setup.html`.
+- **Passo 1 (Rede & Domínio):** Confirmação da porta HTTP e URL pública do servidor com detecção automática do IP da máquina.
+- **Passo 2 (Alvos Institucionais):** Definição do IP do DNS local, domínio de resolução e gateway/core de roteamento.
+- **Passo 3 (Segurança & Credenciais):** Criação da senha do usuário administrador e chave de API para as sondas.
+- Ao clicar em **Concluir e Salvar**, as configurações são gravadas no `.env`, o admin é cadastrado e a tela redireciona automaticamente para o login.
+
+### 2. Via Terminal no Deploy
+Você pode invocar o assistente interativo no terminal a qualquer momento:
+```bash
+sudo ./deploy.sh --wizard
+```
+O assistente detecta as interfaces de rede, sugere os padrões e salva diretamente no arquivo `.env`.
 
 ---
 
@@ -32,6 +52,9 @@ sudo ./deploy.sh
 O script suporta flags para automação e manutenção:
 
 ```bash
+# Executar assistente interativo de configuração de variáveis
+sudo ./deploy.sh --wizard
+
 # Deploy totalmente automatizado (modo não-interativo, aceita todos os padrões)
 sudo ./deploy.sh -y
 
