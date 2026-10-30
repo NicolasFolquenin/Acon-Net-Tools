@@ -3015,12 +3015,14 @@ function renderKpiCards(summaries) {
         }
       }
     }
-    // 2. Tenta s.modular_results.packet_loss
+    // 2. Tenta s.modular_results.packet_loss (ignora amostras corrompidas de fallback TCP)
     if (!hasLossMetric && s && s.modular_results && s.modular_results.packet_loss) {
       const pl = s.modular_results.packet_loss;
-      hasLossMetric = true;
-      lossVal = pl.loss_percent !== undefined ? pl.loss_percent : (pl.lossPercent || 0);
-      if (pl.target) targetGateway = 'Alvo: ' + pl.target;
+      if (pl.received > 0 || (pl.loss_percent !== undefined && pl.loss_percent < 100)) {
+        hasLossMetric = true;
+        lossVal = pl.loss_percent !== undefined ? pl.loss_percent : (pl.lossPercent || 0);
+        if (pl.target) targetGateway = 'Alvo: ' + pl.target;
+      }
     }
     // 3. Fallback no histórico recente
     if (!hasLossMetric && cachedMetricsSeries && cachedMetricsSeries.length > 0) {
@@ -3031,8 +3033,11 @@ function renderKpiCards(summaries) {
           hasLossMetric = true;
           lossVal = (typeof pl === 'object' && pl.value !== undefined) ? Number(pl.value) : Number(pl);
         } else if (lastItem.modular_results && lastItem.modular_results.packet_loss) {
-          hasLossMetric = true;
-          lossVal = lastItem.modular_results.packet_loss.loss_percent || 0;
+          const mr = lastItem.modular_results.packet_loss;
+          if (mr.received > 0 || (mr.loss_percent !== undefined && mr.loss_percent < 100)) {
+            hasLossMetric = true;
+            lossVal = mr.loss_percent || 0;
+          }
         }
       }
     }
@@ -4038,16 +4043,21 @@ function renderComparativeCharts(series, nodesList) {
       if (!packetLossChart) initCharts();
       if (packetLossChart) {
         const lossData = nodeItems.map(item => {
+          let lossVal = null;
           if (item.metrics) {
             const pl = item.metrics.packet_loss_gateway || item.metrics.packet_loss || item.metrics.packet_loss_core;
             if (pl !== undefined && pl !== null) {
-              return (typeof pl === 'object' && pl.value !== undefined) ? Number(pl.value) : Number(pl);
+              lossVal = (typeof pl === 'object' && pl.value !== undefined) ? Number(pl.value) : Number(pl);
             }
           }
-          if (item.modular_results && item.modular_results.packet_loss) {
-            return item.modular_results.packet_loss.loss_percent || 0;
+          if (lossVal === null && item.modular_results && item.modular_results.packet_loss) {
+            const mr = item.modular_results.packet_loss;
+            // Só aceita resultado legado de modular_results se houver pacotes recebidos ou perda real inferior a 100%
+            if (mr.received > 0 || (mr.loss_percent !== undefined && mr.loss_percent < 100)) {
+              lossVal = Number(mr.loss_percent);
+            }
           }
-          return 0;
+          return (lossVal !== null && !isNaN(lossVal)) ? lossVal : null;
         });
 
         const canvasPL = document.getElementById('centralPacketLossChart');
