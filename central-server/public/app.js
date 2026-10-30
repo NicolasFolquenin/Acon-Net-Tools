@@ -6,6 +6,7 @@
 
 let bandwidthChart = null;
 let latencyChart = null;
+let packetLossChart = null;
 let currentUser = null;
 let currentSummaries = [];
 let pendingDeleteNodeId = null;
@@ -979,9 +980,25 @@ function setupEventListeners() {
   setupSegmentedControl();
 
   if (btnRefresh) {
-    btnRefresh.addEventListener('click', () => {
+    btnRefresh.addEventListener('click', async () => {
+      if (btnRefresh.classList.contains('is-refreshing')) return;
+      btnRefresh.classList.add('is-refreshing');
+      const btnSpan = btnRefresh.querySelector('span');
+      const prevText = btnSpan ? btnSpan.textContent : 'Atualizar';
+      if (btnSpan) btnSpan.textContent = 'Atualizando...';
       refreshCountdown = 15;
-      loadDashboardData();
+
+      try {
+        await loadDashboardData();
+        showToast('Dados e gráficos atualizados com sucesso!', 'toast-success');
+      } catch (err) {
+        showToast('Erro ao atualizar dados: ' + err.message, 'toast-error');
+      } finally {
+        setTimeout(() => {
+          btnRefresh.classList.remove('is-refreshing');
+          if (btnSpan) btnSpan.textContent = prevText;
+        }, 400);
+      }
     });
   }
 
@@ -3043,6 +3060,16 @@ function renderKpiCards(summaries) {
       }
     }
 
+    // Verifica módulos ativos da sonda selecionada para exibir apenas cards pertinentes
+    const activeMods = getActiveModulesForNode(selectedChartNode);
+    const hasDownloadMod = activeMods.some(m => m.id === 'throughput_download' || m.type === 'throughput_download');
+    const hasUploadMod = activeMods.some(m => m.id === 'throughput_upload' || m.type === 'throughput_upload');
+
+    const cardDown = document.getElementById('kpi-card-download');
+    const cardUp = document.getElementById('kpi-card-upload');
+    if (cardDown) cardDown.style.display = hasDownloadMod ? 'flex' : 'none';
+    if (cardUp) cardUp.style.display = hasUploadMod ? 'flex' : 'none';
+
     // Atualiza throughput e ping do nó focado
     if (downEl) downEl.textContent = (s.last_download || 0).toFixed(1);
     if (upEl) upEl.textContent = (s.last_upload || 0).toFixed(1);
@@ -3056,6 +3083,10 @@ function renderKpiCards(summaries) {
   } else {
     // === MODO CONSOLIDADO: CARD 1 = SONDAS MONITORADAS ===
     if (card1Label) card1Label.textContent = 'Sondas Monitoradas';
+    const cardDownCons = document.getElementById('kpi-card-download');
+    const cardUpCons = document.getElementById('kpi-card-upload');
+    if (cardDownCons) cardDownCons.style.display = 'flex';
+    if (cardUpCons) cardUpCons.style.display = 'flex';
 
     const total = summaries.length;
     const onlineCount = summaries.filter(s => s.is_healthy).length;
@@ -3709,6 +3740,40 @@ function initCharts() {
       console.warn('Erro ao criar latencyChart:', chartErr);
     }
   }
+
+  const canvasPacketLoss = document.getElementById('centralPacketLossChart');
+  if (canvasPacketLoss && !packetLossChart) {
+    try {
+      const ctxPacketLoss = canvasPacketLoss.getContext('2d');
+      packetLossChart = new Chart(ctxPacketLoss, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: {
+          ...chartOpts,
+          plugins: {
+            ...chartOpts.plugins,
+            tooltip: {
+              ...chartOpts.plugins.tooltip,
+              callbacks: {
+                label: (ctx) => ' ' + ctx.dataset.label + ': ' + (ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + '%' : '--')
+              }
+            }
+          },
+          scales: {
+            ...chartOpts.scales,
+            y: {
+              ...chartOpts.scales.y,
+              min: 0,
+              max: 100,
+              title: { display: true, text: '% Perda', color: colors.textColor, font: { size: 11, weight: '600' } }
+            }
+          }
+        }
+      });
+    } catch (chartErr) {
+      console.warn('Erro ao criar packetLossChart:', chartErr);
+    }
+  }
 }
 
 function renderComparativeCharts(series, nodesList) {
@@ -3746,11 +3811,29 @@ function renderComparativeCharts(series, nodesList) {
 
   // Modo Sonda Individual: Foco nas métricas dessa sonda
   if (selectedNode !== 'all') {
+    const activeMods = getActiveModulesForNode(selectedNode);
+    const hasDownloadMod = activeMods.some(m => m.id === 'throughput_download' || m.type === 'throughput_download');
+    const hasUploadMod = activeMods.some(m => m.id === 'throughput_upload' || m.type === 'throughput_upload');
+    const hasThroughput = hasDownloadMod || hasUploadMod;
+
+    const hasPingGateway = activeMods.some(m => m.id === 'ping_gateway');
+    const hasPingCore = activeMods.some(m => m.id === 'ping_nti_core');
+    const hasLatency = hasPingGateway || hasPingCore || activeMods.some(m => m.type === 'ping');
+
+    const hasPacketLoss = activeMods.some(m => m.type === 'packet_loss' || (m.id && m.id.startsWith('packet_loss')));
+
+    const bandwidthPanel = document.getElementById('bandwidth-chart-panel');
+    const latencyPanel = document.getElementById('latency-chart-panel');
+    const packetLossPanel = document.getElementById('packet-loss-chart-panel');
+
+    if (bandwidthPanel) bandwidthPanel.style.display = hasThroughput ? 'flex' : 'none';
+    if (latencyPanel) latencyPanel.style.display = hasLatency ? 'flex' : 'none';
+    if (packetLossPanel) packetLossPanel.style.display = hasPacketLoss ? 'flex' : 'none';
+
     const allNodeItems = series
       .filter(s => (s.node_id || s.NodeID) === selectedNode)
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-    // Limita estritamente aos últimos 20 testes
     const nodeItems = allNodeItems.slice(-20);
 
     const isDifferentDay = nodeItems.some(item => {
@@ -3762,77 +3845,26 @@ function renderComparativeCharts(series, nodesList) {
     const nodeLabels = nodeItems.map(item => {
       const d = new Date(item.timestamp);
       if (isDifferentDay) {
-        return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       }
       return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     });
 
-    const downData = nodeItems.map(item => item.download_mbps);
-    const upData = nodeItems.map(item => item.upload_mbps);
-    const pingData = nodeItems.map(item => item.ping_gateway);
+    // 1. Throughput (Download e Upload) se habilitado
+    if (hasThroughput && bandwidthChart) {
+      const downData = nodeItems.map(item => item.download_mbps);
+      const upData = nodeItems.map(item => item.upload_mbps);
+      const bandwidthDatasets = [];
 
-    const bandwidthDatasets = [];
-
-    if (currentBandwidthMetric === 'download') {
-      if (bandwidthChartTitle) bandwidthChartTitle.textContent = `Throughput - Download (${selectedNode})`;
-      if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxa de Download dos últimos 20 testes (Mbps)';
-      if (bandwidthLegendEl) {
-        bandwidthLegendEl.innerHTML = `<span class="legend-badge cyan-dot">Download</span>`;
-      }
-      bandwidthDatasets.push({
-        label: 'Download',
-        data: downData,
-        borderColor: '#06b6d4',
-        backgroundColor: createFillGradient(ctxBandwidth, 'rgba(6, 182, 212, 0.28)', 'rgba(6, 182, 212, 0.01)'),
-        fill: true,
-        tension: 0.38,
-        cubicInterpolationMode: 'monotone',
-        spanGaps: true,
-        borderWidth: 2.5,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-        pointBackgroundColor: '#06b6d4',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 1.5
-      });
-    } else if (currentBandwidthMetric === 'upload') {
-      if (bandwidthChartTitle) bandwidthChartTitle.textContent = `Throughput - Upload (${selectedNode})`;
-      if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxa de Upload dos últimos 20 testes (Mbps)';
-      if (bandwidthLegendEl) {
-        bandwidthLegendEl.innerHTML = `<span class="legend-badge purple-dot">Upload</span>`;
-      }
-      bandwidthDatasets.push({
-        label: 'Upload',
-        data: upData,
-        borderColor: '#4f46e5',
-        backgroundColor: createFillGradient(ctxBandwidth, 'rgba(79, 70, 229, 0.20)', 'rgba(79, 70, 229, 0.01)'),
-        fill: true,
-        tension: 0.38,
-        cubicInterpolationMode: 'monotone',
-        spanGaps: true,
-        borderWidth: 2.5,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-        pointBackgroundColor: '#4f46e5',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 1.5
-      });
-    } else {
-      // Modo Ambos
-      if (bandwidthChartTitle) bandwidthChartTitle.textContent = `Throughput - Comparativo (${selectedNode})`;
-      if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxas de Download e Upload dos últimos 20 testes (Mbps)';
-      if (bandwidthLegendEl) {
-        bandwidthLegendEl.innerHTML = `
-          <span class="legend-badge cyan-dot">Download</span>
-          <span class="legend-badge purple-dot">Upload</span>
-        `;
-      }
-      bandwidthDatasets.push(
-        {
+      if (currentBandwidthMetric === 'download' || (!hasUploadMod && hasDownloadMod)) {
+        if (bandwidthChartTitle) bandwidthChartTitle.textContent = 'Throughput - Download (' + selectedNode + ')';
+        if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxa de Download dos últimos 20 testes (Mbps)';
+        if (bandwidthLegendEl) bandwidthLegendEl.innerHTML = '<span class="legend-badge cyan-dot">Download</span>';
+        bandwidthDatasets.push({
           label: 'Download',
           data: downData,
-          borderColor: '#0284c7',
-          backgroundColor: createFillGradient(ctxBandwidth, 'rgba(2, 132, 199, 0.22)', 'rgba(2, 132, 199, 0.01)'),
+          borderColor: '#06b6d4',
+          backgroundColor: createFillGradient(ctxBandwidth, 'rgba(6, 182, 212, 0.28)', 'rgba(6, 182, 212, 0.01)'),
           fill: true,
           tension: 0.38,
           cubicInterpolationMode: 'monotone',
@@ -3840,11 +3872,15 @@ function renderComparativeCharts(series, nodesList) {
           borderWidth: 2.5,
           pointRadius: 3,
           pointHoverRadius: 6,
-          pointBackgroundColor: '#0284c7',
+          pointBackgroundColor: '#06b6d4',
           pointBorderColor: '#ffffff',
           pointBorderWidth: 1.5
-        },
-        {
+        });
+      } else if (currentBandwidthMetric === 'upload' || (!hasDownloadMod && hasUploadMod)) {
+        if (bandwidthChartTitle) bandwidthChartTitle.textContent = 'Throughput - Upload (' + selectedNode + ')';
+        if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxa de Upload dos últimos 20 testes (Mbps)';
+        if (bandwidthLegendEl) bandwidthLegendEl.innerHTML = '<span class="legend-badge purple-dot">Upload</span>';
+        bandwidthDatasets.push({
           label: 'Upload',
           data: upData,
           borderColor: '#4f46e5',
@@ -3859,42 +3895,198 @@ function renderComparativeCharts(series, nodesList) {
           pointBackgroundColor: '#4f46e5',
           pointBorderColor: '#ffffff',
           pointBorderWidth: 1.5
+        });
+      } else {
+        if (bandwidthChartTitle) bandwidthChartTitle.textContent = 'Throughput - Comparativo (' + selectedNode + ')';
+        if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxas de Download e Upload dos últimos 20 testes (Mbps)';
+        if (bandwidthLegendEl) {
+          bandwidthLegendEl.innerHTML = '<span class="legend-badge cyan-dot">Download</span><span class="legend-badge purple-dot">Upload</span>';
         }
-      );
-    }
-
-    bandwidthChart.data.labels = nodeLabels;
-    bandwidthChart.data.datasets = bandwidthDatasets;
-    bandwidthChart.update();
-
-    if (latencyLegendEl) {
-      latencyLegendEl.innerHTML = `<span class="legend-badge emerald-dot">Ping Gateway</span>`;
-    }
-
-    latencyChart.data.labels = nodeLabels;
-    latencyChart.data.datasets = [
-      {
-        label: 'Ping Gateway',
-        data: pingData,
-        borderColor: '#10b981',
-        backgroundColor: createFillGradient(ctxLatency, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
-        fill: true,
-        tension: 0.38,
-        cubicInterpolationMode: 'monotone',
-        spanGaps: true,
-        borderWidth: 2.5,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-        pointBackgroundColor: '#10b981',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 1.5
+        bandwidthDatasets.push(
+          {
+            label: 'Download',
+            data: downData,
+            borderColor: '#0284c7',
+            backgroundColor: createFillGradient(ctxBandwidth, 'rgba(2, 132, 199, 0.22)', 'rgba(2, 132, 199, 0.01)'),
+            fill: true,
+            tension: 0.38,
+            cubicInterpolationMode: 'monotone',
+            spanGaps: true,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#0284c7',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+          },
+          {
+            label: 'Upload',
+            data: upData,
+            borderColor: '#4f46e5',
+            backgroundColor: createFillGradient(ctxBandwidth, 'rgba(79, 70, 229, 0.20)', 'rgba(79, 70, 229, 0.01)'),
+            fill: true,
+            tension: 0.38,
+            cubicInterpolationMode: 'monotone',
+            spanGaps: true,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#4f46e5',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+          }
+        );
       }
-    ];
-    latencyChart.update();
+      bandwidthChart.data.labels = nodeLabels;
+      bandwidthChart.data.datasets = bandwidthDatasets;
+      bandwidthChart.update();
+    }
+
+    // 2. Latência (Gateway e Core) se habilitado
+    if (hasLatency && latencyChart) {
+      const pingGwData = nodeItems.map(item => item.ping_gateway);
+      const pingCoreData = nodeItems.map(item => {
+        if (item.metrics && item.metrics.ping_nti_core) {
+          const val = item.metrics.ping_nti_core;
+          return typeof val === 'object' ? Number(val.value || 0) : Number(val || 0);
+        }
+        return null;
+      });
+
+      const latencyDatasets = [];
+      if (currentLatencyMetric === 'core' && hasPingCore) {
+        if (latencyLegendEl) latencyLegendEl.innerHTML = '<span class="legend-badge blue-dot">Core NTI</span>';
+        latencyDatasets.push({
+          label: 'Core NTI',
+          data: pingCoreData,
+          borderColor: '#3b82f6',
+          backgroundColor: createFillGradient(ctxLatency, 'rgba(59, 130, 246, 0.25)', 'rgba(59, 130, 246, 0.01)'),
+          fill: true,
+          tension: 0.38,
+          cubicInterpolationMode: 'monotone',
+          spanGaps: true,
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#3b82f6',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
+        });
+      } else if (currentLatencyMetric === 'both' && hasPingCore) {
+        if (latencyLegendEl) latencyLegendEl.innerHTML = '<span class="legend-badge emerald-dot">Ping Gateway</span><span class="legend-badge blue-dot">Core NTI</span>';
+        latencyDatasets.push(
+          {
+            label: 'Ping Gateway',
+            data: pingGwData,
+            borderColor: '#10b981',
+            backgroundColor: createFillGradient(ctxLatency, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
+            fill: true,
+            tension: 0.38,
+            cubicInterpolationMode: 'monotone',
+            spanGaps: true,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#10b981',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+          },
+          {
+            label: 'Core NTI',
+            data: pingCoreData,
+            borderColor: '#3b82f6',
+            backgroundColor: createFillGradient(ctxLatency, 'rgba(59, 130, 246, 0.20)', 'rgba(59, 130, 246, 0.01)'),
+            fill: true,
+            tension: 0.38,
+            cubicInterpolationMode: 'monotone',
+            spanGaps: true,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#3b82f6',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+          }
+        );
+      } else {
+        if (latencyLegendEl) latencyLegendEl.innerHTML = '<span class="legend-badge emerald-dot">Ping Gateway</span>';
+        latencyDatasets.push({
+          label: 'Ping Gateway',
+          data: pingGwData,
+          borderColor: '#10b981',
+          backgroundColor: createFillGradient(ctxLatency, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
+          fill: true,
+          tension: 0.38,
+          cubicInterpolationMode: 'monotone',
+          spanGaps: true,
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#10b981',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
+        });
+      }
+
+      latencyChart.data.labels = nodeLabels;
+      latencyChart.data.datasets = latencyDatasets;
+      latencyChart.update();
+    }
+
+    // 3. Perda de Pacotes se habilitado
+    if (hasPacketLoss) {
+      if (!packetLossChart) initCharts();
+      if (packetLossChart) {
+        const lossData = nodeItems.map(item => {
+          if (item.metrics) {
+            const pl = item.metrics.packet_loss_gateway || item.metrics.packet_loss || item.metrics.packet_loss_core;
+            if (pl !== undefined && pl !== null) {
+              return (typeof pl === 'object' && pl.value !== undefined) ? Number(pl.value) : Number(pl);
+            }
+          }
+          if (item.modular_results && item.modular_results.packet_loss) {
+            return item.modular_results.packet_loss.loss_percent || 0;
+          }
+          return 0;
+        });
+
+        const canvasPL = document.getElementById('centralPacketLossChart');
+        const ctxPL = canvasPL ? canvasPL.getContext('2d') : null;
+        const bgGrad = ctxPL ? createFillGradient(ctxPL, 'rgba(239, 68, 68, 0.25)', 'rgba(239, 68, 68, 0.01)') : 'rgba(239, 68, 68, 0.1)';
+
+        packetLossChart.data.labels = nodeLabels;
+        packetLossChart.data.datasets = [
+          {
+            label: 'Perda de Pacotes (%)',
+            data: lossData,
+            borderColor: '#ef4444',
+            backgroundColor: bgGrad,
+            fill: true,
+            tension: 0.38,
+            cubicInterpolationMode: 'monotone',
+            spanGaps: true,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#ef4444',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+          }
+        ];
+        packetLossChart.update();
+      }
+    }
+
     return;
   }
 
   // Modo Consolidado (Todos os Nós ou Grupo Filtrado):
+  const bPanel = document.getElementById('bandwidth-chart-panel');
+  const lPanel = document.getElementById('latency-chart-panel');
+  const plPanel = document.getElementById('packet-loss-chart-panel');
+  if (bPanel) bPanel.style.display = 'flex';
+  if (lPanel) lPanel.style.display = 'flex';
+  if (plPanel) plPanel.style.display = 'none';
   let effectiveSeries = series;
   let activeGroupName = '';
 
@@ -6012,3 +6204,16 @@ async function resetCurrentMachineToGroup() {
   }
 }
 window.resetCurrentMachineToGroup = resetCurrentMachineToGroup;
+
+function getActiveModulesForNode(hostname) {
+  const mach = (allAdminMachines || []).find(m => m.hostname === hostname);
+  if (mach && mach.is_custom && mach.custom_tests && mach.custom_tests.length > 0) {
+    return mach.custom_tests;
+  }
+  const grpId = (mach && mach.group_id) || 'default';
+  const grp = (currentGroups || []).find(g => g.id === grpId || g.name === grpId);
+  if (grp && grp.profile && grp.profile.tests) {
+    return grp.profile.tests;
+  }
+  return [];
+}
