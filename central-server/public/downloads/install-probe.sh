@@ -241,9 +241,9 @@ show_wifi_animation() {
   local ip="$3"
   local gw="$4"
 
-  trap '
-    printf "\033[?25h\n\n"
-    echo -e "${GREEN}==================================================================${NC}"
+  cleanup_anim() {
+    printf "\033[?25h\033[?1049l"
+    echo -e "\n${GREEN}==================================================================${NC}"
     echo -e "${GREEN}  ✓ Sonda mantida em SEGUNDO PLANO (serviço ativo no systemd)!   ${NC}"
     echo -e "${GREEN}==================================================================${NC}"
     echo -e "A sonda UEPG Net Tools permanece ativa e enviando dados para o servidor."
@@ -252,12 +252,11 @@ show_wifi_animation() {
     echo -e "  • Consultar status:   ${YELLOW}systemctl status uepg-probe${NC}"
     echo -e "  • Reiniciar sonda:    ${YELLOW}systemctl restart uepg-probe${NC}\n"
     exit 0
-  ' SIGINT SIGTERM
+  }
+  trap cleanup_anim SIGINT SIGTERM
 
-  printf "\033[?25l"
-  echo -e "\n${BLUE}================================================================================${NC}"
-  echo -e "${CYAN}   📶 UEPG NET TOOLS • TRANSMISSÃO WIFI EM TEMPO REAL (MATH ASCII WAVES)         ${NC}"
-  echo -e "${BLUE}================================================================================${NC}\n"
+  # Entra no Alternate Screen Buffer, limpa a tela e esconde o cursor
+  printf "\033[?1049h\033[2J\033[H\033[?25l"
 
   F_0=(
     '                                    '
@@ -529,29 +528,40 @@ show_wifi_animation() {
 
     eval "local -a cur_f=(\"\${F_${frame_idx}[@]}\")"
 
-    printf "\r\033[K ${CYAN}%-36s${NC}   ${GREEN}● STATUS: ONLINE${NC}  ${BLUE}[ Systemd Daemon ]${NC}\n" "${cur_f[0]}"
-    printf "\033[K ${CYAN}%-36s${NC}   ${BLUE}──────────────────────────────────────────────${NC}\n" "${cur_f[1]}"
-    printf "\033[K ${CYAN}%-36s${NC}   • Servidor:   ${CYAN}%s${NC}\n" "${cur_f[2]}" "${srv}"
-    printf "\033[K ${CYAN}%-36s${NC}   • Hostname:   ${YELLOW}%s${NC}\n" "${cur_f[3]}" "${host}"
-    printf "\033[K ${CYAN}%-36s${NC}   • IP Sonda:   ${CYAN}%s${NC}\n" "${cur_f[4]}" "${ip}"
-    printf "\033[K ${CYAN}%-36s${NC}   • Gateway:    ${CYAN}%s${NC}\n" "${cur_f[5]}" "${gw}"
-    printf "\033[K ${CYAN}%-36s${NC}   • Conexão:    ${GREEN}%s${NC}  • Uptime: ${YELLOW}%s${NC}\n" "${cur_f[6]}" "${sig}" "${time_str}"
-    printf "\033[K ${CYAN}%-36s${NC}   • Telemetria: Coleta em tempo real ativa\n" "${cur_f[7]}"
-    printf "\033[K ${CYAN}%-36s${NC}   ${BLUE}──────────────────────────────────────────────${NC}\n" "${cur_f[8]}"
-    printf "\033[K ${CYAN}%-36s${NC}   ${YELLOW}👉 Pressione [ CTRL + C ] para sair${NC}\n" "${cur_f[9]}"
-    printf "\033[K ${CYAN}%-36s${NC}      ${GREEN}(a sonda continuará em segundo plano)${NC}\n" "${cur_f[10]}"
-    printf "\033[K ${CYAN}%-36s${NC}\n" "${cur_f[11]}"
-    printf "\033[K ${CYAN}%-36s${NC}\n" "${cur_f[12]}"
-    printf "\033[K ${CYAN}%-36s${NC}\n" "${cur_f[13]}"
+    local disp_srv="${srv}"
+    if [ ${#disp_srv} -gt 28 ]; then
+      disp_srv="${disp_srv:0:25}..."
+    fi
+
+    local disp_host="${host}"
+    if [ ${#disp_host} -gt 20 ]; then
+      disp_host="${disp_host:0:17}..."
+    fi
+
+    # Reposiciona o cursor no canto superior esquerdo (1,1) para estabilidade total contra scrolls
+    printf "\033[H"
+    printf " ${BLUE}┌────────────────────────────────────┐${NC}   ${GREEN}● STATUS: ONLINE${NC}  ${BLUE}[ Systemd Daemon ]${NC}\033[K\n"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   ${BLUE}──────────────────────────────────────${NC}\033[K\n" "${cur_f[0]}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   • Servidor:   ${CYAN}%s${NC}\033[K\n" "${cur_f[1]}" "${disp_srv}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   • Hostname:   ${YELLOW}%s${NC}\033[K\n" "${cur_f[2]}" "${disp_host}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   • IP Sonda:   ${CYAN}%s${NC}\033[K\n" "${cur_f[3]}" "${ip}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   • Gateway:    ${CYAN}%s${NC}\033[K\n" "${cur_f[4]}" "${gw}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   • Conexao:    ${GREEN}%s${NC}  • Tempo: ${YELLOW}%s${NC}\033[K\n" "${cur_f[5]}" "${sig}" "${time_str}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   • Telemetria: Coleta em tempo real ativa\033[K\n" "${cur_f[6]}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   ${BLUE}──────────────────────────────────────${NC}\033[K\n" "${cur_f[7]}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   ${YELLOW}> Pressione [ CTRL + C ] para sair${NC}\033[K\n" "${cur_f[8]}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}     ${GREEN}(a sonda continua em background)${NC}\033[K\n" "${cur_f[9]}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   • Logs:   ${CYAN}journalctl -u uepg-probe -f${NC}\033[K\n" "${cur_f[10]}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}   • Status: ${CYAN}systemctl status uepg-probe${NC}\033[K\n" "${cur_f[11]}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}\033[K\n" "${cur_f[12]}"
+    printf " ${BLUE}│${NC} ${CYAN}%-34.34s${NC} ${BLUE}│${NC}\033[K\n" "${cur_f[13]}"
+    printf " ${BLUE}└────────────────────────────────────┘${NC}\033[K\n"
 
     sleep 0.15
     if [ $(( frame_idx % 6 )) -eq 0 ]; then
       sec=$(( sec + 1 ))
     fi
     frame_idx=$(( (frame_idx + 1) % num_frames ))
-
-    # Retorna 14 linhas para cima para redesenhar fluidamente o próximo frame das ondas WiFi
-    printf "\033[14A"
   done
 }
 
