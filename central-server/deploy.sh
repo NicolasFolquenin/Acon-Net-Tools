@@ -181,9 +181,11 @@ fi
 # ==============================================================================
 echo -e "${GREEN}[2/5] Configurando variáveis de ambiente (.env)...${NC}"
 
+IS_FIRST_INSTALL=false
 if [ ! -f ".env" ]; then
+  IS_FIRST_INSTALL=true
   if [ -f ".env.example" ]; then
-    echo -e "${YELLOW}[!] .env não encontrado. Copiando de .env.example...${NC}"
+    echo -e "${YELLOW}[!] .env não encontrado. Criando a partir de .env.example...${NC}"
     cp .env.example .env
   else
     echo -e "${RED}[ERRO] Arquivo .env.example não encontrado.${NC}"
@@ -217,9 +219,12 @@ if [ -z "$SUGGESTED_PUBLIC_URL" ] || [ "$SUGGESTED_PUBLIC_URL" = "http://localho
   SUGGESTED_PUBLIC_URL="http://${LOCAL_IP}:${CURRENT_PORT}"
 fi
 
-# Verifica se o setup já foi concluído anteriormente
+# Verifica se é uma VM que já possui o servidor em funcionamento ou se é instalação nova
 SETUP_ALREADY_DONE=false
-if grep -q "^SETUP_COMPLETED=true" .env 2>/dev/null || [ -f "config/.setup_done" ]; then
+if [ "$IS_FIRST_INSTALL" = false ]; then
+  # Servidor já existente (já possui .env configurado anteriormente)
+  SETUP_ALREADY_DONE=true
+elif grep -q "^SETUP_COMPLETED=true" .env 2>/dev/null || [ -f "config/.setup_done" ] || [ -d "mongo_data" ]; then
   SETUP_ALREADY_DONE=true
 fi
 
@@ -287,7 +292,7 @@ sed -i "s|^DNS_SERVER_TARGET=.*|DNS_SERVER_TARGET=${TARGET_DNS}|g" .env 2>/dev/n
 sed -i "s|^DNS_DOMAIN_TARGET=.*|DNS_DOMAIN_TARGET=${TARGET_DOMAIN}|g" .env 2>/dev/null || true
 sed -i "s|^PING_CORE_TARGET=.*|PING_CORE_TARGET=${TARGET_CORE}|g" .env 2>/dev/null || true
 sed -i "s|^AUTH_ADMIN_PASSWORD=.*|AUTH_ADMIN_PASSWORD=${TARGET_PASS}|g" .env 2>/dev/null || true
-sed -i "s|^SETUP_COMPLETED=.*|SETUP_COMPLETED=true|g" .env 2>/dev/null || true
+grep -q "^SETUP_COMPLETED=" .env 2>/dev/null && sed -i "s|^SETUP_COMPLETED=.*|SETUP_COMPLETED=true|g" .env || echo "SETUP_COMPLETED=true" >> .env
 
 # Cria marcador em disco indicando setup concluído
 mkdir -p config
