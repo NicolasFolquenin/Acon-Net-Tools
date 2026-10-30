@@ -19,31 +19,35 @@ sudo ./deploy.sh
 
 ### O que o `deploy.sh` faz automaticamente:
 1. **Detecção e Instalação do Docker:** Se o Docker e o Docker Compose não estiverem instalados, oferece instalação automática com o script oficial.
-2. **Assistente Interativo de Setup (`.env`):** No primeiro deploy, guia passo a passo pelo terminal perguntando a porta, URL pública, IP do DNS institucional, domínio de teste, roteador core e senha do administrador — ou permite abrir o navegador para configurar tudo via Web Wizard visual.
-3. **Compatibilidade Ampla de CPU para VMs:** O banco de dados utiliza imagem MongoDB adaptada para rodar perfeitamente em Hypervisors (Proxmox, VMware, ESXi) mesmo sem instruções AVX.
-4. **Construção e Execução dos Containers:** Sobe o servidor Go e o MongoDB em segundo plano via Docker Compose.
-5. **Verificação de Saúde (Healthcheck):** Aguarda a inicialização e valida o endpoint `/health`.
-6. **Exibição do Resumo:** Mostra URLs de acesso, credenciais padrão e comandos de administração.
+2. **Assistente de Primeiro Deploy no Terminal da VM:** No primeiro deploy, guia passo a passo pelo terminal perguntando a porta, URL pública, IP do DNS, domínio de teste, roteador core e senha do administrador, gravando tudo diretamente no `.env`.
+3. **Persistência Completa de Volumes:** As configurações (`.env`), perfis de máquinas (`./config`) e o banco de dados (`./mongo_data`) ficam vinculados a volumes persistentes no host. Comandos como `docker compose down` e `docker compose up` preservam 100% dos dados sem pedir as configurações novamente.
+4. **Compatibilidade Ampla de CPU para VMs:** O banco de dados utiliza imagem MongoDB adaptada para rodar perfeitamente em Hypervisors (Proxmox, VMware, ESXi) mesmo sem instruções AVX.
+5. **Construção e Execução dos Containers:** Sobe o servidor Go e o MongoDB em segundo plano via Docker Compose.
+6. **Verificação de Saúde (Healthcheck):** Aguarda a inicialização e valida o endpoint `/health`.
+7. **Exibição do Resumo:** Mostra URLs de acesso, credenciais prontas e comandos de administração.
 
 ---
 
-## 🧙‍♂️ Assistente de Primeiro Acesso (Setup Wizard)
+## 🛠️ Configuração Inicial e Manutenção na VM
 
-Ao rodar o Servidor Central pela primeira vez, você não precisa editar manualmente o `.env`. O sistema oferece duas formas práticas:
+A configuração do servidor é realizada **exclusivamente dentro do terminal da VM Linux**, garantindo segurança e evitando qualquer exposição de assistentes de configuração na web:
 
-### 1. Via Navegador Web (Recomendado)
-Ao abrir a URL do servidor pela primeira vez (ex: `http://<IP-DA-VM>:8085`), o sistema detecta que o setup ainda não foi realizado e redireciona automaticamente para `/setup.html`.
-- **Passo 1 (Rede & Domínio):** Confirmação da porta HTTP e URL pública do servidor com detecção automática do IP da máquina.
-- **Passo 2 (Alvos Institucionais):** Definição do IP do DNS local, domínio de resolução e gateway/core de roteamento.
-- **Passo 3 (Segurança & Credenciais):** Criação da senha do usuário administrador e chave de API para as sondas.
-- Ao clicar em **Concluir e Salvar**, as configurações são gravadas no `.env`, o admin é cadastrado e a tela redireciona automaticamente para o login.
+### 1. Primeiro Deploy na VM
+Ao executar `./deploy.sh` pela primeira vez, o assistente do terminal detecta a rede e sugere os valores padrão:
+- **Porta HTTP** (padrão `8085`)
+- **URL Pública** (detectada automaticamente a partir do IP da VM)
+- **Servidor DNS e Domínio de Teste**
+- **IP do Roteador Core**
+- **Senha do Administrador Web**
 
-### 2. Via Terminal no Deploy
-Você pode invocar o assistente interativo no terminal a qualquer momento:
+### 2. Reiniciar ou Redeployar sem Reconfigurar
+Nas execuções subsequentes de `./deploy.sh` (ou ao executar `docker compose down` e `docker compose up`), o sistema detecta que o ambiente já está configurado e **inicia imediatamente**, sem repetir perguntas.
+
+### 3. Reconfigurar a Qualquer Momento
+Caso deseje alterar portas, alvos de DNS ou credenciais no futuro, execute no terminal:
 ```bash
 sudo ./deploy.sh --wizard
 ```
-O assistente detecta as interfaces de rede, sugere os padrões e salva diretamente no arquivo `.env`.
 
 ---
 
