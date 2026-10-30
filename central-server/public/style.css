@@ -6164,3 +6164,20 @@ body.auth-mode .dashboard-layout {
   background: #f8fafc;
   border-color: #e2e8f0;
 }
+
+/* Feedback de rotação no botão Atualizar */
+@keyframes spinRefresh {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.btn-glass.is-refreshing {
+  opacity: 0.85;
+  pointer-events: none;
+  cursor: wait;
+}
+
+.btn-glass.is-refreshing .icon-refresh {
+  animation: spinRefresh 0.8s linear infinite !important;
+  color: var(--accent-cyan);
+}
