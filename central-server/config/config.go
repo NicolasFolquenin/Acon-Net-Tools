@@ -2,10 +2,13 @@ package config
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // AppConfig armazena as configurações do Servidor Central
@@ -37,6 +40,8 @@ type AppConfig struct {
 	DefaultPingTarget   string `json:"default_ping_target"`
 	SpeedtestDownloadMB int    `json:"speedtest_download_mb"`
 	SpeedtestUploadMB   int    `json:"speedtest_upload_mb"`
+	SetupCompleted      bool   `json:"setup_completed"`
+	mu                  sync.RWMutex
 }
 
 var currentConfig *AppConfig
@@ -88,6 +93,13 @@ func LoadConfig() *AppConfig {
 		}
 	}
 
+	setupCompleted := getEnvAsBool("SETUP_COMPLETED", false)
+	// Checa também marcador de arquivo em disco
+	setupMarker := filepath.Join("config", ".setup_done")
+	if _, err := os.Stat(setupMarker); err == nil {
+		setupCompleted = true
+	}
+
 	cfg := &AppConfig{
 		Port:                getEnv("PORT", "8085"),
 		MongoURI:            getEnv("MONGO_URI", "mongodb://localhost:27017"),
@@ -108,21 +120,121 @@ func LoadConfig() *AppConfig {
 		OIDCRedirectURL:     getEnv("OIDC_REDIRECT_URL", ""),
 		OIDCAdminGroup:      getEnv("OIDC_ADMIN_GROUP", "noc-admins"),
 		PublicServerURL:     strings.TrimSuffix(getEnv("PUBLIC_SERVER_URL", getEnv("SERVER_EXTERNAL_URL", "")), "/"),
-		DNSServerTarget:     getEnv("DNS_SERVER_TARGET", "177.101.22.40"),
-		DNSDomainTarget:     getEnv("DNS_DOMAIN_TARGET", "uepg.br"),
-		DNSServerName:       getEnv("DNS_SERVER_NAME", "Resolução DNS Institucional"),
-		PingCoreTarget:      getEnv("PING_CORE_TARGET", "177.101.22.40"),
-		PingCoreName:        getEnv("PING_CORE_NAME", "Latência Core NTI (Anel)"),
+		DNSServerTarget:     getEnv("DNS_SERVER_TARGET", "1.1.1.1"),
+		DNSDomainTarget:     getEnv("DNS_DOMAIN_TARGET", "google.com"),
+		DNSServerName:       getEnv("DNS_SERVER_NAME", "DNS Primário"),
+		PingCoreTarget:      getEnv("PING_CORE_TARGET", "1.1.1.1"),
+		PingCoreName:        getEnv("PING_CORE_NAME", "Roteador Central (Core)"),
 		DefaultPingTarget:   getEnv("DEFAULT_PING_TARGET", "auto_gateway"),
 		SpeedtestDownloadMB: getEnvAsInt("SPEEDTEST_DOWNLOAD_MB", 5),
 		SpeedtestUploadMB:   getEnvAsInt("SPEEDTEST_UPLOAD_MB", 2),
+		SetupCompleted:      setupCompleted,
 	}
 
 	currentConfig = cfg
 
-	log.Printf("[CONFIG] Servidor configurado: Port=%s, MongoURI=%s, DB=%s, DNS_Server=%s, DNS_Domain=%s, Core_Target=%s",
-		cfg.Port, cfg.MongoURI, cfg.DatabaseName, cfg.DNSServerTarget, cfg.DNSDomainTarget, cfg.PingCoreTarget)
+	log.Printf("[CONFIG] Servidor configurado: Port=%s, SetupCompleted=%t, DNS_Server=%s, DNS_Domain=%s, Core_Target=%s",
+		cfg.Port, cfg.SetupCompleted, cfg.DNSServerTarget, cfg.DNSDomainTarget, cfg.PingCoreTarget)
 	return cfg
+}
+
+// UpdateEnvFile atualiza ou insere chaves no arquivo .env preservando comentários
+func UpdateEnvFile(filename string, updates map[string]string) error {
+	var lines []string
+	found := make(map[string]bool)
+
+	if data, err := os.ReadFile(filename); err == nil {
+		scanner := bufio.NewScanner(strings.NewReader(string(data)))
+		for scanner.Scan() {
+			line := scanner.Text()
+			trimmed := strings.TrimSpace(line)
+			if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+				parts := strings.SplitN(trimmed, "=", 2)
+				if len(parts) == 2 {
+					key := strings.TrimSpace(parts[0])
+					if val, ok := updates[key]; ok {
+						lines = append(lines, fmt.Sprintf("%s=%s", key, val))
+						found[key] = true
+						continue
+					}
+				}
+			}
+			lines = append(lines, line)
+		}
+	}
+
+	for k, v := range updates {
+		if !found[k] {
+			lines = append(lines, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
+
+	content := strings.Join(lines, "\n")
+	if !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+	return os.WriteFile(filename, []byte(content), 0644)
+}
+
+// MarkSetupCompleted salva as configurações no .env, atualiza a memória e cria o marcador permanente
+func (cfg *AppConfig) MarkSetupCompleted(updates map[string]string) error {
+	cfg.mu.Lock()
+	defer cfg.mu.Unlock()
+
+	updates["SETUP_COMPLETED"] = "true"
+
+	// Atualiza arquivo .env
+	_ = UpdateEnvFile(".env", updates)
+
+	// Atualiza variáveis no processo
+	for k, v := range updates {
+		_ = os.Setenv(k, v)
+	}
+
+	// Atualiza campos da struct em memória
+	if v, ok := updates["PORT"]; ok && v != "" {
+		cfg.Port = v
+	}
+	if v, ok := updates["PUBLIC_SERVER_URL"]; ok && v != "" {
+		cfg.PublicServerURL = v
+	}
+	if v, ok := updates["DNS_SERVER_TARGET"]; ok && v != "" {
+		cfg.DNSServerTarget = v
+	}
+	if v, ok := updates["DNS_DOMAIN_TARGET"]; ok && v != "" {
+		cfg.DNSDomainTarget = v
+	}
+	if v, ok := updates["DNS_SERVER_NAME"]; ok && v != "" {
+		cfg.DNSServerName = v
+	}
+	if v, ok := updates["PING_CORE_TARGET"]; ok && v != "" {
+		cfg.PingCoreTarget = v
+	}
+	if v, ok := updates["PING_CORE_NAME"]; ok && v != "" {
+		cfg.PingCoreName = v
+	}
+	if v, ok := updates["DEFAULT_PING_TARGET"]; ok && v != "" {
+		cfg.DefaultPingTarget = v
+	}
+	if v, ok := updates["AUTH_ADMIN_USER"]; ok && v != "" {
+		cfg.AdminUser = v
+	}
+	if v, ok := updates["AUTH_ADMIN_PASSWORD"]; ok && v != "" {
+		cfg.AdminPass = v
+	}
+	if v, ok := updates["API_TOKEN"]; ok && v != "" {
+		cfg.APIToken = v
+	}
+
+	cfg.SetupCompleted = true
+
+	// Cria marcador permanente em disco
+	_ = os.MkdirAll("config", 0755)
+	setupMarker := filepath.Join("config", ".setup_done")
+	_ = os.WriteFile(setupMarker, []byte("completed"), 0644)
+
+	log.Printf("[SETUP] Assistente de primeiro acesso concluído com sucesso!")
+	return nil
 }
 
 func getEnv(key, defaultVal string) string {
