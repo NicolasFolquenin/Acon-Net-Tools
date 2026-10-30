@@ -49,7 +49,8 @@ sudo ./deploy.sh
 
 ### O que o `deploy.sh` faz por você:
 - ✅ Verifica e instala automaticamente o **Docker** e o **Docker Compose** caso não estejam presentes.
-- ✅ **Assistente de Primeiro Acesso (Setup Wizard):** Permite configurar todas as variáveis (Porta, DNS, Domínio, Core, Senha) via terminal ou pelo navegador (`/setup.html`) na primeira inicialização, gravando tudo automaticamente no `.env`.
+- ✅ **Assistente no Terminal da VM:** Configura as variáveis (Porta, DNS, Domínio, Core, Senha) diretamente no terminal da VM no primeiro deploy, gravando tudo automaticamente no `.env` persistente.
+- ✅ **Persistência Completa de Volumes:** Mantém `.env`, `./config` e `./mongo_data` preservados no host. Comandos como `docker compose down` e `up` não perdem dados nem pedem configs novamente.
 - ✅ Customização total via `.env`: Porta, IP/Domínio do DNS, Core de rede e limites de teste podem ser alterados para qualquer instituição/empresa sem tocar em código.
 - ✅ Garante compatibilidade de CPU em Hypervisors e VMs legadas (MongoDB Time Series 4.4 sem exigência de flags AVX).
 - ✅ Inicia os containers em segundo plano e realiza teste de saúde no endpoint `/health`.
@@ -57,7 +58,8 @@ sudo ./deploy.sh
 
 ### Comandos de Gestão do Servidor:
 ```bash
-./deploy.sh --wizard    # Abre o assistente interativo de configuração no terminal
+./deploy.sh             # Deploy / Inicialização rápida (se já configurado, sobe direto sem perguntas)
+./deploy.sh --wizard    # Abre o assistente interativo de configuração no terminal da VM
 ./deploy.sh --status    # Consulta o status dos containers e saúde do banco
 ./deploy.sh --logs      # Acompanha logs do servidor Go em tempo real
 ./deploy.sh --down      # Interrompe os containers com segurança (mantém os dados salvos)

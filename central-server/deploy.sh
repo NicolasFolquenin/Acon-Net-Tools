@@ -181,9 +181,11 @@ fi
 # ==============================================================================
 echo -e "${GREEN}[2/5] Configurando variáveis de ambiente (.env)...${NC}"
 
+IS_FIRST_INSTALL=false
 if [ ! -f ".env" ]; then
+  IS_FIRST_INSTALL=true
   if [ -f ".env.example" ]; then
-    echo -e "${YELLOW}[!] .env não encontrado. Copiando de .env.example...${NC}"
+    echo -e "${YELLOW}[!] .env não encontrado. Criando a partir de .env.example...${NC}"
     cp .env.example .env
   else
     echo -e "${RED}[ERRO] Arquivo .env.example não encontrado.${NC}"
@@ -217,10 +219,26 @@ if [ -z "$SUGGESTED_PUBLIC_URL" ] || [ "$SUGGESTED_PUBLIC_URL" = "http://localho
   SUGGESTED_PUBLIC_URL="http://${LOCAL_IP}:${CURRENT_PORT}"
 fi
 
-# Configuração interativa (Assistente de Instalação no Terminal)
-if [ "$NON_INTERACTIVE" = false ] && [ -c /dev/tty ]; then
+# Verifica se é uma VM que já possui o servidor em funcionamento ou se é instalação nova
+SETUP_ALREADY_DONE=false
+if [ "$IS_FIRST_INSTALL" = false ]; then
+  # Servidor já existente (já possui .env configurado anteriormente)
+  SETUP_ALREADY_DONE=true
+elif grep -q "^SETUP_COMPLETED=true" .env 2>/dev/null || [ -f "config/.setup_done" ] || [ -d "mongo_data" ]; then
+  SETUP_ALREADY_DONE=true
+fi
+
+SHOULD_RUN_WIZARD=false
+if [ "$ACTION" = "wizard" ]; then
+  SHOULD_RUN_WIZARD=true
+elif [ "$SETUP_ALREADY_DONE" = false ] && [ "$NON_INTERACTIVE" = false ] && [ -c /dev/tty ]; then
+  SHOULD_RUN_WIZARD=true
+fi
+
+# Configuração interativa (Apenas no primeiro deploy na VM ou com flag --wizard)
+if [ "$SHOULD_RUN_WIZARD" = true ]; then
   echo -e "${CYAN}┌────────────────────────────────────────────────────────────────────────┐${NC}"
-  echo -e "${CYAN}│${BOLD}   🛠️  ASSISTENTE INTERATIVO DE CONFIGURAÇÃO (SETUP WIZARD)            ${NC}${CYAN}│${NC}"
+  echo -e "${CYAN}│${BOLD}   🛠️  ASSISTENTE DE CONFIGURAÇÃO DO SERVIDOR CENTRAL NA VM            ${NC}${CYAN}│${NC}"
   echo -e "${CYAN}│   Pressione [ENTER] para aceitar os valores sugeridos entre colchetes. │${NC}"
   echo -e "${CYAN}└────────────────────────────────────────────────────────────────────────┘${NC}\n"
 
@@ -253,7 +271,12 @@ else
   TARGET_DNS="$CURRENT_DNS_SERVER"
   TARGET_DOMAIN="$CURRENT_DNS_DOMAIN"
   TARGET_CORE="$CURRENT_PING_CORE"
-  TARGET_PASS="admin123"
+  TARGET_PASS=$(grep -E '^AUTH_ADMIN_PASSWORD=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "admin123")
+  [ -z "$TARGET_PASS" ] && TARGET_PASS="admin123"
+
+  echo -e "${GREEN}[✓] Configurações persistentes carregadas do .env:${NC}"
+  echo -e "    Porta: ${CYAN}${TARGET_PORT}${NC} | URL: ${CYAN}${TARGET_URL}${NC} | DNS: ${CYAN}${TARGET_DNS}${NC} | Core: ${CYAN}${TARGET_CORE}${NC}"
+  echo -e "${YELLOW}    (Para alterar parâmetros na VM a qualquer momento, execute: ./deploy.sh --wizard)${NC}\n"
 fi
 
 # Garante protocolo http/https na URL pública
@@ -269,7 +292,7 @@ sed -i "s|^DNS_SERVER_TARGET=.*|DNS_SERVER_TARGET=${TARGET_DNS}|g" .env 2>/dev/n
 sed -i "s|^DNS_DOMAIN_TARGET=.*|DNS_DOMAIN_TARGET=${TARGET_DOMAIN}|g" .env 2>/dev/null || true
 sed -i "s|^PING_CORE_TARGET=.*|PING_CORE_TARGET=${TARGET_CORE}|g" .env 2>/dev/null || true
 sed -i "s|^AUTH_ADMIN_PASSWORD=.*|AUTH_ADMIN_PASSWORD=${TARGET_PASS}|g" .env 2>/dev/null || true
-sed -i "s|^SETUP_COMPLETED=.*|SETUP_COMPLETED=true|g" .env 2>/dev/null || true
+grep -q "^SETUP_COMPLETED=" .env 2>/dev/null && sed -i "s|^SETUP_COMPLETED=.*|SETUP_COMPLETED=true|g" .env || echo "SETUP_COMPLETED=true" >> .env
 
 # Cria marcador em disco indicando setup concluído
 mkdir -p config
