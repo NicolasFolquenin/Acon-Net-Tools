@@ -69,15 +69,8 @@ func (h *MachineProfileHandler) HandleGetProfileByHostname(w http.ResponseWriter
 	if errFile == nil {
 		var prof models.MeasurementProfile
 		if errJSON := json.Unmarshal(data, &prof); errJSON == nil {
-			hasThroughput := false
-			for _, t := range prof.Tests {
-				if t.Type == models.TaskTypeThroughputDownload {
-					hasThroughput = true
-					break
-				}
-			}
-			// Se já possui throughput ou é um perfil customizado, retorna diretamente
-			if hasThroughput || len(prof.Tests) > 2 {
+			// Se o perfil tem 1 ou mais módulos configurados, retorna diretamente
+			if len(prof.Tests) > 0 {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write(data)

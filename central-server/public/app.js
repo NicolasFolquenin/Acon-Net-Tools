@@ -306,6 +306,26 @@ let refreshInterval = null;
 
 // Controle de Métrica de Throughput (Download / Upload / Ambos)
 let currentBandwidthMetric = 'download';
+let currentLatencyMetric = 'gateway'; // 'gateway' | 'core' | 'both'
+
+window.handleLatencyMetricBtnClick = function(metric) {
+  if (metric === currentLatencyMetric) return;
+  currentLatencyMetric = metric;
+
+  const toggleContainer = document.getElementById('latency-metric-toggle');
+  if (toggleContainer) {
+    const buttons = toggleContainer.querySelectorAll('.segment-btn');
+    buttons.forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-latency-metric') === metric);
+    });
+  }
+
+  if (cachedMetricsSeries && cachedMetricsSeries.length > 0) {
+    renderComparativeCharts(cachedMetricsSeries, cachedNodesList);
+  } else {
+    loadDashboardData();
+  }
+};
 let cachedMetricsSeries = [];
 let cachedNodesList = [];
 
@@ -2404,24 +2424,20 @@ async function loadDashboardData(requestedDate) {
     currentSummaries = data.summaries || [];
 
     if (currentGroups.length === 0) {
-      apiFetch('/api/v1/admin/groups')
-        .then(r => r.ok ? r.json() : apiFetch('/api/v1/groups').then(r2 => r2.ok ? r2.json() : []))
-        .then(grps => {
-          if (grps && grps.length > 0) {
-            currentGroups = grps;
-            updateChartGroupSelector();
-          }
-        }).catch(() => {});
+      try {
+        const grpRes = await apiFetch('/api/v1/admin/groups');
+        if (grpRes.ok) currentGroups = (await grpRes.json()) || [];
+        else {
+          const fallbackRes = await apiFetch('/api/v1/groups');
+          if (fallbackRes.ok) currentGroups = (await fallbackRes.json()) || [];
+        }
+      } catch (e) {}
     }
     if (allAdminMachines.length === 0) {
-      apiFetch('/api/v1/admin/machines')
-        .then(r => r.ok ? r.json() : [])
-        .then(machs => {
-          if (machs && machs.length > 0) {
-            allAdminMachines = machs;
-            updateChartGroupSelector();
-          }
-        }).catch(() => {});
+      try {
+        const machRes = await apiFetch('/api/v1/admin/machines');
+        if (machRes.ok) allAdminMachines = (await machRes.json()) || [];
+      } catch (e) {}
     }
     updateChartGroupSelector();
 
@@ -2431,6 +2447,7 @@ async function loadDashboardData(requestedDate) {
     renderTelemetryTable(data.metrics_series || [], data.node_diagnostic);
     updateChartFocusUI();
     renderSingleMachineHeaderAndAlert(data.node_diagnostic, currentSummaries);
+    renderSingleMachineDetailsPanel((currentSummaries || []).find(s => s.node_id === selectedChartNode), data.node_diagnostic);
 
     activeNodesCount.textContent = data.total_nodes || 0;
     if (data.generated_at) {
@@ -2603,6 +2620,9 @@ function updateChartFocusUI() {
   const clearGroupBtn = document.getElementById('btn-clear-chart-group');
   const indicator = document.getElementById('chart-focus-indicator');
   const groupSelect = document.getElementById('chart-group-filter-select');
+  const nodesSection = document.getElementById('nodes-table-section');
+  const grpFilterWrap = document.querySelector('.chart-group-filter-wrap');
+  const smDetailsPanel = document.getElementById('single-machine-details-panel');
 
   if (groupSelect && groupSelect.value !== selectedChartGroup) {
     groupSelect.value = selectedChartGroup;
@@ -2616,17 +2636,31 @@ function updateChartFocusUI() {
     if (nameEl) nameEl.textContent = selectedChartNode;
     if (indicator) indicator.className = 'chart-focus-pill focused';
     if (resetBtn) resetBtn.style.display = 'inline-flex';
+
+    // Oculta a lista redundante e filtro de grupo quando monitorando apenas 1 maquina
+    if (nodesSection) nodesSection.style.display = 'none';
+    if (grpFilterWrap) grpFilterWrap.style.display = 'none';
+    if (clearGroupBtn) clearGroupBtn.style.display = 'none';
+    if (smDetailsPanel) smDetailsPanel.style.display = 'block';
   } else if (selectedChartGroup !== 'all') {
     const grp = (currentGroups || []).find(g => g.id === selectedChartGroup);
     const gName = grp ? grp.name : selectedChartGroup;
     const groupNodes = getNodesInGroup(selectedChartGroup);
-    if (nameEl) nameEl.textContent = `Grupo: ${gName} (${groupNodes.size} máquinas)`;
+    if (nameEl) nameEl.textContent = "Grupo: " + gName + " (" + groupNodes.size + " máquinas)";
     if (indicator) indicator.className = 'chart-focus-pill group-focused';
     if (resetBtn) resetBtn.style.display = 'none';
+
+    if (nodesSection) nodesSection.style.display = 'block';
+    if (grpFilterWrap) grpFilterWrap.style.display = 'flex';
+    if (smDetailsPanel) smDetailsPanel.style.display = 'none';
   } else {
     if (nameEl) nameEl.textContent = 'Todas as Sondas (Consolidado)';
     if (indicator) indicator.className = 'chart-focus-pill all';
     if (resetBtn) resetBtn.style.display = 'none';
+
+    if (nodesSection) nodesSection.style.display = 'block';
+    if (grpFilterWrap) grpFilterWrap.style.display = 'flex';
+    if (smDetailsPanel) smDetailsPanel.style.display = 'none';
   }
 
   // Atualiza destaque visual das linhas da tabela
@@ -2927,47 +2961,133 @@ function renderKpiCards(summaries) {
   const upEl = document.getElementById('kpi-avg-upload');
   const pingEl = document.getElementById('kpi-avg-ping');
   const pingSubEl = document.getElementById('kpi-ping-status');
+  const card1Label = document.querySelector('.kpi-card:nth-child(1) .kpi-label');
+
+  const isSingleNode = (selectedChartNode && selectedChartNode !== 'all');
 
   if (!summaries || summaries.length === 0) {
-    if (totalEl) totalEl.textContent = '0';
-    if (healthEl) { healthEl.textContent = '0% Online'; healthEl.className = 'kpi-badge warning'; }
-    if (subEl) subEl.textContent = 'Nenhuma sonda detectada';
+    if (card1Label) card1Label.textContent = isSingleNode ? 'Perda de Pacotes Gateway' : 'Sondas Monitoradas';
+    if (totalEl) totalEl.textContent = isSingleNode ? '0.0%' : '0';
+    if (healthEl) { healthEl.textContent = isSingleNode ? 'Sem Perda' : '0% Online'; healthEl.className = 'kpi-badge warning'; }
+    if (subEl) subEl.textContent = 'Nenhuma medição detectada';
     if (downEl) downEl.textContent = '0.0';
     if (upEl) upEl.textContent = '0.0';
     if (pingEl) pingEl.textContent = '0.0';
     return;
   }
 
-  const total = summaries.length;
-  const onlineCount = summaries.filter(s => s.is_healthy).length;
-  const healthPct = Math.round((onlineCount / total) * 100);
+  if (isSingleNode) {
+    // === MODO MÁQUINA INDIVIDUAL: CARD 1 = PERDA DE PACOTES GATEWAY ===
+    if (card1Label) card1Label.textContent = 'Perda de Pacotes Gateway';
 
-  if (totalEl) totalEl.textContent = total;
-  if (healthEl) {
-    healthEl.textContent = `${healthPct}% Online`;
-    healthEl.className = `kpi-badge ${healthPct >= 80 ? 'success' : (healthPct >= 50 ? 'warning' : 'danger')}`;
-  }
-  if (subEl) subEl.textContent = `${onlineCount} de ${total} ativas no campus`;
+    const s = summaries.find(item => item.node_id === selectedChartNode) || summaries[0];
+    let lossVal = 0.0;
+    let targetGateway = '';
+    let hasLossMetric = false;
 
-  let sumDown = 0, sumUp = 0, sumPing = 0;
-  summaries.forEach(s => {
-    sumDown += (s.last_download || 0);
-    sumUp += (s.last_upload || 0);
-    sumPing += (s.last_ping || 0);
-  });
+    // 1. Tenta s.metrics.packet_loss_gateway
+    if (s && s.metrics) {
+      const pl = s.metrics.packet_loss_gateway || s.metrics.packet_loss;
+      if (pl !== undefined && pl !== null) {
+        hasLossMetric = true;
+        if (typeof pl === 'object') {
+          lossVal = (pl.value !== undefined) ? Number(pl.value) : (pl.loss_percent || 0);
+          if (pl.details) targetGateway = pl.details;
+        } else {
+          lossVal = Number(pl);
+        }
+      }
+    }
+    // 2. Tenta s.modular_results.packet_loss
+    if (!hasLossMetric && s && s.modular_results && s.modular_results.packet_loss) {
+      const pl = s.modular_results.packet_loss;
+      hasLossMetric = true;
+      lossVal = pl.loss_percent !== undefined ? pl.loss_percent : (pl.lossPercent || 0);
+      if (pl.target) targetGateway = 'Alvo: ' + pl.target;
+    }
+    // 3. Fallback no histórico recente
+    if (!hasLossMetric && cachedMetricsSeries && cachedMetricsSeries.length > 0) {
+      const lastItem = cachedMetricsSeries.filter(it => (it.node_id || it.NodeID) === selectedChartNode).pop();
+      if (lastItem) {
+        if (lastItem.metrics && (lastItem.metrics.packet_loss_gateway || lastItem.metrics.packet_loss)) {
+          const pl = lastItem.metrics.packet_loss_gateway || lastItem.metrics.packet_loss;
+          hasLossMetric = true;
+          lossVal = (typeof pl === 'object' && pl.value !== undefined) ? Number(pl.value) : Number(pl);
+        } else if (lastItem.modular_results && lastItem.modular_results.packet_loss) {
+          hasLossMetric = true;
+          lossVal = lastItem.modular_results.packet_loss.loss_percent || 0;
+        }
+      }
+    }
 
-  const avgDown = (sumDown / total).toFixed(1);
-  const avgUp = (sumUp / total).toFixed(1);
-  const avgPing = (sumPing / total).toFixed(1);
+    if (totalEl) totalEl.textContent = lossVal.toFixed(1) + '%';
+    if (healthEl) {
+      if (lossVal === 0) {
+        healthEl.textContent = '0% Perda';
+        healthEl.className = 'kpi-badge success';
+      } else if (lossVal <= 5) {
+        healthEl.textContent = lossVal.toFixed(1) + '% Perda';
+        healthEl.className = 'kpi-badge warning';
+      } else {
+        healthEl.textContent = lossVal.toFixed(1) + '% Perda';
+        healthEl.className = 'kpi-badge danger';
+      }
+    }
 
-  if (downEl) downEl.textContent = avgDown;
-  if (upEl) upEl.textContent = avgUp;
-  if (pingEl) pingEl.textContent = avgPing;
-  if (pingSubEl) {
-    const p = parseFloat(avgPing);
-    if (p <= 5) pingSubEl.textContent = 'Latência excelente (< 5ms)';
-    else if (p <= 20) pingSubEl.textContent = 'Latência estável (< 20ms)';
-    else pingSubEl.textContent = 'Atenção (> 20ms)';
+    if (subEl) {
+      if (targetGateway) {
+        subEl.textContent = targetGateway;
+      } else {
+        const gwIp = (s && s.system_info && s.system_info.gateway) || 'Gateway Local';
+        subEl.textContent = 'Alvo: ' + gwIp + ' (10 amostras ICMP)';
+      }
+    }
+
+    // Atualiza throughput e ping do nó focado
+    if (downEl) downEl.textContent = (s.last_download || 0).toFixed(1);
+    if (upEl) upEl.textContent = (s.last_upload || 0).toFixed(1);
+    if (pingEl) pingEl.textContent = (s.last_ping || 0).toFixed(1);
+    if (pingSubEl) {
+      const p = s.last_ping || 0;
+      if (p <= 5) pingSubEl.textContent = 'Latência excelente (< 5ms)';
+      else if (p <= 20) pingSubEl.textContent = 'Latência estável (< 20ms)';
+      else pingSubEl.textContent = 'Atenção (> 20ms)';
+    }
+  } else {
+    // === MODO CONSOLIDADO: CARD 1 = SONDAS MONITORADAS ===
+    if (card1Label) card1Label.textContent = 'Sondas Monitoradas';
+
+    const total = summaries.length;
+    const onlineCount = summaries.filter(s => s.is_healthy).length;
+    const healthPct = Math.round((onlineCount / total) * 100);
+
+    if (totalEl) totalEl.textContent = total;
+    if (healthEl) {
+      healthEl.textContent = healthPct + '% Online';
+      healthEl.className = 'kpi-badge ' + (healthPct >= 80 ? 'success' : (healthPct >= 50 ? 'warning' : 'danger'));
+    }
+    if (subEl) subEl.textContent = onlineCount + ' de ' + total + ' ativas no campus';
+
+    let sumDown = 0, sumUp = 0, sumPing = 0;
+    summaries.forEach(s => {
+      sumDown += (s.last_download || 0);
+      sumUp += (s.last_upload || 0);
+      sumPing += (s.last_ping || 0);
+    });
+
+    const avgDown = (sumDown / total).toFixed(1);
+    const avgUp = (sumUp / total).toFixed(1);
+    const avgPing = (sumPing / total).toFixed(1);
+
+    if (downEl) downEl.textContent = avgDown;
+    if (upEl) upEl.textContent = avgUp;
+    if (pingEl) pingEl.textContent = avgPing;
+    if (pingSubEl) {
+      const p = parseFloat(avgPing);
+      if (p <= 5) pingSubEl.textContent = 'Latência excelente (< 5ms)';
+      else if (p <= 20) pingSubEl.textContent = 'Latência estável (< 20ms)';
+      else pingSubEl.textContent = 'Atenção (> 20ms)';
+    }
   }
 }
 
@@ -4891,7 +5011,10 @@ async function handleSaveMachineConfigSubmit(e) {
 
     showToast(`Configuração da máquina "${hostname}" salva com sucesso!`, 'toast-success');
     closeMachineConfigModal();
+    allAdminMachines = [];
+    currentGroups = [];
     await loadAdminMachines();
+    await loadDashboardData();
   } catch (err) {
     showToast(`Erro ao salvar: ${err.message}`, 'toast-error');
   } finally {
@@ -5416,3 +5539,476 @@ function triggerSingleMachinePing() {
 window.triggerSingleMachinePing = triggerSingleMachinePing;
 
 
+
+
+/* ==========================================================================
+   PAINEL TÉCNICO EMBUTIDO & DIRETRIZES DE UX/UI (MÁQUINA ÚNICA)
+   ========================================================================== */
+
+function renderSingleMachineDetailsPanel(summary, diagnostic) {
+  const panel = document.getElementById('single-machine-details-panel');
+  if (!panel) return;
+
+  if (!selectedChartNode || selectedChartNode === 'all') {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'block';
+
+  const nodeName = selectedChartNode;
+  const sys = (diagnostic && diagnostic.system_info) || (summary && summary.system_info) || {};
+  const modResults = (diagnostic && diagnostic.modular_results) || (summary && summary.modular_results) || {};
+  const swInfo = (diagnostic && diagnostic.switch_info) || (summary && summary.switch_info) || {};
+
+  // 1. Status Wi-Fi & Potência
+  const wifiBadge = document.getElementById('sm-panel-wifi-status-badge');
+  const wifiContent = document.getElementById('sm-panel-wifi-content');
+  const wf = modResults.wifi;
+
+  if (wifiContent) {
+    if (wf && (wf.status && wf.status !== 'skipped' || wf.has_wifi_adapter)) {
+      if (wf.connected) {
+        const pct = Math.max(0, Math.min(100, wf.signal_percent || wf.signal_quality_percent || 0));
+        const dbmStr = wf.signal_dbm ? (wf.signal_dbm + " dBm") : (wf.signal_strength_dbm ? (wf.signal_strength_dbm + " dBm") : '');
+        let barClass = 'wifi-signal-bar-fill';
+        if (pct < 40) barClass += ' poor';
+        else if (pct < 70) barClass += ' warning';
+
+        if (wifiBadge) {
+          wifiBadge.className = 'badge-pill badge-primary-route';
+          wifiBadge.textContent = 'Wi-Fi Conectado';
+        }
+
+        wifiContent.innerHTML = 
+          '<div class="wifi-meter-box" style="margin-bottom: 10px;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
+              '<span class="font-bold text-white">' + escapeHtml(wf.ssid || 'Rede Wi-Fi') + '</span>' +
+              '<span class="font-mono font-bold text-cyan">' + pct + '% ' + (dbmStr ? ('(' + dbmStr + ')') : '') + '</span>' +
+            '</div>' +
+            '<div class="wifi-signal-bar-track" style="height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow:hidden;">' +
+              '<div class="' + barClass + '" style="width: ' + pct + '%; height: 100%; transition: width 0.4s ease;"></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sm-wifi-stats-row">' +
+            '<div class="sm-wifi-stat-item">' +
+              '<span class="sm-wifi-stat-label">BSSID / AP:</span>' +
+              '<span class="sm-wifi-stat-val font-mono">' + escapeHtml(wf.bssid || '--') + '</span>' +
+            '</div>' +
+            '<div class="sm-wifi-stat-item">' +
+              '<span class="sm-wifi-stat-label">Canal & Frequência:</span>' +
+              '<span class="sm-wifi-stat-val">' + (wf.channel ? ('Canal ' + wf.channel) : '--') + (wf.band ? (' (' + wf.band + ')') : '') + '</span>' +
+            '</div>' +
+            '<div class="sm-wifi-stat-item">' +
+              '<span class="sm-wifi-stat-label">Rádio:</span>' +
+              '<span class="sm-wifi-stat-val">' + escapeHtml(wf.radio_type || '802.11') + '</span>' +
+            '</div>' +
+            '<div class="sm-wifi-stat-item">' +
+              '<span class="sm-wifi-stat-label">Taxa Tx/Rx:</span>' +
+              '<span class="sm-wifi-stat-val font-mono">' + (wf.tx_rate_mbps ? (wf.tx_rate_mbps + ' / ' + (wf.rx_rate_mbps || wf.tx_rate_mbps) + ' Mbps') : '--') + '</span>' +
+            '</div>' +
+          '</div>';
+      } else {
+        if (wifiBadge) {
+          wifiBadge.className = 'badge-pill status-iface-inactive';
+          wifiBadge.textContent = 'Wi-Fi Desconectado';
+        }
+        wifiContent.innerHTML = 
+          '<div class="sm-wifi-ethernet-notice" style="border-color: rgba(245, 158, 11, 0.3); color: #f59e0b;">' +
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+              '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>' +
+              '<line x1="12" y1="9" x2="12" y2="13"></line>' +
+              '<line x1="12" y1="17" x2="12.01" y2="17"></line>' +
+            '</svg>' +
+            '<div>' +
+              '<strong>Adaptador Wi-Fi detectado (desconectado)</strong>' +
+              '<div class="text-xs text-muted">A placa wireless do computador está inativa ou fora do alcance de redes conhecidas.</div>' +
+            '</div>' +
+          '</div>';
+      }
+    } else {
+      if (wifiBadge) {
+        wifiBadge.className = 'badge-pill';
+        wifiBadge.textContent = 'Cabo Ethernet';
+      }
+      wifiContent.innerHTML = 
+        '<div class="sm-wifi-ethernet-notice">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+            '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>' +
+            '<rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>' +
+            '<line x1="6" y1="6" x2="6.01" y2="6"></line>' +
+            '<line x1="6" y1="18" x2="6.01" y2="18"></line>' +
+          '</svg>' +
+          '<div>' +
+            '<strong>Conexão Cabeada Exclusiva (Ethernet)</strong>' +
+            '<div class="text-xs text-muted">Esta sonda opera em enlace de par trançado. Adaptador Wi-Fi ausente ou desativado.</div>' +
+          '</div>' +
+        '</div>';
+    }
+  }
+
+  // 2. Módulos Carregados na Sonda (Resolução Dinâmica do Grupo / Customizado)
+  const modulesListEl = document.getElementById('sm-panel-modules-list');
+  const profileBadgeEl = document.getElementById('sm-panel-modules-profile-badge');
+  const machAdmin = (allAdminMachines || []).find(m => m.hostname === nodeName);
+
+  // Determina o grupo da máquina
+  const targetGroupId = (machAdmin && machAdmin.group_id) || (summary && summary.group_id) || (diagnostic && diagnostic.group_name) || 'default';
+  const grp = (currentGroups || []).find(g => g.id === targetGroupId || g.name === targetGroupId);
+  const grpName = grp ? grp.name : targetGroupId;
+  const grpTests = (grp && grp.profile && grp.profile.tests) ? grp.profile.tests : [];
+
+  // Módulos efetivos: apenas é customizado se is_custom for explicitamente true E custom_tests tiver itens
+  const isCustomMachine = !!(machAdmin && machAdmin.is_custom && machAdmin.custom_tests && machAdmin.custom_tests.length > 0);
+  let effectiveTests = [];
+
+  if (isCustomMachine) {
+    effectiveTests = machAdmin.custom_tests;
+  } else if (grpTests.length > 0) {
+    effectiveTests = grpTests;
+  } else if (machAdmin && machAdmin.custom_tests && machAdmin.custom_tests.length > 0) {
+    // Se não for customizado mas o grupo tiver zero testes em memória, fallback nos testes do registro
+    effectiveTests = machAdmin.custom_tests;
+  } else {
+    effectiveTests = [];
+  }
+
+  const actionsWrap = document.getElementById('sm-panel-modules-actions');
+  if (actionsWrap) {
+    actionsWrap.innerHTML = 
+      '<span id="sm-panel-modules-profile-badge" class="' + (isCustomMachine ? 'badge-pill warning' : 'badge-pill success') + '">' +
+        (isCustomMachine ? ('Customizado (' + effectiveTests.length + ' módulo' + (effectiveTests.length === 1 ? '' : 's') + ')') : ('Padrão do Grupo (' + effectiveTests.length + ' módulo' + (effectiveTests.length === 1 ? '' : 's') + ')')) +
+      '</span>' +
+      (isCustomMachine ? (
+        '<button type="button" class="btn btn-sm btn-glass" onclick="resetCurrentMachineToGroup()" title="Remover customização e restaurar para o padrão do grupo" style="padding: 2px 8px; font-size: 0.72rem; color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); display: flex; align-items: center; gap: 4px;">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>' +
+          '<span>Restaurar Grupo</span>' +
+        '</button>'
+      ) : '') +
+      '<button type="button" id="btn-edit-probe-modules" class="btn btn-sm btn-outline-cyan" onclick="openMachineConfigFromPanel()" title="Personalizar módulos ativos desta sonda" style="padding: 2px 8px; font-size: 0.72rem; display: flex; align-items: center; gap: 4px;">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>' +
+        '<span>Editar Módulos</span>' +
+      '</button>';
+  } else if (profileBadgeEl) {
+    if (isCustomMachine) {
+      profileBadgeEl.textContent = 'Customizado (' + effectiveTests.length + ' módulo' + (effectiveTests.length === 1 ? '' : 's') + ')';
+      profileBadgeEl.className = 'badge-pill warning';
+    } else {
+      profileBadgeEl.textContent = 'Padrão do Grupo (' + effectiveTests.length + ' módulo' + (effectiveTests.length === 1 ? '' : 's') + ')';
+      profileBadgeEl.className = 'badge-pill success';
+    }
+  }
+
+  if (modulesListEl) {
+    if (effectiveTests.length === 0) {
+      modulesListEl.innerHTML = '<span class="text-xs text-muted">Nenhum módulo de teste ativo configurado no perfil deste grupo.</span>';
+    } else {
+      modulesListEl.innerHTML = effectiveTests.map(mod => {
+        const testName = mod.name || mod.id || 'Módulo';
+        return (
+          '<div class="sm-module-chip active" title="Módulo ativo: ' + escapeHtml(mod.id || '') + '">' +
+            '<span class="sm-module-dot"></span>' +
+            '<span>' + escapeHtml(testName) + '</span>' +
+          '</div>'
+        );
+      }).join('');
+    }
+  }
+
+  // 3. Switch LLDP & Conexão de Rede
+  const switchContentEl = document.getElementById('sm-panel-switch-content');
+  const switchVlanBadge = document.getElementById('sm-panel-switch-vlan');
+  const swName = swInfo.switch_name || '--';
+  const swPort = swInfo.switch_port || '--';
+  const vlanNum = swInfo.vlan || (summary && summary.vlan) || (diagnostic && diagnostic.vlan) || 0;
+
+  if (switchVlanBadge) {
+    switchVlanBadge.textContent = vlanNum > 0 ? ('VLAN ' + vlanNum) : 'Sem VLAN';
+  }
+
+  if (switchContentEl) {
+    const hasSwitch = (swName !== '--' && swName !== '' && swName !== '{}');
+    switchContentEl.innerHTML = 
+      '<div class="sm-switch-detail-row">' +
+        '<span class="text-muted">Nome do Switch:</span>' +
+        '<strong class="font-mono text-cyan">' + escapeHtml(swName) + '</strong>' +
+      '</div>' +
+      '<div class="sm-switch-detail-row">' +
+        '<span class="text-muted">Porta de Enlace:</span>' +
+        '<strong class="font-mono">' + escapeHtml(swPort) + '</strong>' +
+      '</div>' +
+      '<div class="sm-switch-detail-row">' +
+        '<span class="text-muted">Protocolo de Descoberta:</span>' +
+        '<span>' + escapeHtml(swInfo.protocol || 'LLDP / 802.1AB') + '</span>' +
+      '</div>' +
+      (hasSwitch ? (
+        '<div class="sm-switch-action-btn-wrap">' +
+          '<button type="button" class="btn btn-sm btn-outline-cyan w-full" onclick="openCurrentMachineSwitchModal()">' +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;">' +
+              '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>' +
+            '</svg>' +
+            'Ver Vizinhos Conectados neste Switch' +
+          '</button>' +
+        '</div>'
+      ) : '<div class="text-xs text-muted mt-2">Nenhum pacote LLDP recente detectado nesta porta.</div>');
+  }
+
+  // 4. Inventário Completo de Placas de Rede & MACs
+  const ifacesTbody = document.getElementById('sm-panel-ifaces-body');
+  const ifacesCount = document.getElementById('sm-panel-ifaces-count');
+  const ifacesList = sys.interfaces || sys.Interfaces || [];
+
+  if (ifacesTbody) {
+    if (ifacesList.length > 0) {
+      if (ifacesCount) ifacesCount.textContent = ifacesList.length + ' placa(s) detectada(s)';
+      ifacesTbody.innerHTML = ifacesList.map(iface => {
+        const isUp = !!iface.is_up;
+        const isPrimary = !!iface.is_primary;
+        const ifaceType = (iface.type || 'ethernet').toLowerCase();
+        let badgeTypeClass = 'badge-iface-eth';
+        let typeLabel = 'Ethernet';
+        if (ifaceType === 'wifi' || ifaceType === 'wi-fi') {
+          badgeTypeClass = 'badge-iface-wifi';
+          typeLabel = 'Wi-Fi';
+        } else if (ifaceType === 'virtual') {
+          badgeTypeClass = 'badge-iface-virtual';
+          typeLabel = 'Virtual';
+        }
+
+        const ipsStr = (iface.ip_addresses && iface.ip_addresses.length > 0)
+          ? iface.ip_addresses.join('<br>')
+          : '<span class="iface-no-ip">Sem IP atribuído</span>';
+
+        return '<tr>' +
+          '<td>' +
+            '<span class="' + (isUp ? 'status-dot-up' : 'status-dot-down') + '"></span>' +
+            '<span class="' + (isUp ? 'status-iface-active' : 'status-iface-inactive') + ' font-bold">' + (isUp ? 'Ativa' : 'Inativa') + '</span>' +
+          '</td>' +
+          '<td>' +
+            '<div class="iface-name font-bold">' + escapeHtml(iface.name || 'Interface') + '</div>' +
+            (iface.description ? ('<div class="iface-desc text-xs text-muted">' + escapeHtml(iface.description) + '</div>') : '') +
+          '</td>' +
+          '<td>' +
+            '<span class="badge-iface-type ' + badgeTypeClass + '">' + typeLabel + '</span>' +
+          '</td>' +
+          '<td>' +
+            '<span class="font-mono iface-mac font-bold">' + escapeHtml(iface.mac_address || '--') + '</span>' +
+          '</td>' +
+          '<td>' +
+            '<span class="font-mono ' + (isUp ? 'text-cyan font-bold' : '') + '">' + ipsStr + '</span>' +
+          '</td>' +
+          '<td style="text-align: center;">' +
+            (isPrimary
+              ? '<span class="badge-primary-route font-bold">Principal (Gateway)</span>'
+              : '<span class="iface-role-secondary text-xs text-muted">Secundária</span>') +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    } else {
+      const fallbackMac = sys.mac_address || sys.MACAddress || '--';
+      const fallbackIp = sys.ip_address || sys.IPAddress || '--';
+      const fallbackName = sys.network_adapter || sys.NetworkAdapter || 'Interface Ativa Padrão';
+      if (ifacesCount) ifacesCount.textContent = '1 placa detectada';
+      ifacesTbody.innerHTML = 
+        '<tr>' +
+          '<td>' +
+            '<span class="status-dot-up"></span>' +
+            '<span class="status-iface-active font-bold">Ativa</span>' +
+          '</td>' +
+          '<td>' +
+            '<div class="iface-name font-bold">' + escapeHtml(fallbackName) + '</div>' +
+          '</td>' +
+          '<td>' +
+            '<span class="badge-iface-type badge-iface-eth">Ethernet</span>' +
+          '</td>' +
+          '<td>' +
+            '<span class="font-mono iface-mac font-bold">' + escapeHtml(fallbackMac) + '</span>' +
+          '</td>' +
+          '<td>' +
+            '<span class="font-mono text-cyan font-bold">' + escapeHtml(fallbackIp) + '</span>' +
+          '</td>' +
+          '<td style="text-align: center;">' +
+            '<span class="badge-primary-route font-bold">Principal (Gateway)</span>' +
+          '</td>' +
+        '</tr>';
+    }
+  }
+}
+window.renderSingleMachineDetailsPanel = renderSingleMachineDetailsPanel;
+
+/* ==========================================================================
+   MODAL DE MÁQUINAS DO SWITCH LLDP & COMPARAÇÃO
+   ========================================================================== */
+
+let currentSwitchNameForModal = '';
+
+function openSwitchMachinesModal(switchName) {
+  if (!switchName || switchName === '--') {
+    const summary = currentSummaries.find(s => s.node_id === selectedChartNode);
+    if (summary && summary.switch_info && summary.switch_info.switch_name) {
+      switchName = summary.switch_info.switch_name;
+    }
+  }
+  if (!switchName || switchName === '--') {
+    showToast('Nenhum switch LLDP identificado para esta máquina', 'toast-warning');
+    return;
+  }
+
+  currentSwitchNameForModal = switchName;
+  const modal = document.getElementById('modal-switch-machines');
+  const titleEl = document.getElementById('modal-switch-title');
+  const pillEl = document.getElementById('modal-switch-name-pill');
+  const totalCountEl = document.getElementById('modal-switch-total-count');
+  const tbody = document.getElementById('modal-switch-table-body');
+
+  if (titleEl) titleEl.textContent = 'Switch LLDP: ' + switchName;
+  if (pillEl) pillEl.textContent = switchName;
+
+  const matchedSummaries = (currentSummaries || []).filter(s => {
+    return s.switch_info && s.switch_info.switch_name && s.switch_info.switch_name.toLowerCase() === switchName.toLowerCase();
+  });
+
+  if (totalCountEl) totalCountEl.textContent = matchedSummaries.length + ' máquina(s) conectada(s)';
+
+  if (tbody) {
+    if (matchedSummaries.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Nenhuma outra máquina reportou conexão neste switch no ciclo recente.</td></tr>';
+    } else {
+      tbody.innerHTML = matchedSummaries.map(s => {
+        const isSelected = (s.node_id === selectedChartNode);
+        const portStr = (s.switch_info && s.switch_info.switch_port) || '--';
+        const ipStr = (s.system_info && (s.system_info.ip_address || s.system_info.IPAddress)) || '--';
+        const macStr = (s.system_info && (s.system_info.mac_address || s.system_info.MACAddress)) || '--';
+        const isOnline = !!s.is_healthy;
+
+        return '<tr style="' + (isSelected ? 'background: rgba(6, 182, 212, 0.08);' : '') + '">' +
+          '<td>' +
+            '<span class="dc-health-badge ' + (isOnline ? 'online' : 'stale') + '">' + (isOnline ? 'Online' : 'Sem sinal') + '</span>' +
+          '</td>' +
+          '<td>' +
+            '<strong class="font-mono text-white">' + escapeHtml(s.node_id) + '</strong>' +
+            (isSelected ? '<span class="badge-pill ml-1" style="font-size:0.65rem;">(Atual)</span>' : '') +
+          '</td>' +
+          '<td>' +
+            '<span class="font-mono text-cyan font-bold">' + escapeHtml(portStr) + '</span>' +
+          '</td>' +
+          '<td>' +
+            '<div class="font-mono">' + escapeHtml(ipStr) + '</div>' +
+            '<div class="font-mono text-xs text-muted">' + escapeHtml(macStr) + '</div>' +
+          '</td>' +
+          '<td style="text-align: right;" class="font-mono">' + (s.last_download ? (s.last_download.toFixed(1) + ' Mbps') : '--') + '</td>' +
+          '<td style="text-align: right;" class="font-mono">' + (s.last_ping ? (s.last_ping.toFixed(1) + ' ms') : '--') + '</td>' +
+          '<td style="text-align: center;">' +
+            '<button type="button" class="btn btn-sm btn-glass" data-node="' + escapeHtml(s.node_id) + '" onclick="handleSwitchRowFocus(this)">' +
+              'Focar Sonda' +
+            '</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
+  }
+
+  if (modal) modal.style.display = 'flex';
+}
+window.openSwitchMachinesModal = openSwitchMachinesModal;
+
+function openCurrentMachineSwitchModal() {
+  const summary = currentSummaries.find(s => s.node_id === selectedChartNode);
+  const swName = (summary && summary.switch_info && summary.switch_info.switch_name) || '';
+  openSwitchMachinesModal(swName);
+}
+window.openCurrentMachineSwitchModal = openCurrentMachineSwitchModal;
+
+function closeSwitchMachinesModal() {
+  const modal = document.getElementById('modal-switch-machines');
+  if (modal) modal.style.display = 'none';
+}
+window.closeSwitchMachinesModal = closeSwitchMachinesModal;
+
+function compareSwitchMachinesOnCharts() {
+  closeSwitchMachinesModal();
+  if (!currentSwitchNameForModal) return;
+
+  const matchedNodes = (currentSummaries || [])
+    .filter(s => s.switch_info && s.switch_info.switch_name && s.switch_info.switch_name.toLowerCase() === currentSwitchNameForModal.toLowerCase())
+    .map(s => s.node_id);
+
+  if (matchedNodes.length <= 1) {
+    showToast('Apenas uma máquina conectada ao switch ' + currentSwitchNameForModal, 'toast-info');
+    return;
+  }
+
+  showToast('Comparando ' + matchedNodes.length + ' máquinas do switch ' + currentSwitchNameForModal, 'toast-info');
+  selectedChartNode = 'all';
+  updateChartFocusUI();
+
+  const nameEl = document.getElementById('chart-focus-name');
+  if (nameEl) nameEl.textContent = 'Switch: ' + currentSwitchNameForModal + ' (' + matchedNodes.length + ' máquinas)';
+  const resetBtn = document.getElementById('btn-reset-chart-focus');
+  if (resetBtn) resetBtn.style.display = 'inline-flex';
+
+  const switchSeries = (cachedMetricsSeries || []).filter(item => {
+    return matchedNodes.includes(item.node_id || item.NodeID);
+  });
+
+  renderComparativeCharts(switchSeries, matchedNodes);
+}
+window.compareSwitchMachinesOnCharts = compareSwitchMachinesOnCharts;
+
+function handleSwitchRowFocus(btn) {
+  const node = btn ? btn.getAttribute('data-node') : null;
+  if (node) selectNodeForCharts(node, true);
+  closeSwitchMachinesModal();
+}
+window.handleSwitchRowFocus = handleSwitchRowFocus;
+
+function openMachineConfigFromPanel() {
+  if (!selectedChartNode || selectedChartNode === 'all') return;
+  const targetNode = selectedChartNode;
+
+  // Garante que lista de máquinas esteja carregada
+  if (!allAdminMachines || allAdminMachines.length === 0) {
+    apiFetch('/api/v1/admin/machines')
+      .then(r => r.ok ? r.json() : [])
+      .then(machs => {
+        allAdminMachines = machs || [];
+        openMachineConfigModal(targetNode);
+      })
+      .catch(() => {
+        openMachineConfigModal(targetNode);
+      });
+  } else {
+    openMachineConfigModal(targetNode);
+  }
+}
+window.openMachineConfigFromPanel = openMachineConfigFromPanel;
+
+async function resetCurrentMachineToGroup() {
+  if (!selectedChartNode || selectedChartNode === 'all') return;
+  const hostname = selectedChartNode;
+  const mach = (allAdminMachines || []).find(m => m.hostname === hostname);
+  const targetGroupId = (mach && mach.group_id) || 'default';
+
+  try {
+    const res = await apiFetch('/api/v1/admin/machines/' + encodeURIComponent(hostname), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        group_id: targetGroupId,
+        is_custom: false,
+        custom_tests: []
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Falha ao redefinir máquina');
+    }
+    showToast('Máquina "' + hostname + '" restaurada para o padrão do grupo (' + targetGroupId + ')!', 'toast-success');
+    allAdminMachines = [];
+    currentGroups = [];
+    await loadAdminMachines();
+    await loadDashboardData();
+  } catch (err) {
+    showToast('Erro ao redefinir: ' + err.message, 'toast-error');
+  }
+}
+window.resetCurrentMachineToGroup = resetCurrentMachineToGroup;
