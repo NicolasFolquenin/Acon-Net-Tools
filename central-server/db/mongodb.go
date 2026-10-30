@@ -801,7 +801,33 @@ func (m *MongoDBClient) SeedInitialGroups(ctx context.Context) error {
 	}
 
 	initialGroups := models.GetInitialGroups()
+	opts := options.Update().SetUpsert(true)
+
 	for _, grp := range initialGroups {
+		// Se for o grupo padrão "default", sincroniza a definição oficial com 1 módulo (ping_gateway)
+		if grp.ID == "default" {
+			update := bson.M{
+				"$set": bson.M{
+					"name":        grp.Name,
+					"description": grp.Description,
+					"profile":     grp.Profile,
+					"updated_at":  time.Now().UTC(),
+				},
+				"$setOnInsert": bson.M{
+					"_id":        grp.ID,
+					"created_at": time.Now().UTC(),
+					"rules":      grp.Rules,
+				},
+			}
+			_, err := m.MachineGroupsCollection.UpdateOne(ctx, bson.M{"_id": grp.ID}, update, opts)
+			if err != nil {
+				log.Printf("[MONGODB][AVISO] Falha ao sincronizar grupo 'default': %v", err)
+			} else {
+				log.Printf("[MONGODB] Grupo padrao 'default' sincronizado com 1 modulo essencial (ping_gateway).")
+			}
+			continue
+		}
+
 		count, err := m.MachineGroupsCollection.CountDocuments(ctx, bson.M{"_id": grp.ID})
 		if err != nil {
 			continue
@@ -815,10 +841,30 @@ func (m *MongoDBClient) SeedInitialGroups(ctx context.Context) error {
 			}
 		}
 	}
+
+	// Purga customizações legadas de 10 módulos em máquinas que pertencem ao grupo default
+	if m.MachinesCollection != nil {
+		filterLegacy := bson.M{
+			"group_id":       "default",
+			"is_custom":      true,
+			"custom_tests.9": bson.M{"$exists": true}, // Contém 10 ou mais testes salvos antigamente
+		}
+		resetUpdate := bson.M{
+			"$set": bson.M{
+				"is_custom":    false,
+				"custom_tests": nil,
+				"updated_at":   time.Now().UTC(),
+			},
+		}
+		res, errLegacy := m.MachinesCollection.UpdateMany(ctx, filterLegacy, resetUpdate)
+		if errLegacy == nil && res.ModifiedCount > 0 {
+			log.Printf("[MONGODB] %d maquinas do grupo default com customizacao legada de 10 modulos foram redefinidas para o padrao do grupo (1 modulo).", res.ModifiedCount)
+		}
+	}
+
 	return nil
 }
 
-// GetMachineGroup busca um grupo de máquinas pelo ID
 func (m *MongoDBClient) GetMachineGroup(ctx context.Context, id string) (*models.MachineGroup, error) {
 	if m.MachineGroupsCollection == nil {
 		return nil, fmt.Errorf("colecao de grupos de maquinas nao inicializada")
