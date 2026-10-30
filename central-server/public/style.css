@@ -5910,3 +5910,257 @@ body.auth-mode .dashboard-layout {
   background: #e2e8f0;
 }
 
+
+
+/* === SINGLE MACHINE EMBEDDED DETAILS PANEL === */
+.sm-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sm-panel-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sm-panel-badge-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 182, 212, 0.12);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+}
+
+.sm-panel-heading {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-main);
+}
+
+.sm-panel-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 2px 0 0 0;
+}
+
+.sm-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+@media (max-width: 1100px) {
+  .sm-panel-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sm-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.sm-card-full {
+  grid-column: 1 / -1;
+}
+
+.sm-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.sm-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-main);
+}
+
+.sm-card-body {
+  font-size: 0.82rem;
+  color: var(--text-main);
+  flex: 1;
+}
+
+/* Wi-Fi Details inside Panel */
+.sm-wifi-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 0.78rem;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sm-wifi-stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.sm-wifi-stat-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sm-wifi-stat-val {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.sm-wifi-ethernet-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(2, 132, 199, 0.08);
+  border: 1px solid rgba(2, 132, 199, 0.2);
+  color: var(--accent-cyan);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* Modules Active Chips */
+.sm-modules-chip-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.sm-module-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  background: rgba(139, 92, 246, 0.1);
+  color: #c084fc;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  transition: all 0.2s ease;
+}
+
+.sm-module-chip.active {
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.sm-module-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Switch LLDP Details */
+.sm-switch-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+  font-size: 0.8rem;
+}
+
+.sm-switch-detail-row:last-child {
+  border-bottom: none;
+}
+
+.sm-switch-action-btn-wrap {
+  margin-top: 12px;
+  text-align: right;
+}
+
+/* Switch Machines Modal Bar */
+.switch-modal-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-glass);
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+
+.switch-stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+/* Light Theme overrides for embedded details panel */
+[data-theme="light"] .sm-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .sm-panel-badge-icon {
+  background: rgba(2, 132, 199, 0.1);
+  border-color: rgba(2, 132, 199, 0.25);
+  color: #0284c7;
+}
+
+[data-theme="light"] .sm-card-header {
+  border-bottom-color: #f1f5f9;
+}
+
+[data-theme="light"] .sm-wifi-ethernet-notice {
+  background: rgba(2, 132, 199, 0.06);
+  border-color: rgba(2, 132, 199, 0.2);
+  color: #0369a1;
+}
+
+[data-theme="light"] .sm-module-chip {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .sm-module-chip.active {
+  background: rgba(16, 185, 129, 0.08);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+[data-theme="light"] .sm-switch-detail-row {
+  border-bottom-color: #f1f5f9;
+}
+
+[data-theme="light"] .switch-modal-summary-bar {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}

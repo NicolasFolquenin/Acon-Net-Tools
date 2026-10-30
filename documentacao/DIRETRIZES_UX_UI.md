@@ -130,3 +130,44 @@ Antes de aprovar qualquer alteração visual no Central Server, verifique cada i
 - [ ] **9. Tema Claro & Tema Escuro:** O contraste de texto e fundos das tabelas foi verificado em ambos os modos.
 - [ ] **10. Clique na Logo:** Clicar na logo da UEPG no canto superior esquerdo reseta a máquina individual, o filtro de grupo e volta ao Dashboard consolidado.
 
+
+
+---
+
+## 7. Modo Isolado de Sonda (Visualização de Máquina Única)
+
+Quando um operador ou administrador clica em uma máquina individual para isolar seus gráficos no Dashboard, as seguintes diretrizes são de aplicação mandatória:
+
+### 7.1. Eliminação Estrita de Redundâncias
+- **Ocultação da Tabela de 1 Linha:** A seção "Computadores & Sondas Monitoradas" deve ser automaticamente ocultada (`display: none`), pois exibir uma tabela de computadores contendo apenas a máquina que já está selecionada polui a visão do operador.
+- **Remoção do Filtro de Grupos:** O seletor de grupo dos gráficos comparativos deve ser ocultado no modo focado, pois não faz sentido filtrar por grupo se o operador está analisando exclusivamente as séries temporais de um nó específico.
+
+### 7.2. Substituição Contextual do Primeiro Card KPI (Perda de Pacotes Gateway)
+- Em vez de exibir um card trivial "Sondas Monitoradas: 1", o primeiro card do topo deve se transformar dinamicamente em **"Perda de Pacotes Gateway"**.
+- Deve exibir a porcentagem de perda aferida (ex.: `0.0%`), badge de integridade (`0% Perda` em verde, `<= 5%` em amarelo, `> 5%` em vermelho) e o alvo de gateway local testado via ICMP.
+- Ao retornar para a visão consolidada de todas as sondas, o card restaura automaticamente o estado "Sondas Monitoradas" e contagem global.
+
+### 7.3. Painel Técnico Rico Embutido na Página
+Em vez de esconder os detalhes do computador em um modal que tampa a visão dos gráficos, a página embutirá o container `#single-machine-details-panel` contendo quatro blocos especializados:
+1. **Status Wi-Fi & Potência do Sinal:**
+   - Detecção se o computador possui adaptador wireless e se está associado a uma rede.
+   - Em caso positivo: barra de intensidade de sinal com preenchimento colorido, porcentagem precisa, potência em dBm, SSID da rede, BSSID/AP, canal, faixa de frequência (2.4GHz / 5GHz), rádio (802.11ax/ac/n) e taxas Tx/Rx.
+   - Em caso de conexão por cabo Ethernet: notificação visual clara informando conexão cabeada ativa sem poluir com dados wireless vazios.
+2. **Módulos Ativos Carregados:**
+   - Chips visuais com os testes agendados da sonda (Vazão Download/Upload, Ping Gateway, Ping Core NTI, Perda de Pacotes, LLDP, Wi-Fi, DNS).
+   - Indicação se a sonda herda o perfil do grupo ou se possui testes customizados adicionais.
+3. **Topologia Switch LLDP & Conexão de Rede:**
+   - Nome do switch corporativo, porta física, VLAN operacional e protocolo.
+   - Botão de ação destacada para inspecionar vizinhos conectados no mesmo equipamento.
+4. **Inventário de Placas de Rede & MACs Físicos:**
+   - Tabela responsiva com contador total de placas, status dot (Ativa/Inativa), descrição do hardware, badge de tipo (Ethernet, Wi-Fi, Virtual), endereço MAC físico formatado, endereços IP e identificação da rota principal/gateway.
+
+### 7.4. Múltiplos Destinos de Latência no Gráfico
+- O gráfico de latência individual deve disponibilizar controles segmentados:
+  - `[Gateway]`: Medição contínua para o Gateway local.
+  - `[Core NTI]`: Medição contínua para o Core institucional no anel óptico.
+  - `[Ambos]`: Plotagem comparativa simultânea com curvas distintas (#10b981 e #3b82f6) e legendas para análise de gargalos (se o salto local ou metropolitano está degradado).
+
+### 7.5. Comparação de Máquinas Conectadas no mesmo Switch LLDP
+- Através do modal de switch LLDP (`#modal-switch-machines`), o operador pode visualizar todos os computadores conectados na mesma infraestrutura física.
+- O botão **"Comparar nos Gráficos"** filtra as séries temporais comparativas exclusivamente para essas máquinas vizinhas, permitindo identificar se oscilações de banda e latência são pontuais do host ou generalizadas naquele switch/setor.
