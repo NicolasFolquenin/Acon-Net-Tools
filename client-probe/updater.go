@@ -17,7 +17,7 @@ import (
 )
 
 // CurrentClientVersion versão atual embutida da sonda client
-const CurrentClientVersion = "2.4.0"
+const CurrentClientVersion = "2.4.1"
 
 // RemoteVersionResponse estrutura recebida do endpoint GET /api/v1/download/version
 type RemoteVersionResponse struct {

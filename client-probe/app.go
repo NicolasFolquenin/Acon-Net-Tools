@@ -451,6 +451,38 @@ func (a *App) RefreshProfile() (*MeasurementProfile, error) {
 	return prof, err
 }
 
+// CheckUpdateNow expõe ao frontend a checagem manual de versão junto ao Central Server
+func (a *App) CheckUpdateNow() (map[string]interface{}, error) {
+	cfg := GetCurrentConfig()
+	if cfg.ServerURL == "" || cfg.ServerURL == "none" {
+		return map[string]interface{}{
+			"updated":         false,
+			"current_version": CurrentClientVersion,
+			"message":         "Servidor central não configurado",
+		}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+	defer cancel()
+
+	updated, err := CheckAndApplyAutoUpdate(ctx, cfg.ServerURL, cfg.APIToken)
+	if err != nil {
+		return map[string]interface{}{
+			"updated":         false,
+			"current_version": CurrentClientVersion,
+			"message":         fmt.Sprintf("Falha ao checar atualização: %v", err),
+		}, err
+	}
+	msg := fmt.Sprintf("Sonda já está operando na versão mais recente (v%s).", CurrentClientVersion)
+	if updated {
+		msg = "Atualização instalada com sucesso! Reinicie o aplicativo para concluir."
+	}
+	return map[string]interface{}{
+		"updated":         updated,
+		"current_version": CurrentClientVersion,
+		"message":         msg,
+	}, nil
+}
+
 // GetConfig expõe a configuração para a UI
 func (a *App) GetConfig() Config {
 	return GetCurrentConfig()

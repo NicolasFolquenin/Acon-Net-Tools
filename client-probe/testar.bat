@@ -13,6 +13,7 @@ if not exist "frontend\dist" mkdir "frontend\dist"
 copy /y "frontend\index.html" "frontend\dist\" >nul
 copy /y "frontend\main.js" "frontend\dist\" >nul
 copy /y "frontend\style.css" "frontend\dist\" >nul
+if exist "frontend\chart.umd.min.js" copy /y "frontend\chart.umd.min.js" "frontend\dist\" >nul
 if exist "frontend\uepg-logo.png" copy /y "frontend\uepg-logo.png" "frontend\dist\" >nul
 
 echo [2/3] Localizando compilador Go...
