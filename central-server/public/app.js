@@ -5732,9 +5732,9 @@ async function executeAdminPing(hostname, target) {
     const minMs = typeof data.min_ms === 'number' ? data.min_ms : data.min_latency_ms;
     const maxMs = typeof data.max_ms === 'number' ? data.max_ms : data.max_latency_ms;
 
-    if (statAvg) statAvg.textContent = (avgMs > 0 ? avgMs.toFixed(1) : '--');
-    if (statMin) statMin.textContent = (minMs > 0 ? minMs.toFixed(1) : '--');
-    if (statMax) statMax.textContent = (maxMs > 0 ? maxMs.toFixed(1) : '--');
+    if (statAvg) statAvg.textContent = (avgMs > 0 ? avgMs.toFixed(1) : (isAlive ? '< 1' : '--'));
+    if (statMin) statMin.textContent = (minMs > 0 ? minMs.toFixed(1) : (isAlive ? '< 1' : '--'));
+    if (statMax) statMax.textContent = (maxMs > 0 ? maxMs.toFixed(1) : (isAlive ? '< 1' : '--'));
 
     if (statLoss) statLoss.textContent = loss.toFixed(0);
     if (statLossDesc) {
