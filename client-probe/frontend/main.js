@@ -165,7 +165,7 @@ async function initApp() {
     try {
       const status = await WailsApp.getStatus();
       updateStatusBadge(status);
-    } catch (_) {}
+    } catch (_) { }
   }, 10000);
 }
 
@@ -381,11 +381,12 @@ function initTheme() {
 
   const btnTheme = document.getElementById('btn-theme-toggle');
   if (btnTheme) {
-    btnTheme.addEventListener('click', () => {
+    btnTheme.onclick = (e) => {
+      e.preventDefault();
       const cur = document.documentElement.getAttribute('data-theme') || 'light';
       const next = cur === 'dark' ? 'light' : 'dark';
       applyTheme(next);
-    });
+    };
   }
 }
 
@@ -710,7 +711,7 @@ function getProfileCapabilities(profile, history) {
 
   // Fallback: se não há perfil definido ainda, verifica histórico de medições reais
   const hasHistoryThroughput = Array.isArray(history) && history.some(r => (r.download_mbps > 0 || r.upload_mbps > 0));
-  const hasHistoryPacketLoss = Array.isArray(history) && history.some(r => r.metrics && r.metrics.packet_loss != null);
+  const hasHistoryPacketLoss = Array.isArray(history) && history.some(r => r.metrics && (r.metrics.packet_loss_gateway != null || r.metrics.packet_loss != null));
   return {
     hasDownload: hasHistoryThroughput,
     hasUpload: hasHistoryThroughput,
@@ -748,7 +749,7 @@ function applyCapabilitiesToUI(caps) {
     throughputChartCard.style.display = caps.hasThroughput ? '' : 'none';
     if (caps.hasThroughput && wasHidden && throughputChart) {
       setTimeout(() => {
-        try { throughputChart.resize(); throughputChart.update(); } catch (_) {}
+        try { throughputChart.resize(); throughputChart.update(); } catch (_) { }
       }, 50);
     }
   }
@@ -798,12 +799,13 @@ async function refreshDashboard() {
     // Perda de Pacotes
     let lossVal = 0.0;
     let lossDetail = 'Alvo: Gateway local';
-    if (latest.metrics && latest.metrics.packet_loss) {
-      if (typeof latest.metrics.packet_loss.value === 'number') {
-        lossVal = latest.metrics.packet_loss.value;
+    const plMetric = latest.metrics && (latest.metrics.packet_loss_gateway || latest.metrics.packet_loss);
+    if (plMetric) {
+      if (typeof plMetric.value === 'number') {
+        lossVal = plMetric.value;
       }
-      if (latest.metrics.packet_loss.details) {
-        lossDetail = latest.metrics.packet_loss.details;
+      if (plMetric.details) {
+        lossDetail = plMetric.details;
       }
     }
     const statLoss = document.getElementById('stat-packet-loss');
@@ -834,15 +836,16 @@ async function refreshDashboard() {
     const uploads = history.map(item => item.upload_mbps);
     const pings = history.map(item => item.ping_gateway);
     const packetLosses = history.map(item => {
-      if (item.metrics && item.metrics.packet_loss && typeof item.metrics.packet_loss.value === 'number') {
-        return item.metrics.packet_loss.value;
+      const pl = item.metrics && (item.metrics.packet_loss_gateway || item.metrics.packet_loss);
+      if (pl && typeof pl.value === 'number') {
+        return pl.value;
       }
       return 0.0;
     });
 
     // Inicializa charts se ainda não foram criados
     if (!throughputChart && typeof Chart !== 'undefined') {
-      try { initCharts(); } catch (_) {}
+      try { initCharts(); } catch (_) { }
     }
 
     // Atualiza Chart Throughput
@@ -1123,8 +1126,9 @@ function renderTable(records, caps = currentCapabilities) {
       if (r.metrics.ping_nti_core && r.metrics.ping_nti_core.value > 0) {
         extraBadges += `<span class="mono-badge" style="font-size: 0.68rem; margin-left: 4px; color: #c084fc; border-color: rgba(192, 132, 252, 0.3);" title="Ping Core NTI">NTI ${r.metrics.ping_nti_core.value.toFixed(1)}ms</span>`;
       }
-      if (r.metrics.packet_loss && r.metrics.packet_loss.value >= 0) {
-        extraBadges += `<span class="mono-badge" style="font-size: 0.68rem; margin-left: 4px; color: #f87171;" title="Perda de Pacotes">Perda ${r.metrics.packet_loss.value.toFixed(0)}%</span>`;
+      const pl = r.metrics && (r.metrics.packet_loss_gateway || r.metrics.packet_loss);
+      if (pl && typeof pl.value === 'number' && pl.value >= 0) {
+        extraBadges += `<span class="mono-badge" style="font-size: 0.68rem; margin-left: 4px; color: #f87171;" title="Perda de Pacotes">Perda ${pl.value.toFixed(0)}%</span>`;
       }
     }
 

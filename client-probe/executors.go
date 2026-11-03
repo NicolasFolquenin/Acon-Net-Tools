@@ -222,12 +222,16 @@ func ExecutePacketLossTask(ctx context.Context, task TestTaskConfig, execCtx *Ex
 		} else if lossPercent > 0 {
 			status = "warning"
 		}
-		log.Printf("[MODULE:PACKET_LOSS] Ping ICMP executado com sucesso: Alvo=%s, Perda=%.1f%% (%d pacotes), RTT=%.1fms", target, lossPercent, count, avgMs)
+		rttStr := fmt.Sprintf("%.1fms", avgMs)
+		if avgMs <= 0.05 && lossPercent < 100 {
+			rttStr = "< 1ms"
+		}
+		log.Printf("[MODULE:PACKET_LOSS] Ping ICMP executado com sucesso: Alvo=%s, Perda=%.1f%% (%d pacotes), RTT=%s", target, lossPercent, count, rttStr)
 		return DynamicMetricResult{
 			Value:   math.Round(lossPercent*100) / 100,
 			Unit:    "%",
 			Status:  status,
-			Details: fmt.Sprintf("Alvo: %s | Perda: %.1f%% (%d pacotes) | RTT Médio: %.1fms", target, lossPercent, count, avgMs),
+			Details: fmt.Sprintf("Alvo: %s | Perda: %.1f%% (%d pacotes) | RTT Médio: %s", target, lossPercent, count, rttStr),
 		}
 	}
 
@@ -332,9 +336,9 @@ func pingViaExecLoss(target string, count int, timeoutMs int) (float64, float64,
 		}
 	}
 
-	// 4. Fallback contando respostas individuais recebidas
+	// 4. Fallback contando respostas individuais recebidas com payload de bytes (evita falsos positivos de "Host inacessível")
 	if lossPercent < 0 && count > 0 {
-		reReplies := regexp.MustCompile(`(?i)(?:bytes[ =]|resposta de|reply from)`)
+		reReplies := regexp.MustCompile(`(?i)(?:bytes[ =]|bytes:\s*|bytes=\d+)`)
 		matches := reReplies.FindAllString(outputStr, -1)
 		receivedCount := len(matches)
 		if receivedCount > count {
