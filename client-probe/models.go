@@ -29,6 +29,7 @@ type SystemInfo struct {
 	Gateway        string                   `json:"gateway"`
 	NetworkAdapter string                   `json:"network_adapter"`
 	Interfaces     []NetworkInterfaceDetail `json:"interfaces,omitempty"`
+	ClientVersion  string                   `json:"client_version,omitempty"`
 }
 
 // SwitchInfo armazena as informações do switch descobertas via LLDP
@@ -366,6 +367,7 @@ type MetricPayload struct {
 	UploadMbps     float64                `json:"upload_mbps"`
 	PingGateway    float64                `json:"ping_gateway"`
 	ProfileVersion string                 `json:"profile_version,omitempty"`
+	ClientVersion  string                 `json:"client_version,omitempty"`
 	Metrics        map[string]interface{} `json:"metrics,omitempty"`
 	SystemInfo     *SystemInfo            `json:"system_info,omitempty"`
 	SwitchInfo     *SwitchInfo            `json:"switch_info,omitempty"`
@@ -384,6 +386,7 @@ type LocalMetricRecord struct {
 	UploadMbps     float64                `json:"upload_mbps"`
 	PingGateway    float64                `json:"ping_gateway"`
 	ProfileVersion string                 `json:"profile_version,omitempty"`
+	ClientVersion  string                 `json:"client_version,omitempty"`
 	Metrics        map[string]interface{} `json:"metrics,omitempty"`
 	Synced         bool                   `json:"synced"`
 	ErrorMessage   string                 `json:"error_message,omitempty"`

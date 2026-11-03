@@ -2731,6 +2731,36 @@ function renderSingleMachineHeaderAndAlert(diagnostic, summaries) {
     statusBadge.textContent = isOnline ? 'Online na Rede' : 'Desconectada';
   }
 
+  // Versão da Sonda
+  const versionBadge = document.getElementById('sm-version-badge');
+  const smVersionMeta = document.getElementById('sm-version-meta');
+  const smVersionVal = document.getElementById('sm-version-val');
+
+  const clientVer = (diagnostic && (diagnostic.client_version || (diagnostic.system_info && diagnostic.system_info.client_version)))
+    || (summary && (summary.client_version || (summary.system_info && summary.system_info.client_version)))
+    || '';
+
+  if (versionBadge) {
+    if (clientVer) {
+      versionBadge.style.display = 'inline-flex';
+      const isLatest = (clientVer === '2.4.1' || clientVer.startsWith('2.4.1'));
+      versionBadge.className = `sm-version-badge ${isLatest ? 'latest' : 'outdated'}`;
+      versionBadge.textContent = isLatest ? `v${clientVer} (Atualizado)` : `v${clientVer} (Atualização Pendente)`;
+      versionBadge.title = isLatest ? 'Sonda operando na versão oficial mais recente' : 'Nova versão v2.4.1 disponível no servidor central';
+    } else {
+      versionBadge.style.display = 'none';
+    }
+  }
+
+  if (smVersionMeta && smVersionVal) {
+    if (clientVer) {
+      smVersionMeta.style.display = 'inline-flex';
+      smVersionVal.textContent = `v${clientVer}`;
+    } else {
+      smVersionMeta.style.display = 'none';
+    }
+  }
+
   // IP
   let ipStr = '--';
   if (diagnostic && diagnostic.system_info && (diagnostic.system_info.ip_address || diagnostic.system_info.IPAddress)) {
@@ -3188,6 +3218,12 @@ function renderNodesTable(summaries) {
       ? `<span class="node-sub-ip">${escapeHtml(s.system_info.ip_address)}</span>`
       : '';
 
+    // Versão da Sonda
+    const clientVer = s.client_version || (s.system_info && s.system_info.client_version) || '';
+    const verBadgeHtml = clientVer
+      ? `<span class="node-ver-badge ${clientVer === '2.4.1' ? 'ver-latest' : 'ver-old'}" title="${clientVer === '2.4.1' ? 'Sonda atualizada (v2.4.1)' : 'Atualização pendente: versão local v' + escapeHtml(clientVer) + ' (servidor: v2.4.1)'}">v${escapeHtml(clientVer)}</span>`
+      : '';
+
     return `
       <tr class="node-row ${isSelected ? 'selected-chart-node' : ''}" data-node-id="${escapeHtml(s.node_id)}" title="Clique para focar gráficos nesta máquina">
         <td>
@@ -3198,9 +3234,12 @@ function renderNodesTable(summaries) {
         </td>
         <td>
           <div class="node-cell-main">
-            <button type="button" class="btn-node-link font-bold font-mono" onclick="event.stopPropagation(); selectNodeForCharts('${escapeHtml(s.node_id)}', true)">
-              ${escapeHtml(s.node_id)}
-            </button>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <button type="button" class="btn-node-link font-bold font-mono" onclick="event.stopPropagation(); selectNodeForCharts('${escapeHtml(s.node_id)}', true)">
+                ${escapeHtml(s.node_id)}
+              </button>
+              ${verBadgeHtml}
+            </div>
             ${ipHtml}
           </div>
         </td>

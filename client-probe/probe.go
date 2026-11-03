@@ -54,6 +54,7 @@ func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile,
 
 	// Pré-carrega informações do host para alimentar alvos que necessitam dele (ex: auto_gateway)
 	sysInfo := CollectSystemInfo()
+	sysInfo.ClientVersion = CurrentClientVersion
 	execCtx.SysInfo = &sysInfo
 
 	metricsMap := make(map[string]interface{})
@@ -134,6 +135,7 @@ func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile,
 		VLAN:           vlan,
 		Timestamp:      time.Now().UTC().Truncate(time.Second),
 		ProfileVersion: prof.Version,
+		ClientVersion:  CurrentClientVersion,
 		DownloadMbps:   math.Round(downloadMbps*100) / 100,
 		UploadMbps:     math.Round(uploadMbps*100) / 100,
 		PingGateway:    math.Round(pingGateway*100) / 100,
