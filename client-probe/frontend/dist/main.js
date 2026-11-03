@@ -381,12 +381,11 @@ function initTheme() {
 
   const btnTheme = document.getElementById('btn-theme-toggle');
   if (btnTheme) {
-    btnTheme.onclick = (e) => {
-      e.preventDefault();
+    btnTheme.addEventListener('click', () => {
       const cur = document.documentElement.getAttribute('data-theme') || 'light';
       const next = cur === 'dark' ? 'light' : 'dark';
       applyTheme(next);
-    };
+    });
   }
 }
 
@@ -663,7 +662,6 @@ function initCharts() {
       }
     });
   }
-}
 }
 
 // Avalia quais medições estão de fato ativas e configuradas no perfil da máquina
