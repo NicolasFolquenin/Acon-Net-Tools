@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -250,11 +251,17 @@ func performBinarySwap(ctx context.Context, downloadURL, apiToken string) error 
 
 	log.Printf("[UPDATER] ✨ Binario atualizado com sucesso! Reiniciando sonda com a nova versao...")
 
-	// 3. Reinicia o processo com os mesmos argumentos
+	// 3. Reinicia o processo com os mesmos argumentos em processo desacoplado
 	cmd := exec.Command(execPath, os.Args[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
+	cmd.Dir = filepath.Dir(execPath)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	cmd.Stdin = nil
+	if runtime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			CreationFlags: 0x00000008 | 0x00000200, // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+		}
+	}
 
 	if err := cmd.Start(); err != nil {
 		log.Printf("[UPDATER] [AVISO] Novo binario instalado, mas falhou ao reiniciar processo automaticamente: %v", err)

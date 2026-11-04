@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
@@ -30,13 +32,32 @@ func main() {
 		Fullscreen:        false,
 		Frameless:         false,
 		StartHidden:       false,
-		HideWindowOnClose: false,
+		HideWindowOnClose: true,
 		BackgroundColour:  &options.RGBA{R: 248, G: 250, B: 252, A: 255}, // Light Base #f8fafc
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup:  app.startup,
-		OnShutdown: app.shutdown,
+		OnStartup: func(ctx context.Context) {
+			app.startup(ctx)
+			initSystemTray(ctx, app)
+		},
+		OnShutdown: func(ctx context.Context) {
+			cleanupTray()
+			app.shutdown(ctx)
+		},
+		OnBeforeClose: func(ctx context.Context) (prevent bool) {
+			showTrayBalloon("UEPG Net Tools", "A sonda continua monitorando a rede em segundo plano. Clique no ícone da bandeja para reabrir.")
+			return false // HideWindowOnClose: true esconde a janela sem encerrar o processo
+		},
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId: "uepg-net-tools-desktop-client-2026",
+			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
+				if app.ctx != nil {
+					runtime.WindowShow(app.ctx)
+					runtime.WindowUnminimise(app.ctx)
+				}
+			},
+		},
 		Bind: []interface{}{
 			app,
 		},

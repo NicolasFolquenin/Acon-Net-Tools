@@ -191,6 +191,8 @@ func (h *DownloadHandler) locateRawBinary(platform string) (string, os.FileInfo,
 	case "windows", "windows-amd64", "win":
 		candidates = []string{
 			filepath.Join(h.cfg.StaticDir, "downloads", "uepg-net-tools.exe"),
+			filepath.Join("client-probe", "cmd", "installer", "payload", "uepg-net-tools.exe"),
+			filepath.Join("..", "client-probe", "cmd", "installer", "payload", "uepg-net-tools.exe"),
 			filepath.Join("..", "client-probe", "build", "bin", "uepg-net-tools.exe"),
 			filepath.Join("..", "client-probe", "probe-app.exe"),
 			filepath.Join("client-probe", "build", "bin", "uepg-net-tools.exe"),
