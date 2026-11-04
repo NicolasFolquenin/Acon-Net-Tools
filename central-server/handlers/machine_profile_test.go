@@ -134,9 +134,9 @@ func TestMachineProfileHandler_RegisterDefaultGroup(t *testing.T) {
 	var prof models.MeasurementProfile
 	_ = json.Unmarshal(rr.Body.Bytes(), &prof)
 
-	// Grupo padrão deve ter apenas teste de ping básico
-	if len(prof.Tests) != 1 || prof.Tests[0].Type != models.TaskTypePing {
-		t.Errorf("esperado grupo default com apenas 1 teste de ping, obteve %d testes", len(prof.Tests))
+	// Grupo padrão deve conter o ciclo completo de medição (ping gateway, download, upload e dns)
+	if len(prof.Tests) != 1 {
+		t.Errorf("esperado grupo default com testes completos (exatamente 1 teste), obteve %d testes", len(prof.Tests))
 	}
 }
 

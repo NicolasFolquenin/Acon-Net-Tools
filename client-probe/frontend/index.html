@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <!-- Chart.js Local (resiliente e offline) -->
+  <script src="chart.umd.min.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -23,7 +23,7 @@
           <div class="node-meta">
             <span id="node-id-display" class="mono-badge">minipc-dc-01</span>
             <span id="node-location-display" class="location-badge">Guarapuava-DC1</span>
-            <span id="group-badge-display" class="location-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Grupo: Carregando...</span>
+            <span id="group-badge-display" class="group-badge">Grupo: Carregando...</span>
             <span id="profile-badge" class="profile-badge" title="Perfil de Medição Ativo">Perfil: Sincronizando...</span>
           </div>
         </div>
@@ -45,23 +45,36 @@
           <span id="btn-label">Rodar Teste Agora</span>
         </button>
 
-        <!-- Botão Alternar Modo Claro / Escuro -->
-        <button id="btn-theme-toggle" class="btn btn-secondary btn-icon-only" title="Alternar Modo Claro / Escuro" aria-label="Alternar Tema">
-          <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
-          <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
+        <!-- Botão Alternar Modo Claro / Escuro (Design Pill Moderno) -->
+        <button id="btn-theme-toggle" class="theme-toggle-pill" type="button" title="Alternar tema da interface" aria-label="Alternar tema">
+          <span class="theme-toggle-thumb">
+            <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+            <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+          </span>
+          <span id="theme-toggle-label" class="theme-toggle-label">Modo Escuro</span>
         </button>
+
+        <!-- Versão & Update -->
+        <div class="header-version-wrap">
+          <span class="header-version-badge" id="client-version-badge" title="Versão da Sonda Local">v2.4.1</span>
+          <button id="btn-check-update" class="btn btn-secondary btn-icon-only" title="Verificar atualizações no servidor" aria-label="Verificar atualizações">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+            </svg>
+          </button>
+        </div>
 
         <!-- Botão Configurações -->
         <button id="btn-open-settings" class="btn btn-secondary btn-icon-only" title="Configurações" aria-label="Configurações">
@@ -79,6 +92,27 @@
     <main class="main-content">
       <!-- Metric Cards Grid -->
       <section class="cards-grid">
+        <!-- Packet Loss Card -->
+        <div class="card card-stat card-rose" id="card-packet-loss">
+          <div class="card-header">
+            <div class="card-title">PERDA DE PACOTES</div>
+            <div class="card-icon rose">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="2" y="4" width="20" height="5" rx="2"></rect>
+                <rect x="2" y="15" width="20" height="5" rx="2"></rect>
+              </svg>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="stat-value">
+              <span id="stat-packet-loss">0.0</span>
+              <span class="stat-unit">%</span>
+              <span class="kpi-badge success" id="stat-packet-loss-badge">0% Perda</span>
+            </div>
+            <div class="stat-subtext" id="stat-packet-loss-detail">Alvo: Gateway local</div>
+          </div>
+        </div>
+
         <!-- Download Card -->
         <div class="card card-stat card-cyan" id="card-download">
           <div class="card-header">
@@ -165,84 +199,140 @@
         </div>
       </section>
 
-      <!-- Hardware & LLDP Switch Information Section -->
+      <!-- Hardware, Wi-Fi & LLDP Switch Information Section -->
       <section class="device-info-section">
-        <!-- PC Specs Card -->
-        <div class="info-box-card">
+        <div class="section-title-wrap mb-3">
+          <h3 class="section-heading">Especificações Técnicas, Rede &amp; Módulos Ativos</h3>
+          <p class="section-subtitle">Diagnóstico aprofundado do enlace local, adaptadores de rede, Wi-Fi e switch LLDP</p>
+        </div>
+
+        <div class="device-info-grid">
+          <!-- Bloco 1: Status Wi-Fi & Potência do Sinal -->
+          <div class="info-box-card" id="card-wifi-status">
+            <div class="info-box-header">
+              <div class="info-box-icon cyan">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                  <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+                  <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                  <line x1="12" y1="20" x2="12.01" y2="20"></line>
+                </svg>
+              </div>
+              <div class="flex-1">
+                <h4>Status Wi-Fi &amp; Potência</h4>
+                <p class="text-muted text-xs">Telemetria de rádio e sinal</p>
+              </div>
+              <span id="wifi-status-badge" class="badge-pill">Cabo Ethernet</span>
+            </div>
+            <div id="wifi-content-body" class="info-box-body">
+              <div class="wifi-eth-notice">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-cyan"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                <span>Conexão Cabeada Exclusiva (Ethernet)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bloco 2: Módulos Carregados na Sonda -->
+          <div class="info-box-card" id="card-modules-status">
+            <div class="info-box-header">
+              <div class="info-box-icon purple">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+              </div>
+              <div class="flex-1">
+                <h4>Módulos Ativos Carregados</h4>
+                <p class="text-muted text-xs">Perfil dinâmico de medição</p>
+              </div>
+              <span id="modules-profile-badge" class="badge-pill">Ativo</span>
+            </div>
+            <div class="info-box-body">
+              <div id="modules-chips-container" class="modules-chip-container">
+                <span class="module-chip">Carregando módulos...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bloco 3: Conexão de Switch (LLDP) -->
+          <div class="info-box-card" id="card-switch-status">
+            <div class="info-box-header">
+              <div class="info-box-icon emerald">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                  <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                  <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                  <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                </svg>
+              </div>
+              <div class="flex-1">
+                <h4>Topologia Switch LLDP</h4>
+                <p class="text-muted text-xs">Descoberta em tempo real do switch</p>
+              </div>
+              <span id="switch-vlan" class="badge-pill font-mono">Sem VLAN</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Nome do Switch:</span>
+                <span class="info-val font-bold text-cyan" id="switch-name">Aguardando frame LLDP...</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Porta Conectada:</span>
+                <span class="info-val font-bold font-mono" id="switch-port">--</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Protocolo:</span>
+                <span class="info-val" id="switch-protocol">LLDP</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Placa Local:</span>
+                <span class="info-val" id="pc-adapter">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloco 4: Inventário Completo de Placas de Rede & Endereços MAC -->
+        <div class="info-box-card card-full mt-3" id="card-interfaces-inventory">
           <div class="info-box-header">
-            <div class="info-box-icon cyan">
+            <div class="info-box-icon blue">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
                 <line x1="12" y1="17" x2="12" y2="21"></line>
               </svg>
             </div>
-            <div>
-              <h4>Hardware do Host</h4>
-              <p class="text-muted text-xs">Especificações do nó de teste</p>
+            <div class="flex-1">
+              <h4>Inventário de Placas de Rede &amp; Endereços MAC</h4>
+              <p class="text-muted text-xs">Mapeamento dos adaptadores físicos, endereços MAC e IPv4 configurados</p>
             </div>
+            <span id="ifaces-count-badge" class="count-badge">-- placas</span>
           </div>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">Computador:</span>
-              <span class="info-val" id="pc-model">Detectando...</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Processador:</span>
-              <span class="info-val" id="pc-cpu">Detectando...</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Memória RAM:</span>
-              <span class="info-val" id="pc-ram">-- GB</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">IP Local / MAC:</span>
-              <span class="info-val font-mono" id="pc-ip-mac">--</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Switch LLDP Card -->
-        <div class="info-box-card">
-          <div class="info-box-header">
-            <div class="info-box-icon purple">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                <line x1="6" y1="18" x2="6.01" y2="18"></line>
-              </svg>
-            </div>
-            <div>
-              <h4>Conexão de Switch (LLDP)</h4>
-              <p class="text-muted text-xs">Descoberta em tempo real da porta de rede</p>
-            </div>
-          </div>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">Nome do Switch:</span>
-              <span class="info-val font-bold text-cyan" id="switch-name">Aguardando frame LLDP...</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Porta Conectada:</span>
-              <span class="info-val font-bold" id="switch-port">--</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">VLAN de Acesso:</span>
-              <span class="info-val" id="switch-vlan">--</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Placa Local:</span>
-              <span class="info-val" id="pc-adapter">--</span>
-            </div>
+          <div class="table-wrapper m-0">
+            <table class="data-table ifaces-table">
+              <thead>
+                <tr>
+                  <th style="width: 90px;">Status</th>
+                  <th>Interface / Adaptador</th>
+                  <th style="width: 110px;">Tipo</th>
+                  <th>Endereço MAC Físico</th>
+                  <th>Endereços IPv4</th>
+                  <th style="width: 130px; text-align: center;">Prioridade</th>
+                </tr>
+              </thead>
+              <tbody id="ifaces-tbody">
+                <tr><td colspan="6" class="text-center text-muted py-3">Carregando interfaces...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      <!-- Charts Section (Last 24 runs) -->
-      <section class="charts-container" id="charts-container">
+      <!-- Charts Section: empilhados com cartões independentes e responsivos -->
+      <section class="charts-stack-section" id="charts-container">
         <!-- Throughput Chart -->
-        <div class="chart-card" id="throughput-chart-card">
+        <div class="chart-card mb-3" id="throughput-chart-card">
           <div class="chart-card-header">
             <div>
               <h3>Histórico de Throughput (Últimas 24 execuções)</h3>
@@ -259,7 +349,7 @@
         </div>
 
         <!-- Latency Chart -->
-        <div class="chart-card" id="latency-chart-card">
+        <div class="chart-card mb-3" id="latency-chart-card">
           <div class="chart-card-header">
             <div>
               <h3>Histórico de Latência (Gateway)</h3>
@@ -271,6 +361,22 @@
           </div>
           <div class="chart-wrapper">
             <canvas id="latencyChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Packet Loss Chart (Dedicado) -->
+        <div class="chart-card mb-3" id="packet-loss-chart-card">
+          <div class="chart-card-header">
+            <div>
+              <h3>Histórico de Perda de Pacotes</h3>
+              <p class="chart-subtitle">Taxa de pacotes descartados dos últimos testes (%)</p>
+            </div>
+            <div class="chart-legend-custom">
+              <span class="legend-badge" style="color: #ef4444;"><span class="badge-dot" style="background: #ef4444;"></span>Perda (%)</span>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="packetLossChart"></canvas>
           </div>
         </div>
       </section>

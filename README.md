@@ -4,6 +4,20 @@ Sistema corporativo completo de monitoramento distribuído e telemetria de rede 
 
 ---
 
+## 📚 Documentação Técnica Modular
+
+A documentação detalhada do sistema foi particionada em pastas temáticas dentro do diretório [`docs/`](docs/README.md):
+
+- 🏛️ **[Arquitetura do Sistema](docs/arquitetura/visao_geral.md):** [Visão Geral](docs/arquitetura/visao_geral.md) | [Fluxo de Telemetria](docs/arquitetura/fluxo_telemetria.md) | [Segurança & Permissões](docs/arquitetura/seguranca_e_rede.md)
+- 🐧 **[Servidor Central](docs/central-server/api_referencia.md):** [Referência da REST API](docs/central-server/api_referencia.md) | [Modelagem MongoDB](docs/central-server/banco_de_dados.md) | [Dashboard NOC Web](docs/central-server/dashboard_web.md)
+- 🖥️ **[Sonda Cliente (Probe)](docs/client-probe/ciclo_de_execucao.md):** [Ciclo de Execução](docs/client-probe/ciclo_de_execucao.md) | [Módulos de Teste](docs/client-probe/modulos_de_teste.md) | [Auto-Update (v2.4.1)](docs/client-probe/auto_update.md) | [Modo Desktop Wails](docs/client-probe/modo_desktop_wails.md)
+- 🚀 **[Deploy e Instalação](docs/deploy/servidor_docker.md):** [Servidor Docker na VM](docs/deploy/servidor_docker.md) | [Sonda Linux (systemd)](docs/deploy/sonda_linux.md) | [Sonda Windows (.exe)](docs/deploy/sonda_windows.md)
+- 🎨 **[UX/UI & Design System](docs/ux-ui/diretrizes_visuais.md):** [Diretrizes Visuais](docs/ux-ui/diretrizes_visuais.md) | [Dashboard & Gráficos Chart.js](docs/ux-ui/dashboard_e_graficos.md)
+
+Para o índice completo e navegação, consulte **[`docs/README.md`](docs/README.md)**.
+
+---
+
 ## 🏛️ Componentes do Sistema
 
 ```
@@ -48,13 +62,17 @@ sudo ./deploy.sh
 
 ### O que o `deploy.sh` faz por você:
 - ✅ Verifica e instala automaticamente o **Docker** e o **Docker Compose** caso não estejam presentes.
-- ✅ Configura o arquivo de variáveis de ambiente (`.env`) detectando o IP e domínio da VM.
+- ✅ **Assistente no Terminal da VM:** Configura as variáveis (Porta, DNS, Domínio, Core, Senha) diretamente no terminal da VM no primeiro deploy, gravando tudo automaticamente no `.env` persistente.
+- ✅ **Persistência Completa de Volumes:** Mantém `.env`, `./config` e `./mongo_data` preservados no host. Comandos como `docker compose down` e `up` não perdem dados nem pedem configs novamente.
+- ✅ Customização total via `.env`: Porta, IP/Domínio do DNS, Core de rede e limites de teste podem ser alterados para qualquer instituição/empresa sem tocar em código.
 - ✅ Garante compatibilidade de CPU em Hypervisors e VMs legadas (MongoDB Time Series 4.4 sem exigência de flags AVX).
 - ✅ Inicia os containers em segundo plano e realiza teste de saúde no endpoint `/health`.
 - ✅ Exibe na tela as URLs prontas de acesso e credenciais de administrador.
 
 ### Comandos de Gestão do Servidor:
 ```bash
+./deploy.sh             # Deploy / Inicialização rápida (se já configurado, sobe direto sem perguntas)
+./deploy.sh --wizard    # Abre o assistente interativo de configuração no terminal da VM
 ./deploy.sh --status    # Consulta o status dos containers e saúde do banco
 ./deploy.sh --logs      # Acompanha logs do servidor Go em tempo real
 ./deploy.sh --down      # Interrompe os containers com segurança (mantém os dados salvos)
