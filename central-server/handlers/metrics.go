@@ -176,6 +176,7 @@ func (h *MetricsHandler) GetDashboardMetrics(w http.ResponseWriter, r *http.Requ
 				LastUpload:      latestItem.UploadMbps,
 				LastPing:        latestItem.PingGateway,
 				ProfileVersion:  latestItem.ProfileVersion,
+				ClientVersion:   latestItem.ClientVersion,
 				Metrics:         latestItem.Metrics,
 				IsHealthy:       diagnostic.IsOnline,
 				TotalReadings24: len(series),
@@ -243,6 +244,10 @@ func (h *MetricsHandler) buildNodeDiagnostic(ctx context.Context, nodeID string,
 		diag.VLAN = latest.VLAN
 		if diag.VLAN == 0 && latest.SwitchInfo != nil && latest.SwitchInfo.VLAN > 0 {
 			diag.VLAN = latest.SwitchInfo.VLAN
+		}
+		diag.ClientVersion = latest.ClientVersion
+		if diag.ClientVersion == "" && latest.SystemInfo != nil {
+			diag.ClientVersion = latest.SystemInfo.ClientVersion
 		}
 		diag.SystemInfo = latest.SystemInfo
 		if diag.SystemInfo == nil && mach != nil && mach.IPAddress != "" {
@@ -496,6 +501,11 @@ func (h *MetricsHandler) computeNodeSummaries(ctx context.Context, series []mode
 			resolvedGroupName = gName
 		}
 
+		clientVer := agg.latest.ClientVersion
+		if clientVer == "" && sys != nil {
+			clientVer = sys.ClientVersion
+		}
+
 		summaries = append(summaries, models.NodeSummaryCard{
 			NodeID:          agg.latest.NodeID,
 			Location:        agg.latest.Location,
@@ -506,6 +516,7 @@ func (h *MetricsHandler) computeNodeSummaries(ctx context.Context, series []mode
 			LastUpload:      agg.latest.UploadMbps,
 			LastPing:        agg.latest.PingGateway,
 			ProfileVersion:  agg.latest.ProfileVersion,
+			ClientVersion:   clientVer,
 			Metrics:         agg.latest.Metrics,
 			IsHealthy:       isHealthy,
 			TotalReadings24: agg.count,

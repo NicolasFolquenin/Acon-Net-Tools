@@ -31,7 +31,7 @@ func main() {
 		Frameless:         false,
 		StartHidden:       false,
 		HideWindowOnClose: false,
-		BackgroundColour:  &options.RGBA{R: 11, G: 15, B: 25, A: 255}, // Dark Slate #0b0f19
+		BackgroundColour:  &options.RGBA{R: 248, G: 250, B: 252, A: 255}, // Light Base #f8fafc
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
@@ -44,7 +44,7 @@ func main() {
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
 			BackdropType:         windows.Mica,
-			Theme:                windows.Dark,
+			Theme:                windows.Light,
 		},
 	})
 

@@ -4852,6 +4852,50 @@ body.auth-mode .dashboard-layout {
   font-family: 'JetBrains Mono', monospace;
 }
 
+.sm-version-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+  letter-spacing: 0.02em;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.sm-version-badge.outdated {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.node-ver-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.node-ver-badge.ver-latest {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.node-ver-badge.ver-old {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
 .sm-actions {
   display: flex;
   align-items: center;
@@ -6163,4 +6207,21 @@ body.auth-mode .dashboard-layout {
 [data-theme="light"] .switch-modal-summary-bar {
   background: #f8fafc;
   border-color: #e2e8f0;
+}
+
+/* Feedback de rotação no botão Atualizar */
+@keyframes spinRefresh {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.btn-glass.is-refreshing {
+  opacity: 0.85;
+  pointer-events: none;
+  cursor: wait;
+}
+
+.btn-glass.is-refreshing .icon-refresh {
+  animation: spinRefresh 0.8s linear infinite !important;
+  color: var(--accent-cyan);
 }

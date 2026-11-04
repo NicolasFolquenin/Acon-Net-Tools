@@ -197,6 +197,7 @@
                 <h2 id="sm-machine-name" class="sm-machine-name">--</h2>
               </div>
               <span id="sm-status-badge" class="dc-health-badge online">Online</span>
+              <span id="sm-version-badge" class="sm-version-badge" style="display: none;">v2.4.1</span>
             </div>
 
             <div class="sm-actions">
@@ -244,6 +245,10 @@
             <div class="sm-meta-item">
               <span class="sm-meta-label">Porta:</span>
               <span id="sm-port" class="sm-meta-val font-mono">--</span>
+            </div>
+            <div class="sm-meta-item" id="sm-version-meta" style="display: none;">
+              <span class="sm-meta-label">Versão:</span>
+              <span id="sm-version-val" class="sm-meta-val font-mono">--</span>
             </div>
             <div class="sm-meta-item" id="sm-wifi-meta" style="display: none;">
               <span class="sm-meta-label">Wi-Fi:</span>
@@ -319,7 +324,7 @@
             <span class="kpi-subtext" id="kpi-nodes-sub">Carregando sondas do campus...</span>
           </div>
 
-          <div class="kpi-card">
+          <div class="kpi-card" id="kpi-card-download">
             <div class="kpi-header">
               <span class="kpi-label">Throughput Download</span>
               <span class="kpi-icon-wrap blue">
@@ -337,7 +342,7 @@
             <span class="kpi-subtext">Taxa média das sondas ativas</span>
           </div>
 
-          <div class="kpi-card">
+          <div class="kpi-card" id="kpi-card-upload">
             <div class="kpi-header">
               <span class="kpi-label">Throughput Upload</span>
               <span class="kpi-icon-wrap purple">
@@ -608,7 +613,7 @@
 
           <div class="charts-grid">
             <!-- Chart 1: Bandwidth Comparison (Download & Upload) -->
-            <div class="chart-panel">
+            <div class="chart-panel" id="bandwidth-chart-panel">
               <div class="panel-header">
                 <div>
                   <h4 id="bandwidth-chart-title">Histórico de Throughput</h4>
@@ -654,7 +659,7 @@
             </div>
 
             <!-- Chart 2: Latency Comparison (Gateway Ping) -->
-            <div class="chart-panel">
+            <div class="chart-panel" id="latency-chart-panel">
               <div class="panel-header">
                 <div>
                   <h4 id="latency-chart-title">Histórico de Latência</h4>
@@ -679,6 +684,24 @@
                 </div></div>
               <div class="chart-canvas-container">
                 <canvas id="centralLatencyChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Chart 3: Histórico de Perda de Pacotes (Dedicado) -->
+            <div class="chart-panel" id="packet-loss-chart-panel" style="display: none;">
+              <div class="panel-header">
+                <div>
+                  <h4 id="packet-loss-chart-title">Histórico de Perda de Pacotes</h4>
+                  <p id="packet-loss-chart-desc" class="panel-desc">Taxa de pacotes descartados dos últimos 20 testes (%)</p>
+                </div>
+                <div class="panel-header-right">
+                  <div id="packet-loss-legend-container" class="chart-legend-custom">
+                    <span class="legend-badge" style="color: #ef4444;"><span class="badge-dot" style="background: #ef4444;"></span>Perda (%)</span>
+                  </div>
+                </div>
+              </div>
+              <div class="chart-canvas-container">
+                <canvas id="centralPacketLossChart"></canvas>
               </div>
             </div>
           </div>
