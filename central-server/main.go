@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -57,6 +58,7 @@ func main() {
 	fileServer := http.FileServer(http.Dir(cfg.StaticDir))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
+
 		if path == "/" || strings.HasSuffix(path, ".html") || strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".css") {
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			w.Header().Set("Pragma", "no-cache")
@@ -69,6 +71,12 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"healthy","service":"central-server","time":"` + time.Now().UTC().Format(time.RFC3339) + `"}`))
+	})
+
+	// Endpoint público de configurações do sistema (Porta, DNS, Domínio, Alvos parametrizados no .env)
+	mux.HandleFunc("/api/v1/config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(cfg)
 	})
 
 	// Speedtest endpoints para medição real das sondas

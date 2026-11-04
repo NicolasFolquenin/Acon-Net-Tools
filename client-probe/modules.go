@@ -56,8 +56,13 @@ func RunPacketLossModule(ctx context.Context, p *NetworkProbe, cfg PacketLossMod
 		return nil
 	}
 	target := strings.TrimSpace(cfg.Target)
-	if target == "" {
-		target = "1.1.1.1"
+	if target == "" || target == "auto_gateway" {
+		sysInfo := CollectSystemInfo()
+		if sysInfo.Gateway != "" && sysInfo.Gateway != "--" {
+			target = sysInfo.Gateway
+		} else {
+			target = "1.1.1.1"
+		}
 	}
 	count := cfg.Count
 	if count <= 0 {
@@ -68,7 +73,27 @@ func RunPacketLossModule(ctx context.Context, p *NetworkProbe, cfg PacketLossMod
 		timeoutMs = 1000
 	}
 
-	log.Printf("[MODULE:PACKET_LOSS] Medindo perda de pacotes e jitter para %s (amostras: %d)...", target, count)
+	log.Printf("[MODULE:PACKET_LOSS] Medindo perda de pacotes para %s (amostras: %d)...", target, count)
+
+	// 1. Tenta medição real via comando ping ICMP nativo do SO
+	lossPercent, avgMs, errPing := pingViaExecLoss(target, count, timeoutMs)
+	if errPing == nil {
+		received := int(math.Round(float64(count) * (1.0 - lossPercent/100.0)))
+		res := &PacketLossResult{
+			Target:       target,
+			Sent:         count,
+			Received:     received,
+			LossPercent:  math.Round(lossPercent*10) / 10,
+			JitterMs:     0,
+			MinLatencyMs: math.Round(avgMs*100) / 100,
+			AvgLatencyMs: math.Round(avgMs*100) / 100,
+			MaxLatencyMs: math.Round(avgMs*100) / 100,
+		}
+		log.Printf("[MODULE:PACKET_LOSS] Resultado ICMP nativo: Perda=%.1f%%, Latência Média=%.2f ms", res.LossPercent, res.AvgLatencyMs)
+		return res
+	}
+
+	log.Printf("[MODULE:PACKET_LOSS][AVISO] Falha no ping nativo (%v), utilizando fallback TCP...", errPing)
 
 	var latencies []float64
 	received := 0
@@ -102,7 +127,7 @@ func RunPacketLossModule(ctx context.Context, p *NetworkProbe, cfg PacketLossMod
 		time.Sleep(30 * time.Millisecond)
 	}
 
-	lossPercent := 0.0
+	lossPercent = 0.0
 	if count > 0 {
 		lossPercent = float64(count-received) / float64(count) * 100.0
 	}

@@ -222,13 +222,20 @@ func ExecutePacketLossTask(ctx context.Context, task TestTaskConfig, execCtx *Ex
 		} else if lossPercent > 0 {
 			status = "warning"
 		}
+		rttStr := fmt.Sprintf("%.1fms", avgMs)
+		if avgMs <= 0.05 && lossPercent < 100 {
+			rttStr = "< 1ms"
+		}
+		log.Printf("[MODULE:PACKET_LOSS] Ping ICMP executado com sucesso: Alvo=%s, Perda=%.1f%% (%d pacotes), RTT=%s", target, lossPercent, count, rttStr)
 		return DynamicMetricResult{
 			Value:   math.Round(lossPercent*100) / 100,
 			Unit:    "%",
 			Status:  status,
-			Details: fmt.Sprintf("Alvo: %s | Perda: %.1f%% (%d pacotes) | RTT Médio: %.1fms", target, lossPercent, count, avgMs),
+			Details: fmt.Sprintf("Alvo: %s | Perda: %.1f%% (%d pacotes) | RTT Médio: %s", target, lossPercent, count, rttStr),
 		}
 	}
+
+	log.Printf("[MODULE:PACKET_LOSS][AVISO] Falha ao executar ping ICMP nativo (%v) para %s. Acionando fallback TCP...", err, target)
 
 	// Fallback via TCP probes
 	var lost int
@@ -261,6 +268,8 @@ func ExecutePacketLossTask(ctx context.Context, task TestTaskConfig, execCtx *Ex
 		avgTCP = totalRtt / float64(count-lost)
 	}
 
+	log.Printf("[MODULE:PACKET_LOSS] Fallback TCP finalizado: Alvo=%s, Perda=%.1f%% (%d probes TCP), RTT=%.1fms", target, calcLoss, count, avgTCP)
+
 	return DynamicMetricResult{
 		Value:   math.Round(calcLoss*100) / 100,
 		Unit:    "%",
@@ -289,34 +298,93 @@ func pingViaExecLoss(target string, count int, timeoutMs int) (float64, float64,
 		return 100.0, 0, err
 	}
 
-	reLossWin := regexp.MustCompile(`(?i)(\d+)%\s*(?:de perda|loss)`)
 	var lossPercent float64 = -1
-	if match := reLossWin.FindStringSubmatch(outputStr); len(match) > 1 {
-		if val, errP := strconv.ParseFloat(match[1], 64); errP == nil {
-			lossPercent = val
+	var avgMs float64
+
+	// 1. Parser Windows: "Enviados = X" e "Recebidos = Y" (imune a quebras de linha em "(0% de perda)")
+	reWinSent := regexp.MustCompile(`(?i)(?:Enviados|Sent)\s*=\s*(\d+)`)
+	reWinRecv := regexp.MustCompile(`(?i)(?:Recebidos|Received)\s*=\s*(\d+)`)
+	if mSent := reWinSent.FindStringSubmatch(outputStr); len(mSent) > 1 {
+		if mRecv := reWinRecv.FindStringSubmatch(outputStr); len(mRecv) > 1 {
+			sent, _ := strconv.Atoi(mSent[1])
+			recv, _ := strconv.Atoi(mRecv[1])
+			if sent > 0 {
+				lossPercent = (float64(sent-recv) / float64(sent)) * 100.0
+			}
 		}
 	}
 
+	// 2. Parser Linux: "X packets transmitted, Y received"
 	if lossPercent < 0 {
-		reLossLinux := regexp.MustCompile(`(?i)(\d+)%\s*packet loss`)
-		if match := reLossLinux.FindStringSubmatch(outputStr); len(match) > 1 {
-			if val, errP := strconv.ParseFloat(match[1], 64); errP == nil {
+		reLinuxLoss := regexp.MustCompile(`(\d+)\s+packets transmitted,\s*(\d+)\s+(?:packets\s+)?received`)
+		if m := reLinuxLoss.FindStringSubmatch(outputStr); len(m) >= 3 {
+			sent, _ := strconv.Atoi(m[1])
+			recv, _ := strconv.Atoi(m[2])
+			if sent > 0 {
+				lossPercent = (float64(sent-recv) / float64(sent)) * 100.0
+			}
+		}
+	}
+
+	// 3. Fallback genérico por regex de porcentagem (suporta quebras de linha via (?s))
+	if lossPercent < 0 {
+		reGenericLoss := regexp.MustCompile(`(?s)(?i)([0-9.]+)\s*%\s*(?:packet loss|de\s+perda|loss)`)
+		if m := reGenericLoss.FindStringSubmatch(outputStr); len(m) > 1 {
+			if val, errP := strconv.ParseFloat(m[1], 64); errP == nil {
 				lossPercent = val
 			}
 		}
 	}
 
+	// 4. Fallback contando respostas individuais recebidas com payload de bytes (evita falsos positivos de "Host inacessível")
+	if lossPercent < 0 && count > 0 {
+		reReplies := regexp.MustCompile(`(?i)(?:bytes[ =]|bytes:\s*|bytes=\d+)`)
+		matches := reReplies.FindAllString(outputStr, -1)
+		receivedCount := len(matches)
+		if receivedCount > count {
+			receivedCount = count
+		}
+		lossPercent = (float64(count-receivedCount) / float64(count)) * 100.0
+	}
+
 	if lossPercent < 0 {
-		return 0, 0, fmt.Errorf("nao foi possivel analisar perda de pacotes")
+		return 0, 0, fmt.Errorf("nao foi possivel analisar perda de pacotes da saida: %s", outputStr)
 	}
 
-	var avgMs float64
-	reAvg := regexp.MustCompile(`(?i)(?:Média|Average|Media)\s*=\s*(\d+)ms`)
-	if match := reAvg.FindStringSubmatch(outputStr); len(match) > 1 {
-		avgMs, _ = strconv.ParseFloat(match[1], 64)
+	// Limita aos intervalos válidos [0.0, 100.0]
+	if lossPercent < 0 {
+		lossPercent = 0
+	} else if lossPercent > 100 {
+		lossPercent = 100
 	}
 
-	return lossPercent, avgMs, nil
+	// Parse de Latência RTT média
+	// Linux: rtt min/avg/max/mdev = 0.412/0.446/0.489/0.029 ms
+	reLinuxRtt := regexp.MustCompile(`(?:rtt|round-trip)\s+(?:min/avg/max|min/avg/max/mdev|min/avg/max/stddev)\s*=\s*([0-9.]+)/([0-9.]+)/([0-9.]+)`)
+	if m := reLinuxRtt.FindStringSubmatch(outputStr); len(m) >= 4 {
+		avgMs, _ = strconv.ParseFloat(m[2], 64)
+	} else {
+		// Windows: Média = 1ms ou Average = 1ms (suporta encoding OEM de 'Média')
+		reWinRtt := regexp.MustCompile(`(?i)(?:m.*?dia|average)\s*=\s*([0-9.]+)\s*ms`)
+		if m := reWinRtt.FindStringSubmatch(outputStr); len(m) > 1 {
+			avgMs, _ = strconv.ParseFloat(m[1], 64)
+		} else {
+			// Fallback por linhas individuais: time=0.4 ms ou tempo=1ms ou tempo<1ms
+			reSingle := regexp.MustCompile(`(?i)(?:time|tempo)[=<]([0-9.]+)\s*ms`)
+			matches := reSingle.FindAllStringSubmatch(outputStr, -1)
+			if len(matches) > 0 {
+				var sumLat float64
+				for _, sm := range matches {
+					if lat, errLat := strconv.ParseFloat(sm[1], 64); errLat == nil {
+						sumLat += lat
+					}
+				}
+				avgMs = sumLat / float64(len(matches))
+			}
+		}
+	}
+
+	return math.Round(lossPercent*100) / 100, math.Round(avgMs*100) / 100, nil
 }
 
 // ExecuteThroughputDownloadTask mede a taxa de transferência de download (Mbps)

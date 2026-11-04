@@ -147,6 +147,7 @@ func (a *App) startup(ctx context.Context) {
 	workerCtx, cancel := context.WithCancel(context.Background())
 	a.cancelWorker = cancel
 	go a.backgroundScheduler(workerCtx)
+	go a.autoUpdaterLoop(workerCtx)
 
 	// Sincroniza medições que porventura ficaram pendentes offline
 	go func() {
@@ -235,6 +236,29 @@ func (a *App) backgroundScheduler(ctx context.Context) {
 					_, _ = CheckAndApplyAutoUpdate(upCtx, curCfg.ServerURL, curCfg.APIToken)
 				}
 			}()
+		}
+	}
+}
+
+// autoUpdaterLoop verifica periodicamente em segundo plano se há nova versão da sonda no Servidor Central
+func (a *App) autoUpdaterLoop(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cfg := GetCurrentConfig()
+			if cfg.ServerURL != "" && cfg.ServerURL != "none" {
+				upCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				updated, err := CheckAndApplyAutoUpdate(upCtx, cfg.ServerURL, cfg.APIToken)
+				cancel()
+				if err == nil && updated {
+					log.Println("[UPDATER] Sonda atualizada automaticamente com sucesso para nova versão!")
+				}
+			}
 		}
 	}
 }
@@ -449,6 +473,38 @@ func (a *App) RefreshProfile() (*MeasurementProfile, error) {
 		a.emitStatus()
 	}
 	return prof, err
+}
+
+// CheckUpdateNow expõe ao frontend a checagem manual de versão junto ao Central Server
+func (a *App) CheckUpdateNow() (map[string]interface{}, error) {
+	cfg := GetCurrentConfig()
+	if cfg.ServerURL == "" || cfg.ServerURL == "none" {
+		return map[string]interface{}{
+			"updated":         false,
+			"current_version": CurrentClientVersion,
+			"message":         "Servidor central não configurado",
+		}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+	defer cancel()
+
+	updated, err := CheckAndApplyAutoUpdate(ctx, cfg.ServerURL, cfg.APIToken)
+	if err != nil {
+		return map[string]interface{}{
+			"updated":         false,
+			"current_version": CurrentClientVersion,
+			"message":         fmt.Sprintf("Falha ao checar atualização: %v", err),
+		}, err
+	}
+	msg := fmt.Sprintf("Sonda já está operando na versão mais recente (v%s).", CurrentClientVersion)
+	if updated {
+		msg = "Atualização instalada com sucesso! Reinicie o aplicativo para concluir."
+	}
+	return map[string]interface{}{
+		"updated":         updated,
+		"current_version": CurrentClientVersion,
+		"message":         msg,
+	}, nil
 }
 
 // GetConfig expõe a configuração para a UI

@@ -29,6 +29,7 @@ type SystemInfo struct {
 	Gateway        string                   `bson:"gateway,omitempty" json:"gateway,omitempty"`
 	NetworkAdapter string                   `bson:"network_adapter,omitempty" json:"network_adapter,omitempty"`
 	Interfaces     []NetworkInterfaceDetail `bson:"interfaces,omitempty" json:"interfaces,omitempty"`
+	ClientVersion  string                   `bson:"client_version,omitempty" json:"client_version,omitempty"`
 }
 
 // SwitchInfo armazena as informações do switch descobertas via LLDP
@@ -178,6 +179,7 @@ type MetricPayloadInput struct {
 	UploadMbps     float64                `json:"upload_mbps"`
 	PingGateway    float64                `json:"ping_gateway"`
 	ProfileVersion string                 `json:"profile_version,omitempty"`
+	ClientVersion  string                 `json:"client_version,omitempty"`
 	Metrics        map[string]interface{} `json:"metrics,omitempty"`
 	SystemInfo     *SystemInfo            `json:"system_info,omitempty"`
 	SwitchInfo     *SwitchInfo            `json:"switch_info,omitempty"`
@@ -200,6 +202,7 @@ type TimeSeriesMetricDocument struct {
 	UploadMbps     float64                `bson:"upload_mbps" json:"upload_mbps"`
 	PingGateway    float64                `bson:"ping_gateway" json:"ping_gateway"`
 	ProfileVersion string                 `bson:"profile_version,omitempty" json:"profile_version,omitempty"`
+	ClientVersion  string                 `bson:"client_version,omitempty" json:"client_version,omitempty"`
 	Metrics        map[string]interface{} `bson:"metrics,omitempty" json:"metrics,omitempty"`
 	SystemInfo     *SystemInfo            `bson:"system_info,omitempty" json:"system_info,omitempty"`
 	SwitchInfo     *SwitchInfo            `bson:"switch_info,omitempty" json:"switch_info,omitempty"`
@@ -217,6 +220,7 @@ type FlattenedMetricItem struct {
 	UploadMbps     float64                `json:"upload_mbps"`
 	PingGateway    float64                `json:"ping_gateway"`
 	ProfileVersion string                 `json:"profile_version,omitempty"`
+	ClientVersion  string                 `json:"client_version,omitempty"`
 	Metrics        map[string]interface{} `json:"metrics,omitempty"`
 	SystemInfo     *SystemInfo            `json:"system_info,omitempty"`
 	SwitchInfo     *SwitchInfo            `json:"switch_info,omitempty"`
@@ -234,6 +238,7 @@ type NodeSummaryCard struct {
 	LastUpload      float64                `json:"last_upload"`
 	LastPing        float64                `json:"last_ping"`
 	ProfileVersion  string                 `json:"profile_version,omitempty"`
+	ClientVersion   string                 `json:"client_version,omitempty"`
 	Metrics         map[string]interface{} `json:"metrics,omitempty"`
 	IsHealthy       bool                   `json:"is_healthy"`
 	TotalReadings24 int                    `json:"total_readings_24h"`
@@ -255,6 +260,7 @@ type NodeDiagnosticInfo struct {
 	Location             string      `json:"location,omitempty"`
 	GroupName            string      `json:"group_name,omitempty"`
 	VLAN                 int         `json:"vlan,omitempty"`
+	ClientVersion        string      `json:"client_version,omitempty"`
 	SystemInfo           *SystemInfo `json:"system_info,omitempty"`
 	SwitchInfo           *SwitchInfo     `json:"switch_info,omitempty"`
 	ModularResults       *ModularResults `json:"modular_results,omitempty"`

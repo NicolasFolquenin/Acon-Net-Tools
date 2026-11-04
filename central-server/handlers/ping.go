@@ -169,41 +169,39 @@ func parsePingOutput(output string, resp *PingResponse) {
 		resp.MinLatencyMs, _ = strconv.ParseFloat(m[1], 64)
 		resp.AvgLatencyMs, _ = strconv.ParseFloat(m[2], 64)
 		resp.MaxLatencyMs, _ = strconv.ParseFloat(m[3], 64)
-		return
-	}
-
-	// Windows: Mínimo = 1ms, Máximo = 2ms, Média = 1ms
-	reWinRtt := regexp.MustCompile(`(?i)(?:M[íi]nimo|Minimum)\s*=\s*([0-9.]+)\s*ms.*?(?:M[áa]ximo|Maximum)\s*=\s*([0-9.]+)\s*ms.*?(?:M[ée]dia|Average)\s*=\s*([0-9.]+)\s*ms`)
-	if m := reWinRtt.FindStringSubmatch(output); len(m) >= 4 {
-		resp.MinLatencyMs, _ = strconv.ParseFloat(m[1], 64)
-		resp.MaxLatencyMs, _ = strconv.ParseFloat(m[2], 64)
-		resp.AvgLatencyMs, _ = strconv.ParseFloat(m[3], 64)
-		return
-	}
-
-	// Fallback para linhas individuais: time=X.X ms ou tempo=Xms ou tempo<1ms
-	reSingle := regexp.MustCompile(`(?i)(?:time|tempo)[=<]([0-9.]+)\s*ms`)
-	matches := reSingle.FindAllStringSubmatch(output, -1)
-	if len(matches) > 0 {
-		var minLat, maxLat, sumLat float64
-		minLat = 999999
-		validCount := 0
-		for _, m := range matches {
-			if val, err := strconv.ParseFloat(m[1], 64); err == nil {
-				if val < minLat {
-					minLat = val
+	} else {
+		// Windows: Mínimo = 1ms, Máximo = 2ms, Média = 1ms
+		reWinRtt := regexp.MustCompile(`(?i)(?:M[íi]nimo|Minimum)\s*=\s*([0-9.]+)\s*ms.*?(?:M[áa]ximo|Maximum)\s*=\s*([0-9.]+)\s*ms.*?(?:M[ée]dia|Average)\s*=\s*([0-9.]+)\s*ms`)
+		if m := reWinRtt.FindStringSubmatch(output); len(m) >= 4 {
+			resp.MinLatencyMs, _ = strconv.ParseFloat(m[1], 64)
+			resp.MaxLatencyMs, _ = strconv.ParseFloat(m[2], 64)
+			resp.AvgLatencyMs, _ = strconv.ParseFloat(m[3], 64)
+		} else {
+			// Fallback para linhas individuais: time=X.X ms ou tempo=Xms ou tempo<1ms
+			reSingle := regexp.MustCompile(`(?i)(?:time|tempo)[=<]([0-9.]+)\s*ms`)
+			matches := reSingle.FindAllStringSubmatch(output, -1)
+			if len(matches) > 0 {
+				var minLat, maxLat, sumLat float64
+				minLat = 999999
+				validCount := 0
+				for _, m := range matches {
+					if val, err := strconv.ParseFloat(m[1], 64); err == nil {
+						if val < minLat {
+							minLat = val
+						}
+						if val > maxLat {
+							maxLat = val
+						}
+						sumLat += val
+						validCount++
+					}
 				}
-				if val > maxLat {
-					maxLat = val
+				if validCount > 0 {
+					resp.MinLatencyMs = minLat
+					resp.MaxLatencyMs = maxLat
+					resp.AvgLatencyMs = sumLat / float64(validCount)
 				}
-				sumLat += val
-				validCount++
 			}
-		}
-		if validCount > 0 {
-			resp.MinLatencyMs = minLat
-			resp.MaxLatencyMs = maxLat
-			resp.AvgLatencyMs = sumLat / float64(validCount)
 		}
 	}
 
