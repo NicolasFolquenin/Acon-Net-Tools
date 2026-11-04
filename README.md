@@ -54,7 +54,6 @@ Para instalar ou atualizar o Servidor Central em qualquer máquina virtual Linux
 git clone https://git.uepg.br/anelconectividade/polling-app-acon.git
 cd polling-app-acon/central-server
 
-# (Ou via GitHub: git clone https://github.com/NicolasFolquenin/Acon-Net-Tools.git && cd Acon-Net-Tools/central-server)
 
 # 2. Executar o script de deploy automatizado
 chmod +x deploy.sh
