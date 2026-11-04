@@ -317,6 +317,7 @@ $SUDO chmod -R 775 mongo_data config 2>/dev/null || true
 # Garante que os scripts em public/downloads sejam executáveis
 chmod +x public/downloads/*.sh 2>/dev/null || true
 chmod +x public/downloads/uepg-probe-monitor 2>/dev/null || true
+cp -n ../client-probe/cmd/installer/payload/uepg-net-tools.exe public/downloads/uepg-net-tools.exe 2>/dev/null || true
 echo -e "${GREEN}[✓] Diretórios e permissões organizados com sucesso.${NC}\n"
 
 # ==============================================================================
