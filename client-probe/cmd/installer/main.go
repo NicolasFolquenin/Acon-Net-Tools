@@ -284,7 +284,16 @@ func performInstallation() {
 	configPath := filepath.Join(destDir, "config.json")
 	iconPath := filepath.Join(destDir, "icon.ico")
 
-	_ = extractFile("payload/uepg-net-tools.exe", exePath)
+	// Encerra qualquer instancia previa em execucao para liberar o arquivo
+	_ = exec.Command("taskkill", "/F", "/IM", "uepg-net-tools.exe", "/T").Run()
+
+	if err := extractFile("payload/uepg-net-tools.exe", exePath); err != nil {
+		pMessageBoxW.Call(hwndMain, uintptr(unsafe.Pointer(utf16Ptr("Falha ao atualizar executavel: "+err.Error()))), uintptr(unsafe.Pointer(utf16Ptr("Erro na Instalacao"))), MB_OK|MB_ICONERROR)
+		pEnableWindow.Call(hwndBtnInstall, 1)
+		pEnableWindow.Call(hwndBtnCancel, 1)
+		pSetWindowTextW.Call(hwndStatus, uintptr(unsafe.Pointer(utf16Ptr("Erro ao copiar arquivos."))))
+		return
+	}
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		_ = extractFile("payload/config.json", configPath)
 	}
