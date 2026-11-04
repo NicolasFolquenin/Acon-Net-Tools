@@ -6,6 +6,7 @@
 
 let bandwidthChart = null;
 let latencyChart = null;
+let packetLossChart = null;
 let currentUser = null;
 let currentSummaries = [];
 let pendingDeleteNodeId = null;
@@ -979,9 +980,25 @@ function setupEventListeners() {
   setupSegmentedControl();
 
   if (btnRefresh) {
-    btnRefresh.addEventListener('click', () => {
+    btnRefresh.addEventListener('click', async () => {
+      if (btnRefresh.classList.contains('is-refreshing')) return;
+      btnRefresh.classList.add('is-refreshing');
+      const btnSpan = btnRefresh.querySelector('span');
+      const prevText = btnSpan ? btnSpan.textContent : 'Atualizar';
+      if (btnSpan) btnSpan.textContent = 'Atualizando...';
       refreshCountdown = 15;
-      loadDashboardData();
+
+      try {
+        await loadDashboardData();
+        showToast('Dados e gráficos atualizados com sucesso!', 'toast-success');
+      } catch (err) {
+        showToast('Erro ao atualizar dados: ' + err.message, 'toast-error');
+      } finally {
+        setTimeout(() => {
+          btnRefresh.classList.remove('is-refreshing');
+          if (btnSpan) btnSpan.textContent = prevText;
+        }, 400);
+      }
     });
   }
 
@@ -2714,6 +2731,36 @@ function renderSingleMachineHeaderAndAlert(diagnostic, summaries) {
     statusBadge.textContent = isOnline ? 'Online na Rede' : 'Desconectada';
   }
 
+  // Versão da Sonda
+  const versionBadge = document.getElementById('sm-version-badge');
+  const smVersionMeta = document.getElementById('sm-version-meta');
+  const smVersionVal = document.getElementById('sm-version-val');
+
+  const clientVer = (diagnostic && (diagnostic.client_version || (diagnostic.system_info && diagnostic.system_info.client_version)))
+    || (summary && (summary.client_version || (summary.system_info && summary.system_info.client_version)))
+    || '';
+
+  if (versionBadge) {
+    if (clientVer) {
+      versionBadge.style.display = 'inline-flex';
+      const isLatest = (clientVer === '2.4.1' || clientVer.startsWith('2.4.1'));
+      versionBadge.className = `sm-version-badge ${isLatest ? 'latest' : 'outdated'}`;
+      versionBadge.textContent = isLatest ? `v${clientVer} (Atualizado)` : `v${clientVer} (Atualização Pendente)`;
+      versionBadge.title = isLatest ? 'Sonda operando na versão oficial mais recente' : 'Nova versão v2.4.1 disponível no servidor central';
+    } else {
+      versionBadge.style.display = 'none';
+    }
+  }
+
+  if (smVersionMeta && smVersionVal) {
+    if (clientVer) {
+      smVersionMeta.style.display = 'inline-flex';
+      smVersionVal.textContent = `v${clientVer}`;
+    } else {
+      smVersionMeta.style.display = 'none';
+    }
+  }
+
   // IP
   let ipStr = '--';
   if (diagnostic && diagnostic.system_info && (diagnostic.system_info.ip_address || diagnostic.system_info.IPAddress)) {
@@ -2998,12 +3045,14 @@ function renderKpiCards(summaries) {
         }
       }
     }
-    // 2. Tenta s.modular_results.packet_loss
+    // 2. Tenta s.modular_results.packet_loss (ignora amostras corrompidas de fallback TCP)
     if (!hasLossMetric && s && s.modular_results && s.modular_results.packet_loss) {
       const pl = s.modular_results.packet_loss;
-      hasLossMetric = true;
-      lossVal = pl.loss_percent !== undefined ? pl.loss_percent : (pl.lossPercent || 0);
-      if (pl.target) targetGateway = 'Alvo: ' + pl.target;
+      if (pl.received > 0 || (pl.loss_percent !== undefined && pl.loss_percent < 100)) {
+        hasLossMetric = true;
+        lossVal = pl.loss_percent !== undefined ? pl.loss_percent : (pl.lossPercent || 0);
+        if (pl.target) targetGateway = 'Alvo: ' + pl.target;
+      }
     }
     // 3. Fallback no histórico recente
     if (!hasLossMetric && cachedMetricsSeries && cachedMetricsSeries.length > 0) {
@@ -3014,8 +3063,11 @@ function renderKpiCards(summaries) {
           hasLossMetric = true;
           lossVal = (typeof pl === 'object' && pl.value !== undefined) ? Number(pl.value) : Number(pl);
         } else if (lastItem.modular_results && lastItem.modular_results.packet_loss) {
-          hasLossMetric = true;
-          lossVal = lastItem.modular_results.packet_loss.loss_percent || 0;
+          const mr = lastItem.modular_results.packet_loss;
+          if (mr.received > 0 || (mr.loss_percent !== undefined && mr.loss_percent < 100)) {
+            hasLossMetric = true;
+            lossVal = mr.loss_percent || 0;
+          }
         }
       }
     }
@@ -3043,6 +3095,16 @@ function renderKpiCards(summaries) {
       }
     }
 
+    // Verifica módulos ativos da sonda selecionada para exibir apenas cards pertinentes
+    const activeMods = getActiveModulesForNode(selectedChartNode);
+    const hasDownloadMod = activeMods.some(m => m.id === 'throughput_download' || m.type === 'throughput_download');
+    const hasUploadMod = activeMods.some(m => m.id === 'throughput_upload' || m.type === 'throughput_upload');
+
+    const cardDown = document.getElementById('kpi-card-download');
+    const cardUp = document.getElementById('kpi-card-upload');
+    if (cardDown) cardDown.style.display = hasDownloadMod ? 'flex' : 'none';
+    if (cardUp) cardUp.style.display = hasUploadMod ? 'flex' : 'none';
+
     // Atualiza throughput e ping do nó focado
     if (downEl) downEl.textContent = (s.last_download || 0).toFixed(1);
     if (upEl) upEl.textContent = (s.last_upload || 0).toFixed(1);
@@ -3056,6 +3118,10 @@ function renderKpiCards(summaries) {
   } else {
     // === MODO CONSOLIDADO: CARD 1 = SONDAS MONITORADAS ===
     if (card1Label) card1Label.textContent = 'Sondas Monitoradas';
+    const cardDownCons = document.getElementById('kpi-card-download');
+    const cardUpCons = document.getElementById('kpi-card-upload');
+    if (cardDownCons) cardDownCons.style.display = 'flex';
+    if (cardUpCons) cardUpCons.style.display = 'flex';
 
     const total = summaries.length;
     const onlineCount = summaries.filter(s => s.is_healthy).length;
@@ -3152,6 +3218,12 @@ function renderNodesTable(summaries) {
       ? `<span class="node-sub-ip">${escapeHtml(s.system_info.ip_address)}</span>`
       : '';
 
+    // Versão da Sonda
+    const clientVer = s.client_version || (s.system_info && s.system_info.client_version) || '';
+    const verBadgeHtml = clientVer
+      ? `<span class="node-ver-badge ${clientVer === '2.4.1' ? 'ver-latest' : 'ver-old'}" title="${clientVer === '2.4.1' ? 'Sonda atualizada (v2.4.1)' : 'Atualização pendente: versão local v' + escapeHtml(clientVer) + ' (servidor: v2.4.1)'}">v${escapeHtml(clientVer)}</span>`
+      : '';
+
     return `
       <tr class="node-row ${isSelected ? 'selected-chart-node' : ''}" data-node-id="${escapeHtml(s.node_id)}" title="Clique para focar gráficos nesta máquina">
         <td>
@@ -3162,9 +3234,12 @@ function renderNodesTable(summaries) {
         </td>
         <td>
           <div class="node-cell-main">
-            <button type="button" class="btn-node-link font-bold font-mono" onclick="event.stopPropagation(); selectNodeForCharts('${escapeHtml(s.node_id)}', true)">
-              ${escapeHtml(s.node_id)}
-            </button>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <button type="button" class="btn-node-link font-bold font-mono" onclick="event.stopPropagation(); selectNodeForCharts('${escapeHtml(s.node_id)}', true)">
+                ${escapeHtml(s.node_id)}
+              </button>
+              ${verBadgeHtml}
+            </div>
             ${ipHtml}
           </div>
         </td>
@@ -3709,6 +3784,40 @@ function initCharts() {
       console.warn('Erro ao criar latencyChart:', chartErr);
     }
   }
+
+  const canvasPacketLoss = document.getElementById('centralPacketLossChart');
+  if (canvasPacketLoss && !packetLossChart) {
+    try {
+      const ctxPacketLoss = canvasPacketLoss.getContext('2d');
+      packetLossChart = new Chart(ctxPacketLoss, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: {
+          ...chartOpts,
+          plugins: {
+            ...chartOpts.plugins,
+            tooltip: {
+              ...chartOpts.plugins.tooltip,
+              callbacks: {
+                label: (ctx) => ' ' + ctx.dataset.label + ': ' + (ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + '%' : '--')
+              }
+            }
+          },
+          scales: {
+            ...chartOpts.scales,
+            y: {
+              ...chartOpts.scales.y,
+              min: 0,
+              max: 100,
+              title: { display: true, text: '% Perda', color: colors.textColor, font: { size: 11, weight: '600' } }
+            }
+          }
+        }
+      });
+    } catch (chartErr) {
+      console.warn('Erro ao criar packetLossChart:', chartErr);
+    }
+  }
 }
 
 function renderComparativeCharts(series, nodesList) {
@@ -3746,11 +3855,29 @@ function renderComparativeCharts(series, nodesList) {
 
   // Modo Sonda Individual: Foco nas métricas dessa sonda
   if (selectedNode !== 'all') {
+    const activeMods = getActiveModulesForNode(selectedNode);
+    const hasDownloadMod = activeMods.some(m => m.id === 'throughput_download' || m.type === 'throughput_download');
+    const hasUploadMod = activeMods.some(m => m.id === 'throughput_upload' || m.type === 'throughput_upload');
+    const hasThroughput = hasDownloadMod || hasUploadMod;
+
+    const hasPingGateway = activeMods.some(m => m.id === 'ping_gateway');
+    const hasPingCore = activeMods.some(m => m.id === 'ping_nti_core');
+    const hasLatency = hasPingGateway || hasPingCore || activeMods.some(m => m.type === 'ping');
+
+    const hasPacketLoss = activeMods.some(m => m.type === 'packet_loss' || (m.id && m.id.startsWith('packet_loss')));
+
+    const bandwidthPanel = document.getElementById('bandwidth-chart-panel');
+    const latencyPanel = document.getElementById('latency-chart-panel');
+    const packetLossPanel = document.getElementById('packet-loss-chart-panel');
+
+    if (bandwidthPanel) bandwidthPanel.style.display = hasThroughput ? 'flex' : 'none';
+    if (latencyPanel) latencyPanel.style.display = hasLatency ? 'flex' : 'none';
+    if (packetLossPanel) packetLossPanel.style.display = hasPacketLoss ? 'flex' : 'none';
+
     const allNodeItems = series
       .filter(s => (s.node_id || s.NodeID) === selectedNode)
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-    // Limita estritamente aos últimos 20 testes
     const nodeItems = allNodeItems.slice(-20);
 
     const isDifferentDay = nodeItems.some(item => {
@@ -3762,77 +3889,26 @@ function renderComparativeCharts(series, nodesList) {
     const nodeLabels = nodeItems.map(item => {
       const d = new Date(item.timestamp);
       if (isDifferentDay) {
-        return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       }
       return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     });
 
-    const downData = nodeItems.map(item => item.download_mbps);
-    const upData = nodeItems.map(item => item.upload_mbps);
-    const pingData = nodeItems.map(item => item.ping_gateway);
+    // 1. Throughput (Download e Upload) se habilitado
+    if (hasThroughput && bandwidthChart) {
+      const downData = nodeItems.map(item => item.download_mbps);
+      const upData = nodeItems.map(item => item.upload_mbps);
+      const bandwidthDatasets = [];
 
-    const bandwidthDatasets = [];
-
-    if (currentBandwidthMetric === 'download') {
-      if (bandwidthChartTitle) bandwidthChartTitle.textContent = `Throughput - Download (${selectedNode})`;
-      if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxa de Download dos últimos 20 testes (Mbps)';
-      if (bandwidthLegendEl) {
-        bandwidthLegendEl.innerHTML = `<span class="legend-badge cyan-dot">Download</span>`;
-      }
-      bandwidthDatasets.push({
-        label: 'Download',
-        data: downData,
-        borderColor: '#06b6d4',
-        backgroundColor: createFillGradient(ctxBandwidth, 'rgba(6, 182, 212, 0.28)', 'rgba(6, 182, 212, 0.01)'),
-        fill: true,
-        tension: 0.38,
-        cubicInterpolationMode: 'monotone',
-        spanGaps: true,
-        borderWidth: 2.5,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-        pointBackgroundColor: '#06b6d4',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 1.5
-      });
-    } else if (currentBandwidthMetric === 'upload') {
-      if (bandwidthChartTitle) bandwidthChartTitle.textContent = `Throughput - Upload (${selectedNode})`;
-      if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxa de Upload dos últimos 20 testes (Mbps)';
-      if (bandwidthLegendEl) {
-        bandwidthLegendEl.innerHTML = `<span class="legend-badge purple-dot">Upload</span>`;
-      }
-      bandwidthDatasets.push({
-        label: 'Upload',
-        data: upData,
-        borderColor: '#4f46e5',
-        backgroundColor: createFillGradient(ctxBandwidth, 'rgba(79, 70, 229, 0.20)', 'rgba(79, 70, 229, 0.01)'),
-        fill: true,
-        tension: 0.38,
-        cubicInterpolationMode: 'monotone',
-        spanGaps: true,
-        borderWidth: 2.5,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-        pointBackgroundColor: '#4f46e5',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 1.5
-      });
-    } else {
-      // Modo Ambos
-      if (bandwidthChartTitle) bandwidthChartTitle.textContent = `Throughput - Comparativo (${selectedNode})`;
-      if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxas de Download e Upload dos últimos 20 testes (Mbps)';
-      if (bandwidthLegendEl) {
-        bandwidthLegendEl.innerHTML = `
-          <span class="legend-badge cyan-dot">Download</span>
-          <span class="legend-badge purple-dot">Upload</span>
-        `;
-      }
-      bandwidthDatasets.push(
-        {
+      if (currentBandwidthMetric === 'download' || (!hasUploadMod && hasDownloadMod)) {
+        if (bandwidthChartTitle) bandwidthChartTitle.textContent = 'Throughput - Download (' + selectedNode + ')';
+        if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxa de Download dos últimos 20 testes (Mbps)';
+        if (bandwidthLegendEl) bandwidthLegendEl.innerHTML = '<span class="legend-badge cyan-dot">Download</span>';
+        bandwidthDatasets.push({
           label: 'Download',
           data: downData,
-          borderColor: '#0284c7',
-          backgroundColor: createFillGradient(ctxBandwidth, 'rgba(2, 132, 199, 0.22)', 'rgba(2, 132, 199, 0.01)'),
+          borderColor: '#06b6d4',
+          backgroundColor: createFillGradient(ctxBandwidth, 'rgba(6, 182, 212, 0.28)', 'rgba(6, 182, 212, 0.01)'),
           fill: true,
           tension: 0.38,
           cubicInterpolationMode: 'monotone',
@@ -3840,11 +3916,15 @@ function renderComparativeCharts(series, nodesList) {
           borderWidth: 2.5,
           pointRadius: 3,
           pointHoverRadius: 6,
-          pointBackgroundColor: '#0284c7',
+          pointBackgroundColor: '#06b6d4',
           pointBorderColor: '#ffffff',
           pointBorderWidth: 1.5
-        },
-        {
+        });
+      } else if (currentBandwidthMetric === 'upload' || (!hasDownloadMod && hasUploadMod)) {
+        if (bandwidthChartTitle) bandwidthChartTitle.textContent = 'Throughput - Upload (' + selectedNode + ')';
+        if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxa de Upload dos últimos 20 testes (Mbps)';
+        if (bandwidthLegendEl) bandwidthLegendEl.innerHTML = '<span class="legend-badge purple-dot">Upload</span>';
+        bandwidthDatasets.push({
           label: 'Upload',
           data: upData,
           borderColor: '#4f46e5',
@@ -3859,42 +3939,203 @@ function renderComparativeCharts(series, nodesList) {
           pointBackgroundColor: '#4f46e5',
           pointBorderColor: '#ffffff',
           pointBorderWidth: 1.5
+        });
+      } else {
+        if (bandwidthChartTitle) bandwidthChartTitle.textContent = 'Throughput - Comparativo (' + selectedNode + ')';
+        if (bandwidthChartDesc) bandwidthChartDesc.textContent = 'Taxas de Download e Upload dos últimos 20 testes (Mbps)';
+        if (bandwidthLegendEl) {
+          bandwidthLegendEl.innerHTML = '<span class="legend-badge cyan-dot">Download</span><span class="legend-badge purple-dot">Upload</span>';
         }
-      );
-    }
-
-    bandwidthChart.data.labels = nodeLabels;
-    bandwidthChart.data.datasets = bandwidthDatasets;
-    bandwidthChart.update();
-
-    if (latencyLegendEl) {
-      latencyLegendEl.innerHTML = `<span class="legend-badge emerald-dot">Ping Gateway</span>`;
-    }
-
-    latencyChart.data.labels = nodeLabels;
-    latencyChart.data.datasets = [
-      {
-        label: 'Ping Gateway',
-        data: pingData,
-        borderColor: '#10b981',
-        backgroundColor: createFillGradient(ctxLatency, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
-        fill: true,
-        tension: 0.38,
-        cubicInterpolationMode: 'monotone',
-        spanGaps: true,
-        borderWidth: 2.5,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-        pointBackgroundColor: '#10b981',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 1.5
+        bandwidthDatasets.push(
+          {
+            label: 'Download',
+            data: downData,
+            borderColor: '#0284c7',
+            backgroundColor: createFillGradient(ctxBandwidth, 'rgba(2, 132, 199, 0.22)', 'rgba(2, 132, 199, 0.01)'),
+            fill: true,
+            tension: 0.38,
+            cubicInterpolationMode: 'monotone',
+            spanGaps: true,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#0284c7',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+          },
+          {
+            label: 'Upload',
+            data: upData,
+            borderColor: '#4f46e5',
+            backgroundColor: createFillGradient(ctxBandwidth, 'rgba(79, 70, 229, 0.20)', 'rgba(79, 70, 229, 0.01)'),
+            fill: true,
+            tension: 0.38,
+            cubicInterpolationMode: 'monotone',
+            spanGaps: true,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#4f46e5',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+          }
+        );
       }
-    ];
-    latencyChart.update();
+      bandwidthChart.data.labels = nodeLabels;
+      bandwidthChart.data.datasets = bandwidthDatasets;
+      bandwidthChart.update();
+    }
+
+    // 2. Latência (Gateway e Core) se habilitado
+    if (hasLatency && latencyChart) {
+      const pingGwData = nodeItems.map(item => item.ping_gateway);
+      const pingCoreData = nodeItems.map(item => {
+        if (item.metrics && item.metrics.ping_nti_core) {
+          const val = item.metrics.ping_nti_core;
+          return typeof val === 'object' ? Number(val.value || 0) : Number(val || 0);
+        }
+        return null;
+      });
+
+      const latencyDatasets = [];
+      if (currentLatencyMetric === 'core' && hasPingCore) {
+        if (latencyLegendEl) latencyLegendEl.innerHTML = '<span class="legend-badge blue-dot">Core NTI</span>';
+        latencyDatasets.push({
+          label: 'Core NTI',
+          data: pingCoreData,
+          borderColor: '#3b82f6',
+          backgroundColor: createFillGradient(ctxLatency, 'rgba(59, 130, 246, 0.25)', 'rgba(59, 130, 246, 0.01)'),
+          fill: true,
+          tension: 0.38,
+          cubicInterpolationMode: 'monotone',
+          spanGaps: true,
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#3b82f6',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
+        });
+      } else if (currentLatencyMetric === 'both' && hasPingCore) {
+        if (latencyLegendEl) latencyLegendEl.innerHTML = '<span class="legend-badge emerald-dot">Ping Gateway</span><span class="legend-badge blue-dot">Core NTI</span>';
+        latencyDatasets.push(
+          {
+            label: 'Ping Gateway',
+            data: pingGwData,
+            borderColor: '#10b981',
+            backgroundColor: createFillGradient(ctxLatency, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
+            fill: true,
+            tension: 0.38,
+            cubicInterpolationMode: 'monotone',
+            spanGaps: true,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#10b981',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+          },
+          {
+            label: 'Core NTI',
+            data: pingCoreData,
+            borderColor: '#3b82f6',
+            backgroundColor: createFillGradient(ctxLatency, 'rgba(59, 130, 246, 0.20)', 'rgba(59, 130, 246, 0.01)'),
+            fill: true,
+            tension: 0.38,
+            cubicInterpolationMode: 'monotone',
+            spanGaps: true,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#3b82f6',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+          }
+        );
+      } else {
+        if (latencyLegendEl) latencyLegendEl.innerHTML = '<span class="legend-badge emerald-dot">Ping Gateway</span>';
+        latencyDatasets.push({
+          label: 'Ping Gateway',
+          data: pingGwData,
+          borderColor: '#10b981',
+          backgroundColor: createFillGradient(ctxLatency, 'rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.01)'),
+          fill: true,
+          tension: 0.38,
+          cubicInterpolationMode: 'monotone',
+          spanGaps: true,
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#10b981',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 1.5
+        });
+      }
+
+      latencyChart.data.labels = nodeLabels;
+      latencyChart.data.datasets = latencyDatasets;
+      latencyChart.update();
+    }
+
+    // 3. Perda de Pacotes se habilitado
+    if (hasPacketLoss) {
+      if (!packetLossChart) initCharts();
+      if (packetLossChart) {
+        const lossData = nodeItems.map(item => {
+          let lossVal = null;
+          if (item.metrics) {
+            const pl = item.metrics.packet_loss_gateway || item.metrics.packet_loss || item.metrics.packet_loss_core;
+            if (pl !== undefined && pl !== null) {
+              lossVal = (typeof pl === 'object' && pl.value !== undefined) ? Number(pl.value) : Number(pl);
+            }
+          }
+          if (lossVal === null && item.modular_results && item.modular_results.packet_loss) {
+            const mr = item.modular_results.packet_loss;
+            // Só aceita resultado legado de modular_results se houver pacotes recebidos ou perda real inferior a 100%
+            if (mr.received > 0 || (mr.loss_percent !== undefined && mr.loss_percent < 100)) {
+              lossVal = Number(mr.loss_percent);
+            }
+          }
+          return (lossVal !== null && !isNaN(lossVal)) ? lossVal : null;
+        });
+
+        const canvasPL = document.getElementById('centralPacketLossChart');
+        const ctxPL = canvasPL ? canvasPL.getContext('2d') : null;
+        const bgGrad = ctxPL ? createFillGradient(ctxPL, 'rgba(239, 68, 68, 0.25)', 'rgba(239, 68, 68, 0.01)') : 'rgba(239, 68, 68, 0.1)';
+
+        packetLossChart.data.labels = nodeLabels;
+        packetLossChart.data.datasets = [
+          {
+            label: 'Perda de Pacotes (%)',
+            data: lossData,
+            borderColor: '#ef4444',
+            backgroundColor: bgGrad,
+            fill: true,
+            tension: 0.38,
+            cubicInterpolationMode: 'monotone',
+            spanGaps: true,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#ef4444',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+          }
+        ];
+        packetLossChart.update();
+      }
+    }
+
     return;
   }
 
   // Modo Consolidado (Todos os Nós ou Grupo Filtrado):
+  const bPanel = document.getElementById('bandwidth-chart-panel');
+  const lPanel = document.getElementById('latency-chart-panel');
+  const plPanel = document.getElementById('packet-loss-chart-panel');
+  if (bPanel) bPanel.style.display = 'flex';
+  if (lPanel) lPanel.style.display = 'flex';
+  if (plPanel) plPanel.style.display = 'none';
   let effectiveSeries = series;
   let activeGroupName = '';
 
@@ -5491,9 +5732,9 @@ async function executeAdminPing(hostname, target) {
     const minMs = typeof data.min_ms === 'number' ? data.min_ms : data.min_latency_ms;
     const maxMs = typeof data.max_ms === 'number' ? data.max_ms : data.max_latency_ms;
 
-    if (statAvg) statAvg.textContent = (avgMs > 0 ? avgMs.toFixed(1) : '--');
-    if (statMin) statMin.textContent = (minMs > 0 ? minMs.toFixed(1) : '--');
-    if (statMax) statMax.textContent = (maxMs > 0 ? maxMs.toFixed(1) : '--');
+    if (statAvg) statAvg.textContent = (avgMs > 0 ? avgMs.toFixed(1) : (isAlive ? '< 1' : '--'));
+    if (statMin) statMin.textContent = (minMs > 0 ? minMs.toFixed(1) : (isAlive ? '< 1' : '--'));
+    if (statMax) statMax.textContent = (maxMs > 0 ? maxMs.toFixed(1) : (isAlive ? '< 1' : '--'));
 
     if (statLoss) statLoss.textContent = loss.toFixed(0);
     if (statLossDesc) {
@@ -6012,3 +6253,16 @@ async function resetCurrentMachineToGroup() {
   }
 }
 window.resetCurrentMachineToGroup = resetCurrentMachineToGroup;
+
+function getActiveModulesForNode(hostname) {
+  const mach = (allAdminMachines || []).find(m => m.hostname === hostname);
+  if (mach && mach.is_custom && mach.custom_tests && mach.custom_tests.length > 0) {
+    return mach.custom_tests;
+  }
+  const grpId = (mach && mach.group_id) || 'default';
+  const grp = (currentGroups || []).find(g => g.id === grpId || g.name === grpId);
+  if (grp && grp.profile && grp.profile.tests) {
+    return grp.profile.tests;
+  }
+  return [];
+}

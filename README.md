@@ -4,6 +4,20 @@ Sistema corporativo completo de monitoramento distribuído e telemetria de rede 
 
 ---
 
+## 📚 Documentação Técnica Modular
+
+A documentação detalhada do sistema foi particionada em pastas temáticas dentro do diretório [`docs/`](docs/README.md):
+
+- 🏛️ **[Arquitetura do Sistema](docs/arquitetura/visao_geral.md):** [Visão Geral](docs/arquitetura/visao_geral.md) | [Fluxo de Telemetria](docs/arquitetura/fluxo_telemetria.md) | [Segurança & Permissões](docs/arquitetura/seguranca_e_rede.md)
+- 🐧 **[Servidor Central](docs/central-server/api_referencia.md):** [Referência da REST API](docs/central-server/api_referencia.md) | [Modelagem MongoDB](docs/central-server/banco_de_dados.md) | [Dashboard NOC Web](docs/central-server/dashboard_web.md)
+- 🖥️ **[Sonda Cliente (Probe)](docs/client-probe/ciclo_de_execucao.md):** [Ciclo de Execução](docs/client-probe/ciclo_de_execucao.md) | [Módulos de Teste](docs/client-probe/modulos_de_teste.md) | [Auto-Update (v2.4.1)](docs/client-probe/auto_update.md) | [Modo Desktop Wails](docs/client-probe/modo_desktop_wails.md)
+- 🚀 **[Deploy e Instalação](docs/deploy/servidor_docker.md):** [Servidor Docker na VM](docs/deploy/servidor_docker.md) | [Sonda Linux (systemd)](docs/deploy/sonda_linux.md) | [Sonda Windows (.exe)](docs/deploy/sonda_windows.md)
+- 🎨 **[UX/UI & Design System](docs/ux-ui/diretrizes_visuais.md):** [Diretrizes Visuais](docs/ux-ui/diretrizes_visuais.md) | [Dashboard & Gráficos Chart.js](docs/ux-ui/dashboard_e_graficos.md)
+
+Para o índice completo e navegação, consulte **[`docs/README.md`](docs/README.md)**.
+
+---
+
 ## 🏛️ Componentes do Sistema
 
 ```
