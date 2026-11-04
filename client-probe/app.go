@@ -147,6 +147,7 @@ func (a *App) startup(ctx context.Context) {
 	workerCtx, cancel := context.WithCancel(context.Background())
 	a.cancelWorker = cancel
 	go a.backgroundScheduler(workerCtx)
+	go a.autoUpdaterLoop(workerCtx)
 
 	// Sincroniza medições que porventura ficaram pendentes offline
 	go func() {
@@ -235,6 +236,29 @@ func (a *App) backgroundScheduler(ctx context.Context) {
 					_, _ = CheckAndApplyAutoUpdate(upCtx, curCfg.ServerURL, curCfg.APIToken)
 				}
 			}()
+		}
+	}
+}
+
+// autoUpdaterLoop verifica periodicamente em segundo plano se há nova versão da sonda no Servidor Central
+func (a *App) autoUpdaterLoop(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cfg := GetCurrentConfig()
+			if cfg.ServerURL != "" && cfg.ServerURL != "none" {
+				upCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				updated, err := CheckAndApplyAutoUpdate(upCtx, cfg.ServerURL, cfg.APIToken)
+				cancel()
+				if err == nil && updated {
+					log.Println("[UPDATER] Sonda atualizada automaticamente com sucesso para nova versão!")
+				}
+			}
 		}
 	}
 }
