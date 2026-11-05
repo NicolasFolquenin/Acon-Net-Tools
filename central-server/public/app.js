@@ -2837,6 +2837,23 @@ function renderSingleMachineHeaderAndAlert(diagnostic, summaries) {
     }
   }
 
+  // Usuário Logado no Cabeçalho de Máquina Única
+  const smUserMeta = document.getElementById('sm-user-meta');
+  const smUserVal = document.getElementById('sm-user-val');
+  const userLogged = (diagnostic && (diagnostic.logged_user || (diagnostic.system_info && (diagnostic.system_info.logged_user || diagnostic.system_info.active_user))))
+    || (summary && (summary.logged_user || (summary.system_info && (summary.system_info.logged_user || summary.system_info.active_user))))
+    || '';
+
+  if (smUserMeta && smUserVal) {
+    if (userLogged) {
+      smUserMeta.style.display = 'inline-flex';
+      smUserVal.textContent = cleanUserShort(userLogged);
+      smUserMeta.title = `Usuário em execução na sonda: ${userLogged}`;
+    } else {
+      smUserMeta.style.display = 'none';
+    }
+  }
+
   // Modo Histórico
   const isHistorical = diagnostic ? !!diagnostic.is_historical_fallback : false;
   if (histTag) histTag.style.display = isHistorical ? 'inline-flex' : 'none';
@@ -3218,6 +3235,12 @@ function renderNodesTable(summaries) {
       ? `<span class="node-sub-ip">${escapeHtml(s.system_info.ip_address)}</span>`
       : '';
 
+    // Usuário da Sonda
+    const loggedUser = s.logged_user || (s.system_info && (s.system_info.logged_user || s.system_info.active_user)) || '';
+    const userHtml = loggedUser
+      ? `<span class="node-sub-user" title="Usuário logado na sonda: ${escapeHtml(loggedUser)}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px; margin-right:3px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>${escapeHtml(cleanUserShort(loggedUser))}</span>`
+      : '';
+
     // Versão da Sonda
     const clientVer = s.client_version || (s.system_info && s.system_info.client_version) || '';
     const verBadgeHtml = clientVer
@@ -3240,7 +3263,10 @@ function renderNodesTable(summaries) {
               </button>
               ${verBadgeHtml}
             </div>
-            ${ipHtml}
+            <div class="node-sub-info-row">
+              ${ipHtml}
+              ${userHtml}
+            </div>
           </div>
         </td>
         <td>
@@ -3298,6 +3324,12 @@ function renderNodesTable(summaries) {
   }).join('');
 }
 
+function cleanUserShort(u) {
+  if (!u) return '';
+  const parts = u.split('\\');
+  return parts[parts.length - 1];
+}
+
 /* ==========================================================================
    5. Modal de Detalhes & Configurações do Computador
    ========================================================================== */
@@ -3324,6 +3356,13 @@ function openPCDetailsModal(s) {
   document.getElementById('modal-hw-cpu').textContent = sys.cpu || '--';
   document.getElementById('modal-hw-ram').textContent = sys.ram_total_gb ? `${sys.ram_total_gb.toFixed(1)} GB` : '--';
   document.getElementById('modal-hw-os').textContent = sys.os || '--';
+
+  const loggedUser = s.logged_user || sys.logged_user || sys.active_user || '--';
+  const activeUser = sys.active_user || s.logged_user || sys.logged_user || '--';
+  const hwLoggedEl = document.getElementById('modal-hw-logged-user');
+  if (hwLoggedEl) hwLoggedEl.textContent = loggedUser;
+  const hwActiveEl = document.getElementById('modal-hw-active-user');
+  if (hwActiveEl) hwActiveEl.textContent = activeUser;
 
   // 3. Rede Local (Resumo Primário)
   document.getElementById('modal-net-ip').textContent = sys.ip_address || sys.IPAddress || '--';
@@ -3412,6 +3451,59 @@ function openPCDetailsModal(s) {
           </td>
         </tr>
       `;
+    }
+  }
+
+  // 3.1 Contas de Usuários do Sistema
+  const usersTbody = document.getElementById('modal-users-body');
+  const usersCount = document.getElementById('modal-users-count');
+  const usersList = sys.users || sys.Users || [];
+
+  if (usersTbody) {
+    if (usersList.length > 0) {
+      if (usersCount) usersCount.textContent = `${usersList.length} conta(s)`;
+      usersTbody.innerHTML = usersList.map(u => {
+        const isLogged = !!u.is_logged;
+        const sessionBadge = isLogged
+          ? '<span class="status-indicator-badge online" style="font-size:0.7rem; padding: 1px 6px;"><span class="status-indicator-dot"></span>Logado</span>'
+          : '<span class="status-indicator-badge stale" style="font-size:0.7rem; padding: 1px 6px;">Inativo</span>';
+
+        const roleBadge = u.is_admin
+          ? '<span class="badge-role-admin">Administrador</span>'
+          : '<span class="badge-role-standard">Usuário Padrão</span>';
+
+        const statusBadge = u.enabled
+          ? '<span class="badge-user-status enabled">Habilitada</span>'
+          : '<span class="badge-user-status disabled">Desabilitada</span>';
+
+        return `
+          <tr class="${isLogged ? 'row-user-active' : ''}">
+            <td>${sessionBadge}</td>
+            <td><strong class="font-mono text-cyan">${escapeHtml(u.username)}</strong></td>
+            <td>${escapeHtml(u.full_name || '--')}</td>
+            <td style="text-align: center;">${roleBadge}</td>
+            <td style="text-align: center;">${statusBadge}</td>
+            <td class="text-subtle text-xs">${escapeHtml(u.description || '--')}</td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      if (loggedUser && loggedUser !== '--') {
+        if (usersCount) usersCount.textContent = '1 conta ativa';
+        usersTbody.innerHTML = `
+          <tr class="row-user-active">
+            <td><span class="status-indicator-badge online" style="font-size:0.7rem; padding: 1px 6px;"><span class="status-indicator-dot"></span>Logado</span></td>
+            <td><strong class="font-mono text-cyan">${escapeHtml(loggedUser)}</strong></td>
+            <td>--</td>
+            <td style="text-align: center;"><span class="badge-role-admin">Administrador</span></td>
+            <td style="text-align: center;"><span class="badge-user-status enabled">Habilitada</span></td>
+            <td class="text-subtle text-xs">Sessão da sonda em execução</td>
+          </tr>
+        `;
+      } else {
+        if (usersCount) usersCount.textContent = '0 contas';
+        usersTbody.innerHTML = '<tr><td colspan="6" class="text-center text-subtle" style="padding: 10px;">Nenhum usuário detalhado reportado.</td></tr>';
+      }
     }
   }
 
@@ -6071,6 +6163,72 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
             '<span class="badge-primary-route font-bold">Principal (Gateway)</span>' +
           '</td>' +
         '</tr>';
+    }
+  }
+
+  // 5. Inventário de Contas de Usuário do Dispositivo
+  const usersTbody = document.getElementById('sm-panel-users-body');
+  const usersCount = document.getElementById('sm-panel-users-count');
+  const loggedBadge = document.getElementById('sm-panel-logged-badge');
+  const probeUser = (diagnostic && (diagnostic.logged_user || (diagnostic.system_info && (diagnostic.system_info.logged_user || diagnostic.system_info.active_user))))
+    || (summary && (summary.logged_user || (summary.system_info && (summary.system_info.logged_user || summary.system_info.active_user))))
+    || '';
+  const usersList = (sys && (sys.users || sys.Users)) || [];
+
+  if (loggedBadge) {
+    if (probeUser) {
+      loggedBadge.style.display = 'inline-block';
+      loggedBadge.textContent = 'Logado: ' + cleanUserShort(probeUser);
+      loggedBadge.title = 'Usuário que executou os testes: ' + probeUser;
+    } else {
+      loggedBadge.style.display = 'none';
+    }
+  }
+
+  if (usersTbody) {
+    if (usersList.length > 0) {
+      if (usersCount) usersCount.textContent = usersList.length + ' conta(s) detectada(s)';
+      usersTbody.innerHTML = usersList.map(u => {
+        const isLogged = !!u.is_logged;
+        const sessionBadge = isLogged
+          ? '<span class="status-indicator-badge online" style="font-size:0.7rem; padding: 1px 6px;"><span class="status-indicator-dot"></span>Logado</span>'
+          : '<span class="status-indicator-badge stale" style="font-size:0.7rem; padding: 1px 6px;">Inativo</span>';
+
+        const roleBadge = u.is_admin
+          ? '<span class="badge-role-admin">Administrador</span>'
+          : '<span class="badge-role-standard">Usuário Padrão</span>';
+
+        const statusBadge = u.enabled
+          ? '<span class="badge-user-status enabled">Habilitada</span>'
+          : '<span class="badge-user-status disabled">Desabilitada</span>';
+
+        return (
+          '<tr class="' + (isLogged ? 'row-user-active' : '') + '">' +
+            '<td>' + sessionBadge + '</td>' +
+            '<td><strong class="font-mono text-cyan">' + escapeHtml(u.username) + '</strong></td>' +
+            '<td>' + escapeHtml(u.full_name || '--') + '</td>' +
+            '<td style="text-align: center;">' + roleBadge + '</td>' +
+            '<td style="text-align: center;">' + statusBadge + '</td>' +
+            '<td class="text-subtle text-xs">' + escapeHtml(u.description || '--') + '</td>' +
+          '</tr>'
+        );
+      }).join('');
+    } else {
+      if (probeUser) {
+        if (usersCount) usersCount.textContent = '1 conta ativa';
+        usersTbody.innerHTML = 
+          '<tr class="row-user-active">' +
+            '<td><span class="status-indicator-badge online" style="font-size:0.7rem; padding: 1px 6px;"><span class="status-indicator-dot"></span>Logado</span></td>' +
+            '<td><strong class="font-mono text-cyan">' + escapeHtml(probeUser) + '</strong></td>' +
+            '<td>--</td>' +
+            '<td style="text-align: center;"><span class="badge-role-admin">Administrador</span></td>' +
+            '<td style="text-align: center;"><span class="badge-user-status enabled">Habilitada</span></td>' +
+            '<td class="text-subtle text-xs">Sessão da sonda em execução</td>' +
+          '</tr>';
+      } else {
+        if (usersCount) usersCount.textContent = '0 contas';
+        usersTbody.innerHTML = '<tr><td colspan="6" class="text-center text-subtle" style="padding: 12px;">Nenhum usuário detalhado reportado.</td></tr>';
+      }
     }
   }
 }

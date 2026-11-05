@@ -260,6 +260,24 @@ body {
   border-color: rgba(168, 85, 247, 0.28);
 }
 
+.user-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(13, 148, 136, 0.25);
+  display: inline-flex;
+  align-items: center;
+}
+
+[data-theme="dark"] .user-badge {
+  color: #2dd4bf;
+  background: rgba(45, 212, 191, 0.12);
+  border-color: rgba(45, 212, 191, 0.25);
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -1497,4 +1515,144 @@ body {
 
 .date-input-ctrl:focus {
   border-color: #38bdf8;
+}
+
+/* ==========================================================================
+   Contas de Usuário do Sistema e Sessões
+   ========================================================================== */
+.users-session-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-hover, rgba(0, 0, 0, 0.02));
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.user-session-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-session-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.user-session-val {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.user-session-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+  display: inline-block;
+}
+
+.badge-user-session {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.badge-user-session.logged {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+[data-theme="dark"] .badge-user-session.logged {
+  color: #34d399;
+}
+
+.badge-user-session.off {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.user-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.badge-role-admin {
+  background: rgba(168, 85, 247, 0.12);
+  color: #9333ea;
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+
+[data-theme="dark"] .badge-role-admin {
+  color: #c084fc;
+}
+
+.badge-role-standard {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+
+.badge-user-status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+
+.badge-user-status.enabled {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+[data-theme="dark"] .badge-user-status.enabled {
+  color: #60a5fa;
+}
+
+.badge-user-status.disabled {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+[data-theme="dark"] .badge-user-status.disabled {
+  color: #f87171;
+}
+
+.row-user-active {
+  background: rgba(16, 185, 129, 0.03);
+}
+
+[data-theme="dark"] .row-user-active {
+  background: rgba(16, 185, 129, 0.06);
 }

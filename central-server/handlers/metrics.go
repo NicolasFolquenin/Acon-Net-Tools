@@ -177,6 +177,7 @@ func (h *MetricsHandler) GetDashboardMetrics(w http.ResponseWriter, r *http.Requ
 				LastPing:        latestItem.PingGateway,
 				ProfileVersion:  latestItem.ProfileVersion,
 				ClientVersion:   latestItem.ClientVersion,
+				LoggedUser:      extractLoggedUser(latestItem.SystemInfo, diagnostic.SystemInfo),
 				Metrics:         latestItem.Metrics,
 				IsHealthy:       diagnostic.IsOnline,
 				TotalReadings24: len(series),
@@ -517,6 +518,7 @@ func (h *MetricsHandler) computeNodeSummaries(ctx context.Context, series []mode
 			LastPing:        agg.latest.PingGateway,
 			ProfileVersion:  agg.latest.ProfileVersion,
 			ClientVersion:   clientVer,
+			LoggedUser:      extractLoggedUser(sys, agg.knownSys),
 			Metrics:         agg.latest.Metrics,
 			IsHealthy:       isHealthy,
 			TotalReadings24: agg.count,
@@ -587,6 +589,21 @@ func isValidMAC(mac string) bool {
 		}
 	}
 	return true
+}
+
+func extractLoggedUser(sysList ...*models.SystemInfo) string {
+	for _, sys := range sysList {
+		if sys == nil {
+			continue
+		}
+		if sys.LoggedUser != "" {
+			return sys.LoggedUser
+		}
+		if sys.ActiveUser != "" {
+			return sys.ActiveUser
+		}
+	}
+	return ""
 }
 
 func contextWithTimeout(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {

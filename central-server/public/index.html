@@ -250,6 +250,10 @@
               <span class="sm-meta-label">Versão:</span>
               <span id="sm-version-val" class="sm-meta-val font-mono">--</span>
             </div>
+            <div class="sm-meta-item" id="sm-user-meta" style="display: none;">
+              <span class="sm-meta-label">Usuário:</span>
+              <span id="sm-user-val" class="sm-meta-val font-mono font-bold text-cyan">--</span>
+            </div>
             <div class="sm-meta-item" id="sm-wifi-meta" style="display: none;">
               <span class="sm-meta-label">Wi-Fi:</span>
               <span id="sm-wifi-val" class="sm-meta-val font-bold">--</span>
@@ -507,6 +511,46 @@
                     </thead>
                     <tbody id="sm-panel-ifaces-body">
                       <!-- Linhas das interfaces preenchidas via JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bloco 5: Inventário de Contas de Usuário do Dispositivo -->
+            <div class="sm-card sm-card-full sm-users-card" id="sm-panel-users-card">
+              <div class="sm-card-header">
+                <div class="sm-card-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-purple">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  </svg>
+                  <span>Usuários do Sistema &amp; Contas Locais</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span id="sm-panel-logged-badge" class="badge-pill font-mono" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">Logado: --</span>
+                  <span id="sm-panel-users-count" class="count-badge">-- usuários</span>
+                </div>
+              </div>
+              <div class="sm-card-body p-0">
+                <div class="table-container m-0">
+                  <table class="nodes-table sm-users-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 110px;">Sessão</th>
+                        <th>Nome de Usuário (Login)</th>
+                        <th>Nome Completo</th>
+                        <th style="width: 140px; text-align: center;">Privilégio</th>
+                        <th style="width: 110px; text-align: center;">Conta</th>
+                        <th>Descrição / Papel</th>
+                      </tr>
+                    </thead>
+                    <tbody id="sm-panel-users-body">
+                      <tr>
+                        <td colspan="6" class="text-center text-subtle" style="padding: 12px;">Carregando usuários do sistema...</td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -1404,6 +1448,14 @@
               <span class="info-key">Sistema Operacional:</span>
               <span class="info-val" id="modal-hw-os">--</span>
             </div>
+            <div class="info-row">
+              <span class="info-key">Usuário da Medição / Sonda:</span>
+              <span class="info-val font-mono font-bold text-cyan" id="modal-hw-logged-user">--</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key">Usuário no Console (Desktop):</span>
+              <span class="info-val font-mono" id="modal-hw-active-user">--</span>
+            </div>
           </div>
         </div>
 
@@ -1457,6 +1509,45 @@
                 <tbody id="modal-interfaces-body">
                   <tr>
                     <td colspan="6" class="text-center text-subtle" style="padding: 10px;">Nenhuma interface detalhada reportada.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.1 Contas de Usuários do Sistema -->
+        <div class="details-section" id="modal-users-section">
+          <div class="section-badge-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <span>Contas de Usuário do Dispositivo</span>
+          </div>
+
+          <div class="interfaces-block" style="margin-top: 10px;">
+            <div class="interfaces-header-row">
+              <span class="info-subkey">Contas Locais &amp; Sessões Mapeadas</span>
+              <span id="modal-users-count" class="interfaces-count-badge">0 contas</span>
+            </div>
+            <div class="interfaces-table-scroll">
+              <table class="interfaces-table">
+                <thead>
+                  <tr>
+                    <th style="width: 100px;">Sessão</th>
+                    <th>Nome de Usuário</th>
+                    <th>Nome Completo</th>
+                    <th style="text-align: center;">Privilégio</th>
+                    <th style="text-align: center;">Conta</th>
+                    <th>Descrição</th>
+                  </tr>
+                </thead>
+                <tbody id="modal-users-body">
+                  <tr>
+                    <td colspan="6" class="text-center text-subtle" style="padding: 10px;">Nenhum usuário detalhado reportado.</td>
                   </tr>
                 </tbody>
               </table>
