@@ -17,6 +17,16 @@ type NetworkInterfaceDetail struct {
 	Gateway     string   `json:"gateway,omitempty"`      // Gateway associado
 }
 
+// UserAccountInfo representa os dados de uma conta de usuário do sistema operacional
+type UserAccountInfo struct {
+	Username    string `json:"username"`
+	FullName    string `json:"full_name,omitempty"`
+	Enabled     bool   `json:"enabled"`
+	IsAdmin     bool   `json:"is_admin,omitempty"`
+	IsLogged    bool   `json:"is_logged,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
 // SystemInfo armazena dados de hardware e rede local da máquina que executa o teste
 type SystemInfo struct {
 	Hostname       string                   `json:"hostname"`
@@ -30,6 +40,9 @@ type SystemInfo struct {
 	NetworkAdapter string                   `json:"network_adapter"`
 	Interfaces     []NetworkInterfaceDetail `json:"interfaces,omitempty"`
 	ClientVersion  string                   `json:"client_version,omitempty"`
+	LoggedUser     string                   `json:"logged_user,omitempty"` // Usuário da sessão/processo que envia as medições
+	ActiveUser     string                   `json:"active_user,omitempty"` // Usuário interativo do console/desktop
+	Users          []UserAccountInfo        `json:"users,omitempty"`       // Contas de usuário locais da máquina
 }
 
 // SwitchInfo armazena as informações do switch descobertas via LLDP

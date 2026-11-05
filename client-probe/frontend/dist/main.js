@@ -892,6 +892,30 @@ function renderTechnicalSpecs(status, latestRecord) {
   const swInfo = (status && status.current_switch) || (latestRecord && latestRecord.switch_info) || null;
   const profile = (status && status.current_profile) || null;
 
+  // 0. Usuários do Sistema e Sessão Ativa
+  const loggedUser = (sysInfo && (sysInfo.logged_user || sysInfo.active_user)) || '';
+  const activeUser = (sysInfo && (sysInfo.active_user || sysInfo.logged_user)) || '';
+
+  const userBadgeDisplay = document.getElementById('user-badge-display');
+  const userDisplayText = document.getElementById('user-display-text');
+  if (userDisplayText) {
+    if (loggedUser) {
+      userDisplayText.textContent = `Usuário: ${cleanUserDisplay(loggedUser)}`;
+      if (userBadgeDisplay) userBadgeDisplay.title = `Usuário em Execução: ${loggedUser}${activeUser && activeUser !== loggedUser ? ' | Console: ' + activeUser : ''}`;
+    } else {
+      userDisplayText.textContent = 'Usuário: Não identificado';
+    }
+  }
+
+  const sessionLoggedEl = document.getElementById('session-logged-user');
+  if (sessionLoggedEl) {
+    sessionLoggedEl.textContent = loggedUser || 'Não identificado';
+  }
+  const sessionActiveEl = document.getElementById('session-active-user');
+  if (sessionActiveEl) {
+    sessionActiveEl.textContent = activeUser || loggedUser || 'Não identificado';
+  }
+
   // 1. Status Wi-Fi & Potência
   const wifiBadge = document.getElementById('wifi-status-badge');
   const wifiBody = document.getElementById('wifi-content-body');
@@ -1039,6 +1063,65 @@ function renderTechnicalSpecs(status, latestRecord) {
       }).join('');
     }
   }
+
+  // 5. Inventário de Contas de Usuário do Sistema
+  const usersTbody = document.getElementById('users-tbody');
+  const usersCountBadge = document.getElementById('users-count-badge');
+  if (usersTbody) {
+    const users = (sysInfo && Array.isArray(sysInfo.users)) ? sysInfo.users : [];
+    if (usersCountBadge) {
+      usersCountBadge.textContent = `${users.length} usuário(s) mapeado(s)`;
+    }
+
+    if (users.length === 0) {
+      if (loggedUser) {
+        usersTbody.innerHTML = `
+          <tr class="row-user-active">
+            <td><span class="badge-user-session logged"><span class="user-pulse-dot"></span>Logado</span></td>
+            <td><strong class="font-mono text-cyan">${escapeHtml(loggedUser)}</strong></td>
+            <td>--</td>
+            <td style="text-align: center;"><span class="badge-role-admin">Administrador</span></td>
+            <td style="text-align: center;"><span class="badge-user-status enabled">Ativa</span></td>
+            <td class="text-muted text-xs">Sessão da sonda em execução</td>
+          </tr>
+        `;
+      } else {
+        usersTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Nenhuma conta de usuário identificada até o momento.</td></tr>';
+      }
+    } else {
+      usersTbody.innerHTML = users.map(u => {
+        const isLogged = !!u.is_logged;
+        const sessionBadge = isLogged
+          ? '<span class="badge-user-session logged"><span class="user-pulse-dot"></span>Logado</span>'
+          : '<span class="badge-user-session off">Inativo</span>';
+
+        const roleBadge = u.is_admin
+          ? '<span class="badge-role-admin">Administrador</span>'
+          : '<span class="badge-role-standard">Usuário Padrão</span>';
+
+        const statusBadge = u.enabled
+          ? '<span class="badge-user-status enabled">Habilitada</span>'
+          : '<span class="badge-user-status disabled">Desabilitada</span>';
+
+        return `
+          <tr class="${isLogged ? 'row-user-active' : ''}">
+            <td>${sessionBadge}</td>
+            <td><strong class="font-mono text-cyan">${escapeHtml(u.username)}</strong></td>
+            <td>${escapeHtml(u.full_name || '--')}</td>
+            <td style="text-align: center;">${roleBadge}</td>
+            <td style="text-align: center;">${statusBadge}</td>
+            <td class="text-muted text-xs">${escapeHtml(u.description || '--')}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+}
+
+function cleanUserDisplay(u) {
+  if (!u) return '';
+  const parts = u.split('\\');
+  return parts[parts.length - 1];
 }
 
 function escapeHtml(str) {

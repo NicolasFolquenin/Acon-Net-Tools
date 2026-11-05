@@ -6225,3 +6225,103 @@ body.auth-mode .dashboard-layout {
   animation: spinRefresh 0.8s linear infinite !important;
   color: var(--accent-cyan);
 }
+
+/* ==========================================================================
+   Contas de Usuário do Sistema e Usuário Ativo
+   ========================================================================== */
+
+.node-sub-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.node-sub-user {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+[data-theme="light"] .node-sub-user {
+  color: #0284c7;
+  background: rgba(2, 132, 199, 0.08);
+  border-color: rgba(2, 132, 199, 0.2);
+}
+
+.badge-role-admin {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+[data-theme="light"] .badge-role-admin {
+  color: #9333ea;
+  border-color: rgba(147, 51, 234, 0.25);
+}
+
+.badge-role-standard {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+[data-theme="light"] .badge-role-standard {
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+
+.badge-user-status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.badge-user-status.enabled {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+[data-theme="light"] .badge-user-status.enabled {
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+.badge-user-status.disabled {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+[data-theme="light"] .badge-user-status.disabled {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.row-user-active {
+  background: rgba(16, 185, 129, 0.05);
+}
+
+[data-theme="light"] .row-user-active {
+  background: rgba(16, 185, 129, 0.08);
+}

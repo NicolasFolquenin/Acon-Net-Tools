@@ -6,8 +6,11 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/user"
 	"runtime"
 	"strings"
+	"sync"
+	"time"
 )
 
 // CollectSystemInfo reúne informações detalhadas da máquina local de forma nativa e resiliente.
@@ -27,6 +30,9 @@ func CollectSystemInfo() SystemInfo {
 	} else if runtime.GOOS == "linux" {
 		collectLinuxHardware(&info)
 	}
+
+	// 3. Informações de Usuários (Sessão Atual, Ativa e Contas Locais)
+	collectUserAccounts(&info)
 
 	return info
 }
@@ -306,4 +312,236 @@ func collectLinuxHardware(info *SystemInfo) {
 	} else if dtModel, err := os.ReadFile("/proc/device-tree/model"); err == nil {
 		info.Model = strings.TrimSpace(string(dtModel))
 	}
+}
+
+var (
+	userCacheMu   sync.Mutex
+	cachedUsers   []UserAccountInfo
+	lastUserCheck time.Time
+)
+
+func collectUserAccounts(info *SystemInfo) {
+	// 1. Identifica o usuário da sessão/processo que executa a sonda e envia as medições
+	if curUser, err := user.Current(); err == nil && curUser.Username != "" {
+		info.LoggedUser = curUser.Username
+	} else {
+		userEnv := os.Getenv("USERNAME")
+		domainEnv := os.Getenv("USERDOMAIN")
+		if domainEnv != "" && userEnv != "" {
+			info.LoggedUser = domainEnv + `\` + userEnv
+		} else if userEnv != "" {
+			info.LoggedUser = userEnv
+		} else if u := os.Getenv("USER"); u != "" {
+			info.LoggedUser = u
+		}
+	}
+
+	// 2. Identifica o usuário ativo no console físico e contas cadastradas
+	if runtime.GOOS == "windows" {
+		collectWindowsUsers(info)
+	} else if runtime.GOOS == "linux" {
+		collectLinuxUsers(info)
+	} else {
+		info.ActiveUser = info.LoggedUser
+	}
+}
+
+func collectWindowsUsers(info *SystemInfo) {
+	// 1. Usuário ativo do console
+	cmdUser := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
+		`(Get-CimInstance Win32_ComputerSystem).UserName`)
+	hideWindow(cmdUser)
+	if out, err := cmdUser.Output(); err == nil {
+		active := strings.TrimSpace(string(out))
+		if active != "" {
+			info.ActiveUser = active
+		}
+	}
+	if info.ActiveUser == "" {
+		info.ActiveUser = info.LoggedUser
+	}
+
+	// 2. Relação de contas locais (cache de 15 minutos para otimização de CPU/ciclos)
+	userCacheMu.Lock()
+	if time.Since(lastUserCheck) < 15*time.Minute && len(cachedUsers) > 0 {
+		info.Users = cloneUsers(cachedUsers)
+		updateLoggedStatus(info)
+		userCacheMu.Unlock()
+		return
+	}
+	userCacheMu.Unlock()
+
+	cmdList := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
+		`Get-LocalUser | Select-Object Name, FullName, Enabled, Description | ConvertTo-Json -Compress`)
+	hideWindow(cmdList)
+	outList, errList := cmdList.Output()
+
+	var psUsers []struct {
+		Name        string `json:"Name"`
+		FullName    string `json:"FullName"`
+		Enabled     bool   `json:"Enabled"`
+		Description string `json:"Description"`
+	}
+
+	if errList == nil && len(outList) > 0 {
+		trimmed := strings.TrimSpace(string(outList))
+		if strings.HasPrefix(trimmed, "[") {
+			_ = json.Unmarshal([]byte(trimmed), &psUsers)
+		} else if strings.HasPrefix(trimmed, "{") {
+			var single struct {
+				Name        string `json:"Name"`
+				FullName    string `json:"FullName"`
+				Enabled     bool   `json:"Enabled"`
+				Description string `json:"Description"`
+			}
+			if errU := json.Unmarshal([]byte(trimmed), &single); errU == nil {
+				psUsers = append(psUsers, single)
+			}
+		}
+	}
+
+	// Administradores locais
+	adminSet := make(map[string]bool)
+	cmdAdmins := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
+		`$m = Get-LocalGroupMember -Group 'Administradores' -ErrorAction SilentlyContinue; if (!$m) { $m = Get-LocalGroupMember -Group 'Administrators' -ErrorAction SilentlyContinue }; if ($m) { $m | ForEach-Object { $_.Name } }`)
+	hideWindow(cmdAdmins)
+	if outAdmins, err := cmdAdmins.Output(); err == nil {
+		lines := strings.Split(strings.ReplaceAll(string(outAdmins), "\r\n", "\n"), "\n")
+		for _, l := range lines {
+			l = strings.TrimSpace(l)
+			if l != "" {
+				parts := strings.Split(l, `\`)
+				adminSet[strings.ToLower(parts[len(parts)-1])] = true
+			}
+		}
+	}
+
+	var users []UserAccountInfo
+	for _, pu := range psUsers {
+		name := strings.TrimSpace(pu.Name)
+		if name == "" {
+			continue
+		}
+		isAdmin := adminSet[strings.ToLower(name)]
+		users = append(users, UserAccountInfo{
+			Username:    name,
+			FullName:    strings.TrimSpace(pu.FullName),
+			Enabled:     pu.Enabled,
+			IsAdmin:     isAdmin,
+			Description: strings.TrimSpace(pu.Description),
+		})
+	}
+
+	userCacheMu.Lock()
+	cachedUsers = users
+	lastUserCheck = time.Now()
+	info.Users = cloneUsers(cachedUsers)
+	updateLoggedStatus(info)
+	userCacheMu.Unlock()
+}
+
+func collectLinuxUsers(info *SystemInfo) {
+	// 1. Usuário ativo do console
+	cmdWho := exec.Command("sh", "-c", "who | awk '{print $1}' | head -n 1")
+	if out, err := cmdWho.Output(); err == nil {
+		act := strings.TrimSpace(string(out))
+		if act != "" {
+			info.ActiveUser = act
+		}
+	}
+	if info.ActiveUser == "" {
+		info.ActiveUser = info.LoggedUser
+	}
+
+	// 2. Cache de 15 minutos
+	userCacheMu.Lock()
+	if time.Since(lastUserCheck) < 15*time.Minute && len(cachedUsers) > 0 {
+		info.Users = cloneUsers(cachedUsers)
+		updateLoggedStatus(info)
+		userCacheMu.Unlock()
+		return
+	}
+	userCacheMu.Unlock()
+
+	// 3. Administradores (sudo / wheel)
+	adminMap := make(map[string]bool)
+	adminMap["root"] = true
+	if grpData, err := os.ReadFile("/etc/group"); err == nil {
+		lines := strings.Split(string(grpData), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "sudo:") || strings.HasPrefix(line, "wheel:") {
+				parts := strings.Split(line, ":")
+				if len(parts) >= 4 {
+					members := strings.Split(parts[3], ",")
+					for _, m := range members {
+						m = strings.TrimSpace(m)
+						if m != "" {
+							adminMap[m] = true
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 4. Lê /etc/passwd
+	var users []UserAccountInfo
+	if data, err := os.ReadFile("/etc/passwd"); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.Split(line, ":")
+			if len(parts) >= 7 {
+				uname := parts[0]
+				var uid int
+				fmt.Sscanf(parts[2], "%d", &uid)
+				shell := parts[6]
+				fullName := parts[4]
+
+				if (uid == 0 || uid >= 1000) && !strings.HasSuffix(shell, "nologin") && !strings.HasSuffix(shell, "false") {
+					users = append(users, UserAccountInfo{
+						Username: uname,
+						FullName: fullName,
+						Enabled:  true,
+						IsAdmin:  adminMap[uname],
+					})
+				}
+			}
+		}
+	}
+
+	userCacheMu.Lock()
+	cachedUsers = users
+	lastUserCheck = time.Now()
+	info.Users = cloneUsers(cachedUsers)
+	updateLoggedStatus(info)
+	userCacheMu.Unlock()
+}
+
+func updateLoggedStatus(info *SystemInfo) {
+	loggedShort := cleanUsername(info.LoggedUser)
+	activeShort := cleanUsername(info.ActiveUser)
+
+	for i := range info.Users {
+		u := &info.Users[i]
+		if strings.EqualFold(u.Username, loggedShort) || strings.EqualFold(u.Username, activeShort) {
+			u.IsLogged = true
+		} else {
+			u.IsLogged = false
+		}
+	}
+}
+
+func cleanUsername(u string) string {
+	parts := strings.Split(u, `\`)
+	return strings.TrimSpace(parts[len(parts)-1])
+}
+
+func cloneUsers(src []UserAccountInfo) []UserAccountInfo {
+	dst := make([]UserAccountInfo, len(src))
+	copy(dst, src)
+	return dst
 }

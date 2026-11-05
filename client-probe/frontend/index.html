@@ -25,6 +25,13 @@
             <span id="node-location-display" class="location-badge">Guarapuava-DC1</span>
             <span id="group-badge-display" class="group-badge">Grupo: Carregando...</span>
             <span id="profile-badge" class="profile-badge" title="Perfil de Medição Ativo">Perfil: Sincronizando...</span>
+            <span id="user-badge-display" class="user-badge" title="Usuário Ativo no Sistema">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="vertical-align: -2px; margin-right: 4px;">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span id="user-display-text">Usuário: Carregando...</span>
+            </span>
           </div>
         </div>
       </div>
@@ -323,6 +330,61 @@
               </thead>
               <tbody id="ifaces-tbody">
                 <tr><td colspan="6" class="text-center text-muted py-3">Carregando interfaces...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Bloco 5: Inventário de Contas de Usuário do Sistema -->
+        <div class="info-box-card card-full mt-3" id="card-users-inventory">
+          <div class="info-box-header">
+            <div class="info-box-icon purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h4>Contas de Usuário &amp; Sessões do Sistema</h4>
+              <p class="text-muted text-xs">Identificação de usuários conectados no console e contas locais registradas no dispositivo</p>
+            </div>
+            <span id="users-count-badge" class="count-badge">-- usuários</span>
+          </div>
+
+          <!-- Resumo de Sessão Ativa -->
+          <div class="users-session-summary">
+            <div class="user-session-card">
+              <span class="user-session-label">Usuário da Medição (Processo Sonda):</span>
+              <div class="user-session-val">
+                <span class="user-session-dot active"></span>
+                <strong id="session-logged-user">Detectando...</strong>
+              </div>
+            </div>
+            <div class="user-session-card">
+              <span class="user-session-label">Usuário Ativo no Console (Área de Trabalho):</span>
+              <div class="user-session-val">
+                <span class="user-session-dot active"></span>
+                <strong id="session-active-user">Detectando...</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-wrapper m-0">
+            <table class="data-table users-table">
+              <thead>
+                <tr>
+                  <th style="width: 120px;">Sessão</th>
+                  <th>Nome de Usuário (Login)</th>
+                  <th>Nome Completo</th>
+                  <th style="width: 140px; text-align: center;">Privilégio</th>
+                  <th style="width: 110px; text-align: center;">Conta</th>
+                  <th>Descrição / Observação</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr><td colspan="6" class="text-center text-muted py-3">Carregando usuários do sistema...</td></tr>
               </tbody>
             </table>
           </div>

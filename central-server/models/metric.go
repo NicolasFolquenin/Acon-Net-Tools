@@ -17,6 +17,16 @@ type NetworkInterfaceDetail struct {
 	Gateway     string   `bson:"gateway,omitempty" json:"gateway,omitempty"`
 }
 
+// UserAccountInfo representa os dados de uma conta de usuário do sistema operacional
+type UserAccountInfo struct {
+	Username    string `bson:"username" json:"username"`
+	FullName    string `bson:"full_name,omitempty" json:"full_name,omitempty"`
+	Enabled     bool   `bson:"enabled" json:"enabled"`
+	IsAdmin     bool   `bson:"is_admin,omitempty" json:"is_admin,omitempty"`
+	IsLogged    bool   `bson:"is_logged,omitempty" json:"is_logged,omitempty"`
+	Description string `bson:"description,omitempty" json:"description,omitempty"`
+}
+
 // SystemInfo armazena dados de hardware e rede local do host
 type SystemInfo struct {
 	Hostname       string                   `bson:"hostname,omitempty" json:"hostname,omitempty"`
@@ -30,6 +40,9 @@ type SystemInfo struct {
 	NetworkAdapter string                   `bson:"network_adapter,omitempty" json:"network_adapter,omitempty"`
 	Interfaces     []NetworkInterfaceDetail `bson:"interfaces,omitempty" json:"interfaces,omitempty"`
 	ClientVersion  string                   `bson:"client_version,omitempty" json:"client_version,omitempty"`
+	LoggedUser     string                   `bson:"logged_user,omitempty" json:"logged_user,omitempty"` // Usuário da sessão/processo que envia as medições
+	ActiveUser     string                   `bson:"active_user,omitempty" json:"active_user,omitempty"` // Usuário interativo do console/desktop
+	Users          []UserAccountInfo        `bson:"users,omitempty" json:"users,omitempty"`             // Contas de usuário locais da máquina
 }
 
 // SwitchInfo armazena as informações do switch descobertas via LLDP
@@ -239,6 +252,7 @@ type NodeSummaryCard struct {
 	LastPing        float64                `json:"last_ping"`
 	ProfileVersion  string                 `json:"profile_version,omitempty"`
 	ClientVersion   string                 `json:"client_version,omitempty"`
+	LoggedUser      string                 `json:"logged_user,omitempty"`
 	Metrics         map[string]interface{} `json:"metrics,omitempty"`
 	IsHealthy       bool                   `json:"is_healthy"`
 	TotalReadings24 int                    `json:"total_readings_24h"`
