@@ -154,6 +154,8 @@ func (s *StorageService) SaveMetric(m *MetricPayload, synced bool, errMsg string
 		UploadMbps:     m.UploadMbps,
 		PingGateway:    m.PingGateway,
 		ProfileVersion: m.ProfileVersion,
+		ClientVersion:  m.ClientVersion,
+		LoggedUser:     m.LoggedUser,
 		Metrics:        m.Metrics,
 		Synced:         synced,
 		ErrorMessage:   errMsg,

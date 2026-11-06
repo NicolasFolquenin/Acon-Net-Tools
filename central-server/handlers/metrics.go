@@ -65,6 +65,15 @@ func (h *MetricsHandler) PostMetric(w http.ResponseWriter, r *http.Request) {
 		payload.Timestamp = time.Now().UTC()
 	}
 
+	// Garante que o usuário logado no momento do teste seja preenchido
+	if payload.LoggedUser == "" && payload.SystemInfo != nil {
+		if payload.SystemInfo.LoggedUser != "" {
+			payload.LoggedUser = payload.SystemInfo.LoggedUser
+		} else if payload.SystemInfo.ActiveUser != "" {
+			payload.LoggedUser = payload.SystemInfo.ActiveUser
+		}
+	}
+
 	// Insere na coleção Time Series do MongoDB
 	ctx, cancel := contextWithTimeout(r.Context(), 5*time.Second)
 	defer cancel()

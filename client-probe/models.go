@@ -381,6 +381,7 @@ type MetricPayload struct {
 	PingGateway    float64                `json:"ping_gateway"`
 	ProfileVersion string                 `json:"profile_version,omitempty"`
 	ClientVersion  string                 `json:"client_version,omitempty"`
+	LoggedUser     string                 `json:"logged_user,omitempty"`
 	Metrics        map[string]interface{} `json:"metrics,omitempty"`
 	SystemInfo     *SystemInfo            `json:"system_info,omitempty"`
 	SwitchInfo     *SwitchInfo            `json:"switch_info,omitempty"`
@@ -400,6 +401,7 @@ type LocalMetricRecord struct {
 	PingGateway    float64                `json:"ping_gateway"`
 	ProfileVersion string                 `json:"profile_version,omitempty"`
 	ClientVersion  string                 `json:"client_version,omitempty"`
+	LoggedUser     string                 `json:"logged_user,omitempty"`
 	Metrics        map[string]interface{} `json:"metrics,omitempty"`
 	Synced         bool                   `json:"synced"`
 	ErrorMessage   string                 `json:"error_message,omitempty"`

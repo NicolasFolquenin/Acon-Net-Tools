@@ -128,6 +128,15 @@ func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile,
 		groupName = groupCfg.GroupName
 	}
 
+	var loggedUser string
+	if execCtx.SysInfo != nil {
+		if execCtx.SysInfo.LoggedUser != "" {
+			loggedUser = execCtx.SysInfo.LoggedUser
+		} else if execCtx.SysInfo.ActiveUser != "" {
+			loggedUser = execCtx.SysInfo.ActiveUser
+		}
+	}
+
 	payload := &MetricPayload{
 		NodeID:         cfg.NodeID,
 		Location:       cfg.Location,
@@ -136,6 +145,7 @@ func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile,
 		Timestamp:      time.Now().UTC().Truncate(time.Second),
 		ProfileVersion: prof.Version,
 		ClientVersion:  CurrentClientVersion,
+		LoggedUser:     loggedUser,
 		DownloadMbps:   math.Round(downloadMbps*100) / 100,
 		UploadMbps:     math.Round(uploadMbps*100) / 100,
 		PingGateway:    math.Round(pingGateway*100) / 100,

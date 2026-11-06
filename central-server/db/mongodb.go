@@ -146,6 +146,7 @@ func (m *MongoDBClient) InsertMetric(ctx context.Context, payload *models.Metric
 		PingGateway:    payload.PingGateway,
 		ProfileVersion: payload.ProfileVersion,
 		ClientVersion:  payload.ClientVersion,
+		LoggedUser:     payload.LoggedUser,
 		Metrics:        payload.Metrics,
 		SystemInfo:     payload.SystemInfo,
 		SwitchInfo:     payload.SwitchInfo,
@@ -215,6 +216,7 @@ func (m *MongoDBClient) GetMetricsByQuery(ctx context.Context, nodeIDFilter stri
 			PingGateway:    doc.PingGateway,
 			ProfileVersion: doc.ProfileVersion,
 			ClientVersion:  doc.ClientVersion,
+			LoggedUser:     extractDocLoggedUser(&doc),
 			Metrics:        doc.Metrics,
 			SystemInfo:     doc.SystemInfo,
 			SwitchInfo:     doc.SwitchInfo,
@@ -256,6 +258,7 @@ func (m *MongoDBClient) GetLatestMetricForNode(ctx context.Context, nodeID strin
 		PingGateway:    doc.PingGateway,
 		ProfileVersion: doc.ProfileVersion,
 		ClientVersion:  doc.ClientVersion,
+		LoggedUser:     extractDocLoggedUser(&doc),
 		Metrics:        doc.Metrics,
 		SystemInfo:     doc.SystemInfo,
 		SwitchInfo:     doc.SwitchInfo,
@@ -298,6 +301,7 @@ func (m *MongoDBClient) GetHistoricalMetricsForNode(ctx context.Context, nodeID 
 			PingGateway:    doc.PingGateway,
 			ProfileVersion: doc.ProfileVersion,
 			ClientVersion:  doc.ClientVersion,
+			LoggedUser:     extractDocLoggedUser(&doc),
 			Metrics:        doc.Metrics,
 			SystemInfo:     doc.SystemInfo,
 			SwitchInfo:     doc.SwitchInfo,
@@ -1012,6 +1016,24 @@ func (m *MongoDBClient) DeleteMachine(ctx context.Context, hostname string) erro
 	}
 	_, err := m.MachinesCollection.DeleteOne(ctx, bson.M{"_id": hostname})
 	return err
+}
+
+func extractDocLoggedUser(doc *models.TimeSeriesMetricDocument) string {
+	if doc == nil {
+		return ""
+	}
+	if doc.LoggedUser != "" {
+		return doc.LoggedUser
+	}
+	if doc.SystemInfo != nil {
+		if doc.SystemInfo.LoggedUser != "" {
+			return doc.SystemInfo.LoggedUser
+		}
+		if doc.SystemInfo.ActiveUser != "" {
+			return doc.SystemInfo.ActiveUser
+		}
+	}
+	return ""
 }
 
 
