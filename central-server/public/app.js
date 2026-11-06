@@ -64,10 +64,12 @@ const tabDashboard = document.getElementById('tab-dashboard');
 const tabMachines = document.getElementById('tab-machines');
 const tabGroups = document.getElementById('tab-groups');
 const tabModules = document.getElementById('tab-modules');
+const tabUsers = document.getElementById('tab-users') || document.getElementById('btn-open-users');
 const viewDashboard = document.getElementById('view-dashboard');
 const viewMachines = document.getElementById('view-machines');
 const viewGroups = document.getElementById('view-groups');
 const viewModules = document.getElementById('view-modules');
+const viewUsers = document.getElementById('view-users');
 
 // Elementos da Aba Máquinas
 const machinesSearchInput = document.getElementById('machines-search-input');
@@ -190,10 +192,7 @@ const btnCancelDelete = document.getElementById('btn-cancel-delete');
 const btnConfirmDelete = document.getElementById('btn-confirm-delete');
 
 // Elementos de Gerenciamento de Usuários (Admin)
-const btnOpenUsers = document.getElementById('btn-open-users');
-const usersModal = document.getElementById('users-modal');
-const modalBtnCloseUsers = document.getElementById('modal-btn-close-users');
-const modalBtnCloseUsersBottom = document.getElementById('modal-btn-close-users-bottom');
+const btnOpenUsers = tabUsers;
 const createUserForm = document.getElementById('create-user-form');
 const newUsernameInput = document.getElementById('new-user-username');
 const newUserPasswordInput = document.getElementById('new-user-password');
@@ -203,6 +202,16 @@ const createUserErrorAlert = document.getElementById('create-user-error-alert');
 const createUserErrorText = document.getElementById('create-user-error-text');
 const usersTableBody = document.getElementById('users-table-body');
 const usersCountTag = document.getElementById('users-count-tag');
+const usersSearchInput = document.getElementById('users-search-input');
+const usersFilterRole = document.getElementById('users-filter-role');
+const usersFilterOrigin = document.getElementById('users-filter-origin');
+const btnRefreshUsers = document.getElementById('btn-refresh-users');
+const btnScrollCreateUser = document.getElementById('btn-scroll-create-user');
+const kpiUsersTotal = document.getElementById('kpi-users-total');
+const kpiUsersAdmins = document.getElementById('kpi-users-admins');
+const kpiUsersOperators = document.getElementById('kpi-users-operators');
+const kpiUsersProviders = document.getElementById('kpi-users-providers');
+const kpiUsersProvidersSub = document.getElementById('kpi-users-providers-sub');
 
 // Elementos de Gerenciamento de Grupos & VLANs (Admin)
 const btnOpenGroups = document.getElementById('btn-open-groups');
@@ -444,6 +453,8 @@ async function checkAuthAndInitialize() {
           switchView('groups');
         } else if (window.location.hash === '#modules' && data.user.role === 'admin') {
           switchView('modules');
+        } else if (window.location.hash === '#users' && data.user.role === 'admin') {
+          switchView('users');
         } else {
           switchView('dashboard');
         }
@@ -501,17 +512,17 @@ function setAuthenticatedUser(user) {
   const adminSection = document.getElementById('sidebar-admin-section');
   if (user.role === 'admin') {
     if (modalBtnDeletePc) modalBtnDeletePc.style.display = 'inline-flex';
-    if (btnOpenUsers) btnOpenUsers.style.display = 'flex';
+    if (tabUsers) tabUsers.style.display = 'flex';
     if (tabGroups) tabGroups.style.display = 'flex';
     if (tabModules) tabModules.style.display = 'flex';
     if (adminSection) adminSection.style.display = 'block';
   } else {
     if (modalBtnDeletePc) modalBtnDeletePc.style.display = 'none';
-    if (btnOpenUsers) btnOpenUsers.style.display = 'none';
+    if (tabUsers) tabUsers.style.display = 'none';
     if (tabGroups) tabGroups.style.display = 'none';
     if (tabModules) tabModules.style.display = 'none';
     if (adminSection) adminSection.style.display = 'none';
-    if (window.location.hash === '#groups' || window.location.hash === '#modules') {
+    if (window.location.hash === '#groups' || window.location.hash === '#modules' || window.location.hash === '#users') {
       switchView('dashboard');
     }
   }
@@ -743,12 +754,12 @@ function switchView(viewName) {
   const pageTitle = document.getElementById('page-title');
 
   // Remove classe active de todas as abas de navegação
-  [tabDashboard, tabMachines, tabGroups, tabModules].forEach(t => {
+  [tabDashboard, tabMachines, tabGroups, tabModules, tabUsers].forEach(t => {
     if (t) t.classList.remove('active');
   });
 
   // Oculta todas as views principais e remove classe active
-  [viewDashboard, viewMachines, viewGroups, viewModules].forEach(v => {
+  [viewDashboard, viewMachines, viewGroups, viewModules, viewUsers].forEach(v => {
     if (v) {
       v.style.display = 'none';
       v.classList.remove('active');
@@ -792,6 +803,20 @@ function switchView(viewName) {
     if (pageTitle) pageTitle.textContent = 'Módulos JSON';
     window.location.hash = '#modules';
     loadModulesCatalog();
+  } else if (viewName === 'users') {
+    if (!currentUser || currentUser.role !== 'admin') {
+      showToast('Acesso restrito a administradores', 'toast-error');
+      switchView('dashboard');
+      return;
+    }
+    if (viewUsers) {
+      viewUsers.style.display = 'block';
+      viewUsers.classList.add('active');
+    }
+    if (tabUsers) tabUsers.classList.add('active');
+    if (pageTitle) pageTitle.textContent = 'Controle de Acesso & Usuários';
+    window.location.hash = '#users';
+    loadUsersList();
   } else {
     if (viewDashboard) {
       viewDashboard.style.display = 'block';
@@ -1032,19 +1057,36 @@ function setupEventListeners() {
   initPasswordToggle('login-password', 'btn-toggle-login-password');
   initPasswordToggle('new-user-password', 'btn-toggle-new-user-password');
 
-  // Gerenciamento de Usuários (Admin)
-  if (btnOpenUsers) {
-    btnOpenUsers.addEventListener('click', openUsersModal);
+  // Gerenciamento de Usuários & Controle de Acesso (Admin)
+  if (tabUsers) {
+    tabUsers.addEventListener('click', () => switchView('users'));
   }
-  if (modalBtnCloseUsers) {
-    modalBtnCloseUsers.addEventListener('click', closeUsersModal);
+  if (btnOpenUsers && btnOpenUsers !== tabUsers) {
+    btnOpenUsers.addEventListener('click', () => switchView('users'));
   }
-  if (modalBtnCloseUsersBottom) {
-    modalBtnCloseUsersBottom.addEventListener('click', closeUsersModal);
+  if (btnScrollCreateUser) {
+    btnScrollCreateUser.addEventListener('click', () => {
+      const panel = document.getElementById('panel-create-user');
+      if (panel) {
+        panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (newUsernameInput) newUsernameInput.focus();
+      }
+    });
   }
-  if (usersModal) {
-    usersModal.addEventListener('click', (e) => {
-      if (e.target === usersModal) closeUsersModal();
+  if (usersSearchInput) {
+    usersSearchInput.addEventListener('input', () => filterAndRenderUsers());
+  }
+  if (usersFilterRole) {
+    usersFilterRole.addEventListener('change', () => filterAndRenderUsers());
+  }
+  if (usersFilterOrigin) {
+    usersFilterOrigin.addEventListener('change', () => filterAndRenderUsers());
+  }
+  if (btnRefreshUsers) {
+    btnRefreshUsers.addEventListener('click', async () => {
+      btnRefreshUsers.classList.add('loading');
+      await loadUsersList();
+      setTimeout(() => btnRefreshUsers.classList.remove('loading'), 400);
     });
   }
   if (createUserForm) {
@@ -1474,6 +1516,8 @@ function setupEventListeners() {
       switchView('groups');
     } else if (window.location.hash === '#modules') {
       switchView('modules');
+    } else if (window.location.hash === '#users') {
+      switchView('users');
     } else {
       switchView('dashboard');
     }
@@ -1572,22 +1616,219 @@ function setAccountType(type) {
   }
 }
 
-async function openUsersModal() {
-  if (!usersModal) return;
-  usersModal.style.display = 'flex';
-  if (createUserForm) createUserForm.reset();
-  setAccountType('local');
-  if (createUserErrorAlert) createUserErrorAlert.style.display = 'none';
-  await loadUsersList();
+let cachedUsersList = [];
+
+function getUserInitials(name) {
+  if (!name) return 'U';
+  const clean = String(name).trim().replace(/^[@#]+/, '');
+  const parts = clean.split(/[\s._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return clean.slice(0, 2).toUpperCase();
 }
 
-function closeUsersModal() {
-  if (usersModal) usersModal.style.display = 'none';
+function getAvatarPalette(name) {
+  const palettes = [
+    { bg: 'rgba(99, 102, 241, 0.18)', border: 'rgba(99, 102, 241, 0.4)', text: '#818cf8' }, // Indigo
+    { bg: 'rgba(6, 182, 212, 0.18)', border: 'rgba(6, 182, 212, 0.4)', text: '#06b6d4' },   // Cyan
+    { bg: 'rgba(16, 185, 129, 0.18)', border: 'rgba(16, 185, 129, 0.4)', text: '#10b981' }, // Emerald
+    { bg: 'rgba(245, 158, 11, 0.18)', border: 'rgba(245, 158, 11, 0.4)', text: '#f59e0b' }, // Amber
+    { bg: 'rgba(236, 72, 153, 0.18)', border: 'rgba(236, 72, 153, 0.4)', text: '#f472b6' }, // Pink
+    { bg: 'rgba(59, 130, 246, 0.18)', border: 'rgba(59, 130, 246, 0.4)', text: '#60a5fa' }  // Blue
+  ];
+  let hash = 0;
+  for (let i = 0; i < (name || '').length; i++) {
+    hash = (hash << 5) - hash + name.charCodeAt(i);
+    hash |= 0;
+  }
+  const idx = Math.abs(hash) % palettes.length;
+  return palettes[idx];
 }
+
+function updateUsersKpis(users) {
+  if (!users) return;
+  const total = users.length;
+  const admins = users.filter(u => u.role === 'admin').length;
+  const operators = users.filter(u => u.role !== 'admin').length;
+  const keycloakCount = users.filter(u => u.auth_type === 'keycloak').length;
+  const localCount = users.filter(u => u.auth_type !== 'keycloak' && !u.is_system).length;
+  const systemCount = users.filter(u => u.is_system).length;
+
+  if (kpiUsersTotal) kpiUsersTotal.textContent = total;
+  if (kpiUsersAdmins) kpiUsersAdmins.textContent = admins;
+  if (kpiUsersOperators) kpiUsersOperators.textContent = operators;
+  if (kpiUsersProviders) {
+    kpiUsersProviders.textContent = `${keycloakCount} / ${localCount}`;
+  }
+  if (kpiUsersProvidersSub) {
+    kpiUsersProvidersSub.textContent = `${keycloakCount} Keycloak SSO • ${localCount} Local${systemCount > 0 ? ` • ${systemCount} Sis` : ''}`;
+  }
+}
+
+function filterAndRenderUsers() {
+  if (!usersTableBody) return;
+
+  const search = usersSearchInput ? usersSearchInput.value.trim().toLowerCase() : '';
+  const roleFilter = usersFilterRole ? usersFilterRole.value : 'all';
+  const originFilter = usersFilterOrigin ? usersFilterOrigin.value : 'all';
+
+  const filtered = cachedUsersList.filter(u => {
+    // Busca por username ou full_name
+    if (search) {
+      const matchUser = (u.username || '').toLowerCase().includes(search);
+      const matchName = (u.full_name || '').toLowerCase().includes(search);
+      if (!matchUser && !matchName) return false;
+    }
+
+    // Filtro de Papel
+    if (roleFilter !== 'all') {
+      if (roleFilter === 'admin' && u.role !== 'admin') return false;
+      if (roleFilter === 'operator' && u.role === 'admin') return false;
+    }
+
+    // Filtro de Origem
+    if (originFilter !== 'all') {
+      if (originFilter === 'system' && !u.is_system) return false;
+      if (originFilter === 'keycloak' && u.auth_type !== 'keycloak') return false;
+      if (originFilter === 'local' && (u.auth_type === 'keycloak' || u.is_system)) return false;
+    }
+
+    return true;
+  });
+
+  if (usersCountTag) {
+    if (filtered.length === cachedUsersList.length) {
+      usersCountTag.textContent = `${cachedUsersList.length} usuário${cachedUsersList.length !== 1 ? 's' : ''}`;
+    } else {
+      usersCountTag.textContent = `${filtered.length} de ${cachedUsersList.length} usuários`;
+    }
+  }
+
+  if (filtered.length === 0) {
+    if (cachedUsersList.length === 0) {
+      usersTableBody.innerHTML = `<tr>
+        <td colspan="5" class="users-empty-cell">
+          <div class="users-empty-state">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <h5>Nenhum usuário cadastrado</h5>
+            <p>Utilize o painel ao lado para cadastrar o primeiro operador ou administrador.</p>
+          </div>
+        </td>
+      </tr>`;
+    } else {
+      usersTableBody.innerHTML = `<tr>
+        <td colspan="5" class="users-empty-cell">
+          <div class="users-empty-state">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <h5>Nenhum usuário encontrado</h5>
+            <p>Tente ajustar o termo da busca ou redefinir os filtros selecionados.</p>
+          </div>
+        </td>
+      </tr>`;
+    }
+    return;
+  }
+
+  usersTableBody.innerHTML = filtered.map(u => {
+    const isCur = currentUser && currentUser.username.toLowerCase() === u.username.toLowerCase();
+    const initials = getUserInitials(u.full_name || u.username);
+    const pal = getAvatarPalette(u.username);
+
+    // Badge de Origem
+    let originBadge = '<span class="badge-origin-local">Local</span>';
+    if (u.is_system) {
+      originBadge = '<span class="badge-origin-system">Sistema</span>';
+    } else if (u.auth_type === 'keycloak') {
+      originBadge = '<span class="badge-origin-keycloak">Keycloak SSO</span>';
+    }
+
+    // Badge de Perfil + Botão de Alteração Rápida
+    const roleBadge = u.role === 'admin'
+      ? `<span class="role-badge-admin"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Admin</span>`
+      : `<span class="role-badge-operator"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg> Operador</span>`;
+
+    let roleActionBtn = '';
+    if (!u.is_system && !isCur) {
+      if (u.role === 'admin') {
+        roleActionBtn = `<button type="button" class="btn-role-toggle to-operator" onclick="handleToggleRole('${escapeHtml(u.username)}', 'operator')" title="Rebaixar para Operador">Tornar Operador</button>`;
+      } else {
+        roleActionBtn = `<button type="button" class="btn-role-toggle to-admin" onclick="handleToggleRole('${escapeHtml(u.username)}', 'admin')" title="Promover a Administrador">Tornar Admin</button>`;
+      }
+    }
+
+    // Formatação de data
+    let dateFormatted = 'Nunca acessou';
+    const dateToFormat = u.last_login || u.created_at;
+    if (dateToFormat) {
+      try {
+        const d = new Date(dateToFormat);
+        if (!isNaN(d.getTime())) {
+          dateFormatted = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+      } catch {}
+    }
+
+    let actionHtml = '';
+    if (u.is_system) {
+      actionHtml = `<span class="system-tag system-tag-system">Conta do Sistema</span>`;
+    } else if (isCur) {
+      actionHtml = `<span class="system-tag system-tag-you">Sua Conta</span>`;
+    } else {
+      actionHtml = `<button type="button" class="btn-delete-user" onclick="handleDeleteUser('${escapeHtml(u.username)}')" title="Excluir usuário '${escapeHtml(u.username)}'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        <span>Excluir</span>
+      </button>`;
+    }
+
+    const displayNameHtml = `
+      <div class="user-identity-cell">
+        <div class="user-table-avatar" style="background:${pal.bg}; border-color:${pal.border}; color:${pal.text};">
+          ${escapeHtml(initials)}
+        </div>
+        <div class="user-identity-meta">
+          <strong class="user-meta-login">${escapeHtml(u.username)}</strong>
+          ${u.full_name ? `<span class="user-meta-fullname">${escapeHtml(u.full_name)}</span>` : ''}
+        </div>
+      </div>
+    `;
+
+    return `<tr>
+      <td>${displayNameHtml}</td>
+      <td>${originBadge}</td>
+      <td>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+          ${roleBadge}
+          ${roleActionBtn}
+        </div>
+      </td>
+      <td style="color: var(--text-muted); font-size: 0.8rem;">${dateFormatted}</td>
+      <td style="text-align: right;">${actionHtml}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function openUsersModal() {
+  switchView('users');
+}
+window.openUsersModal = openUsersModal;
+
+function closeUsersModal() {
+  switchView('dashboard');
+}
+window.closeUsersModal = closeUsersModal;
 
 async function loadUsersList() {
   if (!usersTableBody) return;
-  usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>Carregando usuários...</td></tr>`;
+  usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);"><div class="spinner" style="width:22px;height:22px;margin:0 auto 10px;"></div>Carregando usuários...</td></tr>`;
 
   try {
     const res = await apiFetch('/api/v1/users');
@@ -1596,82 +1837,9 @@ async function loadUsersList() {
       throw new Error(data.error || 'Falha ao carregar lista de usuários');
     }
 
-    const users = data.users || [];
-    if (usersCountTag) {
-      usersCountTag.textContent = `${users.length} usuário${users.length !== 1 ? 's' : ''}`;
-    }
-
-    if (users.length === 0) {
-      usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--text-muted);">Nenhum usuário cadastrado.</td></tr>`;
-      return;
-    }
-
-    usersTableBody.innerHTML = users.map(u => {
-      const isCur = currentUser && currentUser.username.toLowerCase() === u.username.toLowerCase();
-
-      // Badge de Origem
-      let originBadge = '<span class="badge-origin-local">Local</span>';
-      if (u.is_system) {
-        originBadge = '<span class="badge-origin-system">Sistema</span>';
-      } else if (u.auth_type === 'keycloak') {
-        originBadge = '<span class="badge-origin-keycloak">Keycloak</span>';
-      }
-
-      // Badge de Perfil + Botão de Alteração Rápida
-      const roleBadge = u.role === 'admin'
-        ? `<span class="role-badge-admin">Admin</span>`
-        : `<span class="role-badge-operator">Operador</span>`;
-
-      let roleActionBtn = '';
-      if (!u.is_system && !isCur) {
-        if (u.role === 'admin') {
-          roleActionBtn = `<button class="btn-role-toggle to-operator" onclick="handleToggleRole('${escapeHtml(u.username)}', 'operator')" title="Rebaixar para Operador">Tornar Operador</button>`;
-        } else {
-          roleActionBtn = `<button class="btn-role-toggle to-admin" onclick="handleToggleRole('${escapeHtml(u.username)}', 'admin')" title="Promover a Administrador">Tornar Admin</button>`;
-        }
-      }
-
-      // Formatação de data
-      let dateFormatted = '--';
-      const dateToFormat = u.last_login || u.created_at;
-      if (dateToFormat) {
-        try {
-          const d = new Date(dateToFormat);
-          if (!isNaN(d.getTime())) {
-            dateFormatted = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-          }
-        } catch {}
-      }
-
-      let actionHtml = '';
-      if (u.is_system) {
-        actionHtml = `<span class="system-tag">Conta do Sistema</span>`;
-      } else if (isCur) {
-        actionHtml = `<span class="system-tag">Sua Conta</span>`;
-      } else {
-        actionHtml = `<button class="btn-delete-user" onclick="handleDeleteUser('${escapeHtml(u.username)}')">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          <span>Excluir</span>
-        </button>`;
-      }
-
-      const displayName = u.full_name
-        ? `<strong>${escapeHtml(u.username)}</strong><div style="font-size:0.72rem;color:var(--text-muted);">${escapeHtml(u.full_name)}</div>`
-        : `<strong>${escapeHtml(u.username)}</strong>`;
-
-      return `<tr>
-        <td>${displayName}</td>
-        <td>${originBadge}</td>
-        <td>
-          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
-            ${roleBadge}
-            ${roleActionBtn}
-          </div>
-        </td>
-        <td style="color: var(--text-muted); font-size: 0.78rem;">${dateFormatted}</td>
-        <td style="text-align: right;">${actionHtml}</td>
-      </tr>`;
-    }).join('');
+    cachedUsersList = data.users || [];
+    updateUsersKpis(cachedUsersList);
+    filterAndRenderUsers();
   } catch (err) {
     usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4" style="color: var(--accent-rose);">${escapeHtml(err.message || 'Erro ao carregar usuários')}</td></tr>`;
   }
