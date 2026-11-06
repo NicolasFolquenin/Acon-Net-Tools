@@ -595,6 +595,21 @@ func ExecuteDNSLookupTask(ctx context.Context, task TestTaskConfig, execCtx *Exe
 
 // ExecuteDiscoveryProtocolTask executa a detecção de Switch e Porta física
 func ExecuteDiscoveryProtocolTask(ctx context.Context, task TestTaskConfig, execCtx *ExecutionContext) (*SwitchInfo, DynamicMetricResult) {
+	if execCtx.SysInfo != nil && execCtx.SysInfo.IsOnWiFi() {
+		log.Println("[TASK-LLDP] Interface ativa é conexão sem fio (Wi-Fi). LLDP cabeado suprimido.")
+		sw := SwitchInfo{
+			SwitchName: "Conexão Sem Fio (Wi-Fi)",
+			SwitchPort: "WLAN",
+			Protocol:   "Wi-Fi",
+		}
+		return &sw, DynamicMetricResult{
+			Value:   0,
+			Unit:    "switch",
+			Status:  "skipped",
+			Details: "Sonda conectada via Wi-Fi (descoberta de switch físico aplicável apenas a cabo)",
+		}
+	}
+
 	if execCtx.KnownSwitch != nil && execCtx.KnownSwitch.IsRealSwitch() {
 		log.Printf("[TASK-LLDP] Switch corporativo preservado do cache: %s (Porta %s)", execCtx.KnownSwitch.SwitchName, execCtx.KnownSwitch.SwitchPort)
 		return execCtx.KnownSwitch, DynamicMetricResult{
@@ -718,10 +733,21 @@ func ExecuteTracerouteTask(ctx context.Context, task TestTaskConfig, execCtx *Ex
 
 // ExecuteWiFiStatusTask mede o status da conexão Wi-Fi e a força/potência do sinal
 func ExecuteWiFiStatusTask(ctx context.Context, task TestTaskConfig, execCtx *ExecutionContext) DynamicMetricResult {
+	if execCtx != nil && execCtx.SysInfo != nil && execCtx.SysInfo.WiFiInfo != nil && execCtx.SysInfo.WiFiInfo.Connected {
+		w := execCtx.SysInfo.WiFiInfo
+		detailsStr := fmt.Sprintf("SSID: %s, Sinal: %d%% (%d dBm), Canal: %d (%s), Rádio: %s",
+			w.SSID, w.SignalPercent, w.SignalDBm, w.Channel, w.Band, w.RadioType)
+		return DynamicMetricResult{
+			Value:   float64(w.SignalPercent),
+			Unit:    "%",
+			Status:  "ok",
+			Details: detailsStr,
+		}
+	}
 	if runtime.GOOS == "windows" {
-		return executeWindowsWiFiStatus(ctx)
+		return executeWindowsWiFiStatus(ctx, execCtx)
 	} else if runtime.GOOS == "linux" {
-		return executeLinuxWiFiStatus(ctx)
+		return executeLinuxWiFiStatus(ctx, execCtx)
 	}
 	return DynamicMetricResult{
 		Value:   0,
@@ -731,7 +757,7 @@ func ExecuteWiFiStatusTask(ctx context.Context, task TestTaskConfig, execCtx *Ex
 	}
 }
 
-func executeWindowsWiFiStatus(ctx context.Context) DynamicMetricResult {
+func executeWindowsWiFiStatus(ctx context.Context, execCtx *ExecutionContext) DynamicMetricResult {
 	cmd := exec.CommandContext(ctx, "netsh", "wlan", "show", "interfaces")
 	hideWindow(cmd)
 	out, err := cmd.Output()
@@ -827,6 +853,10 @@ func executeWindowsWiFiStatus(ctx context.Context) DynamicMetricResult {
 		}
 	}
 
+	if execCtx != nil && execCtx.SysInfo != nil {
+		execCtx.SysInfo.WiFiInfo = &res
+	}
+
 	detailsStr := fmt.Sprintf("SSID: %s, Sinal: %d%% (%d dBm), Canal: %d (%s), Rádio: %s",
 		res.SSID, res.SignalPercent, res.SignalDBm, res.Channel, res.Band, res.RadioType)
 
@@ -838,7 +868,7 @@ func executeWindowsWiFiStatus(ctx context.Context) DynamicMetricResult {
 	}
 }
 
-func executeLinuxWiFiStatus(ctx context.Context) DynamicMetricResult {
+func executeLinuxWiFiStatus(ctx context.Context, execCtx *ExecutionContext) DynamicMetricResult {
 	cmd := exec.CommandContext(ctx, "nmcli", "-t", "-f", "active,ssid,bssid,signal,freq,chan", "dev", "wifi")
 	if out, err := cmd.Output(); err == nil {
 		lines := strings.Split(string(out), "\n")
@@ -854,6 +884,20 @@ func executeLinuxWiFiStatus(ctx context.Context) DynamicMetricResult {
 					band := "2.4 GHz"
 					if ch > 14 {
 						band = "5 GHz"
+					}
+					res := WiFiMetricResult{
+						HasWiFiAdapter: true,
+						Connected:      true,
+						SSID:           parts[1],
+						BSSID:          strings.ToUpper(strings.ReplaceAll(parts[2], ":", "-")),
+						SignalPercent:  sig,
+						SignalDBm:      dbm,
+						Channel:        ch,
+						Band:           band,
+						Status:         "ok",
+					}
+					if execCtx != nil && execCtx.SysInfo != nil {
+						execCtx.SysInfo.WiFiInfo = &res
 					}
 					return DynamicMetricResult{
 						Value:   float64(sig),

@@ -14,10 +14,14 @@ type MachineRegistration struct {
 	GroupID      string           `bson:"group_id" json:"group_id"`         // "default", "reitoria", "acon", etc.
 	IsCustom     bool             `bson:"is_custom" json:"is_custom"`       // Se tem perfil customizado em vez do herdado do grupo
 	CustomTests  []TestTaskConfig `bson:"custom_tests,omitempty" json:"custom_tests,omitempty"`
-	Status       string           `bson:"status" json:"status"`             // "active", "pending_review"
-	LastSeen     time.Time        `bson:"last_seen" json:"last_seen"`
-	CreatedAt    time.Time        `bson:"created_at" json:"created_at"`
-	UpdatedAt    time.Time        `bson:"updated_at" json:"updated_at"`
+	Status       string            `bson:"status" json:"status"`             // "active", "pending_review"
+	LastSeen     time.Time         `bson:"last_seen" json:"last_seen"`
+	CreatedAt    time.Time         `bson:"created_at" json:"created_at"`
+	UpdatedAt    time.Time         `bson:"updated_at" json:"updated_at"`
+	SystemInfo   *SystemInfo       `bson:"system_info,omitempty" json:"system_info,omitempty"`
+	LoggedUser   string            `bson:"logged_user,omitempty" json:"logged_user,omitempty"`
+	ActiveUser   string            `bson:"active_user,omitempty" json:"active_user,omitempty"`
+	Users        []UserAccountInfo `bson:"users,omitempty" json:"users,omitempty"`
 }
 
 // ProbeRegisterRequest representa o payload enviado pela sonda no primeiro contato (quando 404)

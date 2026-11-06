@@ -7,14 +7,16 @@ import (
 
 // NetworkInterfaceDetail representa uma placa de rede identificada no computador
 type NetworkInterfaceDetail struct {
-	Name        string   `json:"name"`                   // Ex: "Wi-Fi", "Ethernet", "eth0"
-	Description string   `json:"description,omitempty"`  // Ex: "Intel(R) Wi-Fi 6 AX201"
-	MACAddress  string   `json:"mac_address"`            // Ex: "E4-54-E8-12-34-56"
-	IPAddresses []string `json:"ip_addresses,omitempty"` // Lista de IPs associados
-	Type        string   `json:"type"`                   // "ethernet", "wifi", "virtual", "other"
-	IsPrimary   bool     `json:"is_primary"`             // True se for a placa com a rota padrão/gateway ativo
-	IsUp        bool     `json:"is_up"`                  // Link operacional ativo
-	Gateway     string   `json:"gateway,omitempty"`      // Gateway associado
+	Name        string            `json:"name"`                   // Ex: "Wi-Fi", "Ethernet", "eth0"
+	Description string            `json:"description,omitempty"`  // Ex: "Intel(R) Wi-Fi 6 AX201"
+	MACAddress  string            `json:"mac_address"`            // Ex: "E4-54-E8-12-34-56"
+	IPAddresses []string          `json:"ip_addresses,omitempty"` // Lista de IPs associados
+	Type        string            `json:"type"`                   // "ethernet", "wifi", "virtual", "other"
+	IsPrimary   bool              `json:"is_primary"`             // True se for a placa com a rota padrão/gateway ativo
+	IsUp        bool              `json:"is_up"`                  // Link operacional ativo
+	Gateway     string            `json:"gateway,omitempty"`      // Gateway associado
+	IsWireless  bool              `json:"is_wireless,omitempty"`  // True se for interface de rede sem fio (Wi-Fi)
+	WiFiInfo    *WiFiMetricResult `json:"wifi_info,omitempty"`    // Detalhes da conexão Wi-Fi se associada
 }
 
 // UserAccountInfo representa os dados de uma conta de usuário do sistema operacional
@@ -43,6 +45,27 @@ type SystemInfo struct {
 	LoggedUser     string                   `json:"logged_user,omitempty"` // Usuário da sessão/processo que envia as medições
 	ActiveUser     string                   `json:"active_user,omitempty"` // Usuário interativo do console/desktop
 	Users          []UserAccountInfo        `json:"users,omitempty"`       // Contas de usuário locais da máquina
+	WiFiInfo       *WiFiMetricResult        `json:"wifi_info,omitempty"`   // Telemetria detalhada de sinal e enlace Wi-Fi
+}
+
+// IsOnWiFi indica se a sonda está operando primordialmente em uma conexão sem fio (Wi-Fi)
+func (s *SystemInfo) IsOnWiFi() bool {
+	if s == nil {
+		return false
+	}
+	if s.WiFiInfo != nil && s.WiFiInfo.Connected {
+		return true
+	}
+	for _, iface := range s.Interfaces {
+		if iface.IsPrimary && (iface.Type == "wifi" || iface.IsWireless || strings.Contains(strings.ToLower(iface.Name), "wi-fi") || strings.Contains(strings.ToLower(iface.Name), "wlan")) {
+			return true
+		}
+	}
+	lower := strings.ToLower(s.NetworkAdapter)
+	if strings.Contains(lower, "wi-fi") || strings.Contains(lower, "wireless") || strings.Contains(lower, "wlan") {
+		return true
+	}
+	return false
 }
 
 // SwitchInfo armazena as informações do switch descobertas via LLDP
@@ -69,6 +92,9 @@ func (s *SwitchInfo) IsValid() bool {
 		return false
 	}
 	if strings.HasPrefix(lower, "não detectado") || strings.HasPrefix(lower, "nao detectado") {
+		return false
+	}
+	if strings.Contains(lower, "wi-fi") || strings.Contains(lower, "wifi") || strings.Contains(lower, "sem conexão") || strings.Contains(lower, "sem conexao") {
 		return false
 	}
 	// Telefones VoIP da Cisco não são switches de rede

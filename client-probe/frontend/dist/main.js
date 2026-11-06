@@ -299,7 +299,10 @@ function updateStatusBadge(status) {
   const groupBadge = document.getElementById('group-badge-display');
   if (groupBadge) {
     if (status.group_name) {
-      groupBadge.textContent = `Grupo: ${status.group_name}${status.current_vlan ? ' (VLAN ' + status.current_vlan + ')' : ''}`;
+      const isWiFi = (status.current_pc && status.current_pc.wifi_info && status.current_pc.wifi_info.connected) ||
+                     (status.current_pc && status.current_pc.network_adapter && status.current_pc.network_adapter.toLowerCase().includes('wi-fi'));
+      const netLabel = isWiFi ? ' (Wi-Fi)' : (status.current_vlan ? ` (VLAN ${status.current_vlan})` : '');
+      groupBadge.textContent = `Grupo: ${status.group_name}${netLabel}`;
     } else {
       groupBadge.textContent = 'Grupo: Padrão';
     }
@@ -937,11 +940,24 @@ function renderTechnicalSpecs(status, latestRecord) {
     let wifiData = null;
     if (sysInfo && sysInfo.wifi_info && sysInfo.wifi_info.connected) {
       wifiData = sysInfo.wifi_info;
+    } else if (latestRecord && latestRecord.modular_results && latestRecord.modular_results.wifi && latestRecord.modular_results.wifi.connected) {
+      wifiData = latestRecord.modular_results.wifi;
     } else if (sysInfo && Array.isArray(sysInfo.interfaces)) {
-      const wIface = sysInfo.interfaces.find(i => i.is_wireless || (i.name && i.name.toLowerCase().includes('wi-fi')) || (i.name && i.name.toLowerCase().includes('wlan')));
+      const wIface = sysInfo.interfaces.find(i => i.is_wireless || (i.type && i.type.toLowerCase().includes('wifi')) || (i.name && i.name.toLowerCase().includes('wi-fi')) || (i.name && i.name.toLowerCase().includes('wlan')));
       if (wIface && wIface.wifi_info && wIface.wifi_info.connected) {
         wifiData = wIface.wifi_info;
       }
+    } else if (latestRecord && latestRecord.metrics && latestRecord.metrics.wifi_status && (latestRecord.metrics.wifi_status.status === 'ok' || latestRecord.metrics.wifi_status.value > 0)) {
+      const ms = latestRecord.metrics.wifi_status;
+      const ssidMatch = ms.details ? ms.details.match(/SSID:\s*([^,]+)/) : null;
+      const chMatch = ms.details ? ms.details.match(/Canal:\s*(\d+)/) : null;
+      wifiData = {
+        connected: true,
+        signal_percent: Math.round(ms.value || 0),
+        signal_dbm: Math.round((ms.value || 0) / 2) - 100,
+        ssid: (ssidMatch ? ssidMatch[1].trim() : 'Wi-Fi Conectado'),
+        channel: (chMatch ? parseInt(chMatch[1]) : 36),
+      };
     }
 
     if (wifiData) {
@@ -1013,17 +1029,30 @@ function renderTechnicalSpecs(status, latestRecord) {
   }
 
   // 3. Switch LLDP
-  if (swInfo) {
-    const swName = document.getElementById('switch-name');
-    const swPort = document.getElementById('switch-port');
-    const swVlan = document.getElementById('switch-vlan');
-    const swProto = document.getElementById('switch-protocol');
-    const pcAdapter = document.getElementById('pc-adapter');
+  const swName = document.getElementById('switch-name');
+  const swPort = document.getElementById('switch-port');
+  const swVlan = document.getElementById('switch-vlan');
+  const swProto = document.getElementById('switch-protocol');
+  const pcAdapter = document.getElementById('pc-adapter');
 
+  const isOnWiFi = !!(wifiData && wifiData.connected);
+  if (isOnWiFi) {
+    if (swName) swName.textContent = 'Conexão Sem Fio (Wi-Fi)';
+    if (swPort) swPort.textContent = 'WLAN';
+    if (swVlan) swVlan.textContent = 'Sem VLAN L2 (Wi-Fi)';
+    if (swProto) swProto.textContent = 'Wi-Fi 802.11';
+    if (pcAdapter && sysInfo) pcAdapter.textContent = sysInfo.network_adapter || 'Adaptador Wi-Fi';
+  } else if (swInfo && swInfo.switch_name && !swInfo.switch_name.toLowerCase().includes('wi-fi')) {
     if (swName) swName.textContent = swInfo.switch_name || 'Aguardando frame LLDP...';
     if (swPort) swPort.textContent = swInfo.switch_port || '--';
     if (swVlan) swVlan.textContent = swInfo.vlan ? `VLAN ${swInfo.vlan}` : 'Sem VLAN';
     if (swProto) swProto.textContent = swInfo.protocol || 'LLDP';
+    if (pcAdapter && sysInfo) pcAdapter.textContent = sysInfo.network_adapter || '--';
+  } else {
+    if (swName) swName.textContent = 'Aguardando frame LLDP...';
+    if (swPort) swPort.textContent = '--';
+    if (swVlan) swVlan.textContent = 'Sem VLAN';
+    if (swProto) swProto.textContent = 'LLDP';
     if (pcAdapter && sysInfo) pcAdapter.textContent = sysInfo.network_adapter || '--';
   }
 

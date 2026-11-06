@@ -2971,7 +2971,7 @@ function renderSingleMachineHeaderAndAlert(diagnostic, summaries) {
   const modResults = (diagnostic && diagnostic.modular_results) || (summary && summary.modular_results);
   if (smWifiMeta && smWifiVal) {
     if (modResults && modResults.wifi && modResults.wifi.status && modResults.wifi.status !== 'skipped') {
-      const wf = modResults.wifi;
+      const wf = modResults.wifi || (sys && sys.wifi_info) || null;
       smWifiMeta.style.display = 'inline-flex';
       if (wf.status === 'disconnected') {
         smWifiVal.textContent = 'Desconectado';
@@ -3678,7 +3678,7 @@ function openPCDetailsModal(s) {
   // 3.1 Status Wi-Fi
   const wifiSection = document.getElementById('modal-wifi-section');
   const modResults = s.modular_results || {};
-  const wf = modResults.wifi;
+  const wf = modResults.wifi || (sys && sys.wifi_info) || null;
 
   if (wifiSection) {
     if (wf && wf.status && wf.status !== 'skipped') {
@@ -5170,7 +5170,7 @@ function openMachineMetricsModal(hostname) {
   const wifiValEl = document.getElementById('mm-hw-wifi');
   if (wifiRow && wifiValEl) {
     const modResults = (summary && summary.modular_results) || {};
-    const wf = modResults.wifi;
+    const wf = modResults.wifi || (sys && sys.wifi_info) || null;
     const wsMetric = (summary && summary.metrics && summary.metrics.wifi_status);
 
     if (wf && wf.status && wf.status !== 'skipped' && wf.status !== 'no_adapter') {
@@ -6070,7 +6070,7 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
   // 1. Status Wi-Fi & Potência
   const wifiBadge = document.getElementById('sm-panel-wifi-status-badge');
   const wifiContent = document.getElementById('sm-panel-wifi-content');
-  const wf = modResults.wifi;
+  const wf = modResults.wifi || (sys && sys.wifi_info) || null;
 
   if (wifiContent) {
     if (wf && (wf.status && wf.status !== 'skipped' || wf.has_wifi_adapter)) {

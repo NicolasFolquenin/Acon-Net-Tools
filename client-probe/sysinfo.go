@@ -34,6 +34,9 @@ func CollectSystemInfo() SystemInfo {
 	// 3. Informações de Usuários (Sessão Atual, Ativa e Contas Locais)
 	collectUserAccounts(&info)
 
+	// 4. Detecção e Telemetria de Conexão Wi-Fi
+	collectWiFiInfo(&info)
+
 	return info
 }
 
@@ -99,6 +102,7 @@ func collectNetworkDetails(info *SystemInfo) {
 		}
 
 		ifaceType := detectInterfaceType(iface.Name)
+		isWireless := ifaceType == "wifi"
 		isPrimary := false
 		if primaryAdapterName != "" && (strings.EqualFold(iface.Name, primaryAdapterName) || strings.Contains(strings.ToLower(iface.Name), strings.ToLower(primaryAdapterName))) {
 			isPrimary = true
@@ -113,6 +117,7 @@ func collectNetworkDetails(info *SystemInfo) {
 			IsPrimary:   isPrimary,
 			IsUp:        isUp,
 			Gateway:     info.Gateway,
+			IsWireless:  isWireless,
 		}
 
 		details = append(details, detail)
@@ -372,7 +377,7 @@ func collectWindowsUsers(info *SystemInfo) {
 	userCacheMu.Unlock()
 
 	cmdList := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
-		`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-LocalUser | Select-Object Name, FullName, Enabled, Description | ConvertTo-Json -Compress`)
+		`$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-LocalUser | Select-Object Name, FullName, Enabled, Description | ConvertTo-Json -Compress`)
 	hideWindow(cmdList)
 	outList, errList := cmdList.Output()
 
@@ -403,7 +408,7 @@ func collectWindowsUsers(info *SystemInfo) {
 	// Administradores locais
 	adminSet := make(map[string]bool)
 	cmdAdmins := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
-		`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $m = Get-LocalGroupMember -Group 'Administradores' -ErrorAction SilentlyContinue; if (!$m) { $m = Get-LocalGroupMember -Group 'Administrators' -ErrorAction SilentlyContinue }; if ($m) { $m | ForEach-Object { $_.Name } }`)
+		`$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $m = Get-LocalGroupMember -Group 'Administradores' -ErrorAction SilentlyContinue; if (!$m) { $m = Get-LocalGroupMember -Group 'Administrators' -ErrorAction SilentlyContinue }; if ($m) { $m | ForEach-Object { $_.Name } }`)
 	hideWindow(cmdAdmins)
 	if outAdmins, err := cmdAdmins.Output(); err == nil {
 		lines := strings.Split(strings.ReplaceAll(string(outAdmins), "\r\n", "\n"), "\n")
@@ -544,4 +549,129 @@ func cloneUsers(src []UserAccountInfo) []UserAccountInfo {
 	dst := make([]UserAccountInfo, len(src))
 	copy(dst, src)
 	return dst
+}
+
+func collectWiFiInfo(info *SystemInfo) {
+	if runtime.GOOS == "windows" {
+		cmd := exec.Command("netsh", "wlan", "show", "interfaces")
+		hideWindow(cmd)
+		out, err := cmd.Output()
+		if err != nil {
+			return
+		}
+		lines := strings.Split(string(out), "\n")
+		res := WiFiMetricResult{
+			HasWiFiAdapter: false,
+			Connected:      false,
+			Status:         "no_adapter",
+		}
+
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, ":") {
+				parts := strings.SplitN(line, ":", 2)
+				key := strings.ToLower(strings.TrimSpace(parts[0]))
+				val := strings.TrimSpace(parts[1])
+
+				if strings.Contains(key, "nome") || strings.Contains(key, "name") {
+					res.HasWiFiAdapter = true
+				} else if strings.Contains(key, "estado") || strings.Contains(key, "state") {
+					lowerVal := strings.ToLower(val)
+					if strings.Contains(lowerVal, "conectado") || strings.Contains(lowerVal, "connected") {
+						res.Connected = true
+						res.Status = "ok"
+					} else {
+						res.Status = "disconnected"
+					}
+				} else if key == "ssid" {
+					res.SSID = val
+				} else if key == "bssid" {
+					res.BSSID = strings.ToUpper(strings.ReplaceAll(val, ":", "-"))
+				} else if strings.Contains(key, "sinal") || strings.Contains(key, "signal") {
+					valClean := strings.TrimSuffix(val, "%")
+					valClean = strings.TrimSpace(valClean)
+					var sig int
+					if _, err := fmt.Sscanf(valClean, "%d", &sig); err == nil {
+						res.SignalPercent = sig
+						res.SignalDBm = (sig / 2) - 100
+					}
+				} else if strings.Contains(key, "tipo de rádio") || strings.Contains(key, "tipo de radio") || strings.Contains(key, "radio type") {
+					res.RadioType = val
+				} else if strings.Contains(key, "canal") || strings.Contains(key, "channel") {
+					var ch int
+					if _, err := fmt.Sscanf(val, "%d", &ch); err == nil {
+						res.Channel = ch
+						if ch <= 14 {
+							res.Band = "2.4 GHz"
+						} else if ch <= 165 {
+							res.Band = "5 GHz"
+						} else {
+							res.Band = "6 GHz"
+						}
+					}
+				} else if strings.Contains(key, "recepção") || strings.Contains(key, "recepcao") || strings.Contains(key, "receive rate") {
+					var r float64
+					if _, err := fmt.Sscanf(val, "%f", &r); err == nil {
+						res.RxRateMbps = r
+					}
+				} else if strings.Contains(key, "transmissão") || strings.Contains(key, "transmissao") || strings.Contains(key, "transmit rate") {
+					var r float64
+					if _, err := fmt.Sscanf(val, "%f", &r); err == nil {
+						res.TxRateMbps = r
+					}
+				}
+			}
+		}
+
+		if res.Connected {
+			info.WiFiInfo = &res
+			for i := range info.Interfaces {
+				if info.Interfaces[i].Type == "wifi" || strings.Contains(strings.ToLower(info.Interfaces[i].Name), "wi-fi") || strings.Contains(strings.ToLower(info.Interfaces[i].Name), "wlan") {
+					info.Interfaces[i].WiFiInfo = &res
+					info.Interfaces[i].IsWireless = true
+				}
+			}
+		}
+	} else if runtime.GOOS == "linux" {
+		cmd := exec.Command("nmcli", "-t", "-f", "active,ssid,bssid,signal,freq,chan", "dev", "wifi")
+		if out, err := cmd.Output(); err == nil {
+			lines := strings.Split(string(out), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "yes:") {
+					parts := strings.Split(line, ":")
+					if len(parts) >= 6 {
+						var sig, ch int
+						_, _ = fmt.Sscanf(parts[3], "%d", &sig)
+						_, _ = fmt.Sscanf(parts[5], "%d", &ch)
+						band := "2.4 GHz"
+						if ch > 14 && ch <= 165 {
+							band = "5 GHz"
+						} else if ch > 165 {
+							band = "6 GHz"
+						}
+						res := WiFiMetricResult{
+							HasWiFiAdapter: true,
+							Connected:      true,
+							SSID:           parts[1],
+							BSSID:          strings.ToUpper(strings.ReplaceAll(parts[2], ":", "-")),
+							SignalPercent:  sig,
+							SignalDBm:      (sig / 2) - 100,
+							Channel:        ch,
+							Band:           band,
+							Status:         "ok",
+						}
+						info.WiFiInfo = &res
+						for i := range info.Interfaces {
+							if info.Interfaces[i].Type == "wifi" || strings.Contains(strings.ToLower(info.Interfaces[i].Name), "wl") {
+								info.Interfaces[i].WiFiInfo = &res
+								info.Interfaces[i].IsWireless = true
+							}
+						}
+						break
+					}
+				}
+			}
+		}
+	}
 }
