@@ -314,6 +314,20 @@ function updateStatusBadge(status) {
     profileBadge.title = prof.description || `Perfil ativo com ${activeCount} tarefas`;
   }
 
+  // Atualiza badge de Usuário no Cabeçalho
+  const userDisplayText = document.getElementById('user-display-text');
+  const userBadgeDisplay = document.getElementById('user-badge-display');
+  const currentPc = status.current_pc;
+  const probeUser = (currentPc && (currentPc.logged_user || currentPc.active_user)) || '';
+  if (userDisplayText) {
+    if (probeUser) {
+      userDisplayText.textContent = `Usuário: ${cleanUserDisplay(probeUser)}`;
+      if (userBadgeDisplay) userBadgeDisplay.title = `Usuário em Execução: ${probeUser}`;
+    } else {
+      userDisplayText.textContent = 'Usuário: Detectando...';
+    }
+  }
+
   const footerDesc = document.getElementById('footer-agent-desc');
   if (footerDesc) {
     if (status.sync_with_central) {
