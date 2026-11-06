@@ -136,3 +136,4 @@ Se alguma máquina estiver com a conexão de rede oscilando ou o auto-update for
    Invoke-WebRequest -Uri "$server/api/v1/download/binary/windows" -OutFile $dest
    Start-Process -FilePath $dest -WindowStyle Hidden
    ```
+

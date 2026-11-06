@@ -32,3 +32,4 @@ As sondas instaladas **já possuem auto-update automático a cada 30 minutos**. 
    - Colocar o novo `uepg-net-tools.exe` e `version.txt` na pasta `public/downloads/` do servidor.
 4. **Pronto!**
    - As máquinas clientes detectam a versão nova sozinhas, baixam o patch em segundo plano e reiniciam atualizadas.
+
