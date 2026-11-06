@@ -6,6 +6,9 @@ import (
 	"context"
 	"embed"
 	"log"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -20,6 +23,12 @@ var assets embed.FS
 func main() {
 	// Cria uma instância da aplicação
 	app := NewApp()
+
+	execName := "desktop-client-2026"
+	if p, err := os.Executable(); err == nil {
+		execName = strings.ToLower(filepath.Base(p))
+	}
+	lockId := "uepg-net-tools-" + execName
 
 	// Configuração do Wails v2
 	err := wails.Run(&options.App{
@@ -50,7 +59,7 @@ func main() {
 			return false // HideWindowOnClose: true esconde a janela sem encerrar o processo
 		},
 		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "uepg-net-tools-desktop-client-2026",
+			UniqueId: lockId,
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
 				if app.ctx != nil {
 					runtime.WindowShow(app.ctx)
