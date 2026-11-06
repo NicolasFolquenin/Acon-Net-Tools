@@ -59,7 +59,7 @@ func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile,
 
 	metricsMap := make(map[string]interface{})
 	var currentSwitch *SwitchInfo
-	if knownSwitch != nil {
+	if !sysInfo.IsOnWiFi() && knownSwitch != nil {
 		currentSwitch = knownSwitch
 	}
 
@@ -120,7 +120,11 @@ func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile,
 	// Identifica Grupo e VLAN correspondente
 	var groupName string
 	var vlan int
-	if currentSwitch != nil {
+	if execCtx.SysInfo != nil && execCtx.SysInfo.IsOnWiFi() {
+		// No Wi-Fi, desativa herança de VLAN de switch físico cabeado
+		currentSwitch = nil
+		vlan = 0
+	} else if currentSwitch != nil {
 		vlan = currentSwitch.VLAN
 	}
 	groupCfg := GetCurrentGroupConfig()
@@ -134,6 +138,13 @@ func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile,
 			loggedUser = execCtx.SysInfo.LoggedUser
 		} else if execCtx.SysInfo.ActiveUser != "" {
 			loggedUser = execCtx.SysInfo.ActiveUser
+		}
+	}
+
+	var modResults *ModularResults
+	if execCtx.SysInfo != nil && execCtx.SysInfo.WiFiInfo != nil {
+		modResults = &ModularResults{
+			WiFi: execCtx.SysInfo.WiFiInfo,
 		}
 	}
 
@@ -152,6 +163,7 @@ func (p *NetworkProbe) RunProfile(ctx context.Context, prof *MeasurementProfile,
 		Metrics:        metricsMap,
 		SystemInfo:     execCtx.SysInfo,
 		SwitchInfo:     currentSwitch,
+		ModularResults: modResults,
 	}
 
 	return payload, nil

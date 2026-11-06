@@ -25,10 +25,12 @@ type App struct {
 	activeTask   string
 	lastRun      *time.Time
 	nextRun      *time.Time
-	lastMetric   *LocalMetricRecord
-	currentPC    *SystemInfo
+	lastMetric    *LocalMetricRecord
+	currentPC     *SystemInfo
 	currentSwitch *SwitchInfo
-	mu           sync.Mutex
+	lastGateway   string
+	lastAdapter   string
+	mu            sync.Mutex
 }
 
 // NewApp cria uma nova instância de App
@@ -309,6 +311,21 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 	measureCtx, cancelMeasure := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancelMeasure()
 
+	// Verifica se a conexão ativa mudou para Wi-Fi ou se houve alteração de gateway de rede
+	sysCheck := CollectSystemInfo()
+	if sysCheck.IsOnWiFi() {
+		a.mu.Lock()
+		a.currentSwitch = nil
+		a.mu.Unlock()
+	} else if a.lastGateway != "" && sysCheck.Gateway != "" && a.lastGateway != sysCheck.Gateway {
+		log.Printf("[APP] Mudança de rede detectada (Gateway anterior: %s, Novo: %s). Limpando cache do switch LLDP.", a.lastGateway, sysCheck.Gateway)
+		a.mu.Lock()
+		a.currentSwitch = nil
+		a.mu.Unlock()
+	}
+	a.lastGateway = sysCheck.Gateway
+	a.lastAdapter = sysCheck.NetworkAdapter
+
 	payload, err := a.probe.RunProfile(measureCtx, activeProfile, cfg, a.currentSwitch, func(taskName string) {
 		a.mu.Lock()
 		a.activeTask = taskName
@@ -321,19 +338,32 @@ func (a *App) ExecuteTest(triggerSource string) (*LocalMetricRecord, error) {
 		return nil, err
 	}
 
-	// Preserva o switch corporativo conhecido se a medição capturou apenas telefone ou vazio
-	if payload.SwitchInfo != nil && payload.SwitchInfo.IsRealSwitch() {
+	// Atualiza e valida o switch LLDP
+	if payload.SystemInfo != nil && payload.SystemInfo.IsOnWiFi() {
+		// Conexão Wi-Fi ativa: switch físico e VLAN de enlace cabeado são limpos
+		a.mu.Lock()
+		a.currentSwitch = nil
+		a.mu.Unlock()
+		payload.SwitchInfo = nil
+		payload.VLAN = 0
+	} else if payload.SwitchInfo != nil && payload.SwitchInfo.IsRealSwitch() {
 		a.mu.Lock()
 		a.currentSwitch = payload.SwitchInfo
 		a.mu.Unlock()
 	} else if a.currentSwitch != nil && a.currentSwitch.IsRealSwitch() {
-		payload.SwitchInfo = a.currentSwitch
-	} else if payload.SwitchInfo != nil && payload.SwitchInfo.IsValid() {
+		if payload.SystemInfo != nil && !payload.SystemInfo.IsOnWiFi() {
+			payload.SwitchInfo = a.currentSwitch
+		} else {
+			a.mu.Lock()
+			a.currentSwitch = nil
+			a.mu.Unlock()
+			payload.SwitchInfo = nil
+		}
+	} else {
 		a.mu.Lock()
-		a.currentSwitch = payload.SwitchInfo
+		a.currentSwitch = nil
 		a.mu.Unlock()
-	} else if a.currentSwitch != nil && a.currentSwitch.IsValid() {
-		payload.SwitchInfo = a.currentSwitch
+		payload.SwitchInfo = nil
 	}
 
 	// 2. Envia para o servidor central (POST com Bearer token)
@@ -425,7 +455,9 @@ func (a *App) GetStatus() ProbeStatus {
 	groupCfg := GetCurrentGroupConfig()
 	groupName := groupCfg.GroupName
 	currentVlan := 0
-	if a.currentSwitch != nil {
+	if a.currentPC != nil && a.currentPC.IsOnWiFi() {
+		currentVlan = 0
+	} else if a.currentSwitch != nil {
 		currentVlan = a.currentSwitch.VLAN
 	}
 	if a.lastMetric != nil && a.lastMetric.GroupName != "" {

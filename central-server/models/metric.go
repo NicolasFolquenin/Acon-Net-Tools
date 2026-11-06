@@ -7,14 +7,16 @@ import (
 
 // NetworkInterfaceDetail representa uma placa de rede identificada no computador
 type NetworkInterfaceDetail struct {
-	Name        string   `bson:"name" json:"name"`                                   // Ex: "Wi-Fi", "Ethernet", "eth0"
-	Description string   `bson:"description,omitempty" json:"description,omitempty"` // Ex: "Intel(R) Wi-Fi 6 AX201"
-	MACAddress  string   `bson:"mac_address" json:"mac_address"`                     // Ex: "E4-54-E8-12-34-56"
-	IPAddresses []string `bson:"ip_addresses,omitempty" json:"ip_addresses,omitempty"`
-	Type        string   `bson:"type" json:"type"`                                   // "ethernet", "wifi", "virtual", "other"
-	IsPrimary   bool     `bson:"is_primary" json:"is_primary"`                       // Placa com a rota default/gateway ativo
-	IsUp        bool     `bson:"is_up" json:"is_up"`                                 // Link operacional ativo
-	Gateway     string   `bson:"gateway,omitempty" json:"gateway,omitempty"`
+	Name        string            `bson:"name" json:"name"`                                   // Ex: "Wi-Fi", "Ethernet", "eth0"
+	Description string            `bson:"description,omitempty" json:"description,omitempty"` // Ex: "Intel(R) Wi-Fi 6 AX201"
+	MACAddress  string            `bson:"mac_address" json:"mac_address"`                     // Ex: "E4-54-E8-12-34-56"
+	IPAddresses []string          `bson:"ip_addresses,omitempty" json:"ip_addresses,omitempty"`
+	Type        string            `bson:"type" json:"type"`                                   // "ethernet", "wifi", "virtual", "other"
+	IsPrimary   bool              `bson:"is_primary" json:"is_primary"`                       // Placa com a rota default/gateway ativo
+	IsUp        bool              `bson:"is_up" json:"is_up"`                                 // Link operacional ativo
+	Gateway     string            `bson:"gateway,omitempty" json:"gateway,omitempty"`
+	IsWireless  bool              `bson:"is_wireless,omitempty" json:"is_wireless,omitempty"`
+	WiFiInfo    *WiFiMetricResult `bson:"wifi_info,omitempty" json:"wifi_info,omitempty"`
 }
 
 // UserAccountInfo representa os dados de uma conta de usuário do sistema operacional
@@ -43,6 +45,7 @@ type SystemInfo struct {
 	LoggedUser     string                   `bson:"logged_user,omitempty" json:"logged_user,omitempty"` // Usuário da sessão/processo que envia as medições
 	ActiveUser     string                   `bson:"active_user,omitempty" json:"active_user,omitempty"` // Usuário interativo do console/desktop
 	Users          []UserAccountInfo        `bson:"users,omitempty" json:"users,omitempty"`             // Contas de usuário locais da máquina
+	WiFiInfo       *WiFiMetricResult        `bson:"wifi_info,omitempty" json:"wifi_info,omitempty"`
 }
 
 // SwitchInfo armazena as informações do switch descobertas via LLDP

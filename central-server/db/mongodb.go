@@ -158,7 +158,69 @@ func (m *MongoDBClient) InsertMetric(ctx context.Context, payload *models.Metric
 		return fmt.Errorf("erro ao inserir documento no MongoDB: %w", err)
 	}
 
+	// Persiste imediatamente metadados, usuários e status na coleção 'machines'
+	_ = m.UpdateMachineFromMetric(ctx, payload)
+
 	return nil
+}
+
+// UpdateMachineFromMetric atualiza ou cadastra os dados de hardware, rede e usuários na coleção 'machines'
+func (m *MongoDBClient) UpdateMachineFromMetric(ctx context.Context, payload *models.MetricPayloadInput) error {
+	if m.MachinesCollection == nil || payload == nil || payload.NodeID == "" {
+		return nil
+	}
+
+	setFields := bson.M{
+		"last_seen":  payload.Timestamp.UTC(),
+		"updated_at": time.Now().UTC(),
+	}
+
+	if payload.SystemInfo != nil {
+		setFields["system_info"] = payload.SystemInfo
+		if payload.SystemInfo.IPAddress != "" {
+			setFields["ip_address"] = payload.SystemInfo.IPAddress
+		}
+		if payload.SystemInfo.MACAddress != "" {
+			setFields["mac_address"] = payload.SystemInfo.MACAddress
+		}
+		if payload.SystemInfo.LoggedUser != "" {
+			setFields["logged_user"] = payload.SystemInfo.LoggedUser
+		}
+		if payload.SystemInfo.ActiveUser != "" {
+			setFields["active_user"] = payload.SystemInfo.ActiveUser
+		}
+		if len(payload.SystemInfo.Users) > 0 {
+			setFields["users"] = payload.SystemInfo.Users
+		}
+	}
+
+	if payload.LoggedUser != "" {
+		setFields["logged_user"] = payload.LoggedUser
+	}
+
+	if payload.SwitchInfo != nil && payload.SwitchInfo.IsValid() {
+		setFields["switch_name"] = payload.SwitchInfo.SwitchName
+		setFields["switch_port"] = payload.SwitchInfo.SwitchPort
+		setFields["vlan"] = payload.VLAN
+	} else if payload.VLAN > 0 {
+		setFields["vlan"] = payload.VLAN
+	}
+
+	setOnInsert := bson.M{
+		"created_at": time.Now().UTC(),
+		"group_id":   "default",
+		"status":     "active",
+		"is_custom":  false,
+	}
+
+	update := bson.M{
+		"$set":         setFields,
+		"$setOnInsert": setOnInsert,
+	}
+
+	opts := options.Update().SetUpsert(true)
+	_, err := m.MachinesCollection.UpdateOne(ctx, bson.M{"_id": payload.NodeID}, update, opts)
+	return err
 }
 
 // GetMetricsByQuery busca as métricas com filtro de nó, intervalo de horas ou data específica (YYYY-MM-DD)

@@ -260,11 +260,28 @@ func (h *MetricsHandler) buildNodeDiagnostic(ctx context.Context, nodeID string,
 			diag.ClientVersion = latest.SystemInfo.ClientVersion
 		}
 		diag.SystemInfo = latest.SystemInfo
-		if diag.SystemInfo == nil && mach != nil && mach.IPAddress != "" {
-			diag.SystemInfo = &models.SystemInfo{
-				Hostname:   mach.Hostname,
-				IPAddress:  mach.IPAddress,
-				MACAddress: mach.MACAddress,
+		if diag.SystemInfo == nil && mach != nil {
+			if mach.SystemInfo != nil {
+				diag.SystemInfo = mach.SystemInfo
+			} else if mach.IPAddress != "" {
+				diag.SystemInfo = &models.SystemInfo{
+					Hostname:   mach.Hostname,
+					IPAddress:  mach.IPAddress,
+					MACAddress: mach.MACAddress,
+					LoggedUser: mach.LoggedUser,
+					ActiveUser: mach.ActiveUser,
+					Users:      mach.Users,
+				}
+			}
+		} else if diag.SystemInfo != nil && mach != nil {
+			if len(diag.SystemInfo.Users) == 0 && len(mach.Users) > 0 {
+				diag.SystemInfo.Users = mach.Users
+			}
+			if diag.SystemInfo.LoggedUser == "" && mach.LoggedUser != "" {
+				diag.SystemInfo.LoggedUser = mach.LoggedUser
+			}
+			if diag.SystemInfo.ActiveUser == "" && mach.ActiveUser != "" {
+				diag.SystemInfo.ActiveUser = mach.ActiveUser
 			}
 		}
 		diag.SwitchInfo = latest.SwitchInfo
@@ -308,11 +325,16 @@ func (h *MetricsHandler) buildNodeDiagnostic(ctx context.Context, nodeID string,
 		diag.DowntimeDuration = "Sem telemetria registrada"
 		if mach != nil {
 			diag.VLAN = mach.VLAN
-			if mach.IPAddress != "" {
+			if mach.SystemInfo != nil {
+				diag.SystemInfo = mach.SystemInfo
+			} else if mach.IPAddress != "" {
 				diag.SystemInfo = &models.SystemInfo{
 					Hostname:   mach.Hostname,
 					IPAddress:  mach.IPAddress,
 					MACAddress: mach.MACAddress,
+					LoggedUser: mach.LoggedUser,
+					ActiveUser: mach.ActiveUser,
+					Users:      mach.Users,
 				}
 			}
 			if mach.SwitchName != "" {
@@ -448,13 +470,18 @@ func (h *MetricsHandler) computeNodeSummaries(ctx context.Context, series []mode
 		}
 	}
 
-	// Mapeia intervalo esperado e nome do grupo por nó a partir do cadastro de máquinas e perfis de grupo
+	// Mapeia intervalo esperado, dados cadastrais e usuários por nó
 	nodeIntervalMap := make(map[string]int)
 	nodeGroupMap := make(map[string]string)
+	machineMap := make(map[string]models.MachineRegistration)
+	var allMachines []models.MachineRegistration
+
 	if machines, err := h.db.ListMachines(ctx); err == nil {
+		allMachines = machines
 		groupIntervals := make(map[string]int)
 		groupNames := make(map[string]string)
 		for _, m := range machines {
+			machineMap[m.Hostname] = m
 			interval := 30
 			grpName := ""
 			if m.GroupID != "" {
@@ -492,6 +519,24 @@ func (h *MetricsHandler) computeNodeSummaries(ctx context.Context, series []mode
 		if sys == nil {
 			sys = agg.knownSys
 		}
+
+		// Enriquece com os metadados cadastrais persistidos (especialmente usuários)
+		if m, hasMach := machineMap[agg.latest.NodeID]; hasMach {
+			if sys == nil {
+				sys = m.SystemInfo
+			} else {
+				if len(sys.Users) == 0 && len(m.Users) > 0 {
+					sys.Users = m.Users
+				}
+				if sys.LoggedUser == "" && m.LoggedUser != "" {
+					sys.LoggedUser = m.LoggedUser
+				}
+				if sys.ActiveUser == "" && m.ActiveUser != "" {
+					sys.ActiveUser = m.ActiveUser
+				}
+			}
+		}
+
 		sw := agg.latest.SwitchInfo
 		if sw == nil || !sw.IsRealSwitch() {
 			if agg.knownSw != nil && agg.knownSw.IsRealSwitch() {
@@ -535,6 +580,65 @@ func (h *MetricsHandler) computeNodeSummaries(ctx context.Context, series []mode
 			SwitchInfo:      sw,
 			ModularResults:  agg.latest.ModularResults,
 		})
+	}
+
+	// Inclui máquinas cadastradas que estejam offline (sem telemetria nas últimas 24h)
+	for _, m := range allMachines {
+		if _, exists := aggMap[m.Hostname]; !exists {
+			sys := m.SystemInfo
+			if sys == nil {
+				sys = &models.SystemInfo{
+					Hostname:   m.Hostname,
+					IPAddress:  m.IPAddress,
+					MACAddress: m.MACAddress,
+					LoggedUser: m.LoggedUser,
+					ActiveUser: m.ActiveUser,
+					Users:      m.Users,
+				}
+			} else {
+				if len(sys.Users) == 0 && len(m.Users) > 0 {
+					sys.Users = m.Users
+				}
+				if sys.LoggedUser == "" && m.LoggedUser != "" {
+					sys.LoggedUser = m.LoggedUser
+				}
+				if sys.ActiveUser == "" && m.ActiveUser != "" {
+					sys.ActiveUser = m.ActiveUser
+				}
+			}
+
+			var sw *models.SwitchInfo
+			if m.SwitchName != "" {
+				sw = &models.SwitchInfo{
+					SwitchName: m.SwitchName,
+					SwitchPort: m.SwitchPort,
+					VLAN:       m.VLAN,
+				}
+			}
+
+			grpName := m.GroupID
+			if gn, ok := nodeGroupMap[m.Hostname]; ok && gn != "" {
+				grpName = gn
+			}
+
+			loggedUser := m.LoggedUser
+			if loggedUser == "" && sys != nil {
+				loggedUser = extractLoggedUser(sys)
+			}
+
+			summaries = append(summaries, models.NodeSummaryCard{
+				NodeID:          m.Hostname,
+				Location:        "Cadastrada",
+				GroupName:       grpName,
+				VLAN:            m.VLAN,
+				LastSeen:        m.LastSeen,
+				LoggedUser:      loggedUser,
+				IsHealthy:       false,
+				TotalReadings24: 0,
+				SystemInfo:      sys,
+				SwitchInfo:      sw,
+			})
+		}
 	}
 
 	// Desduplicação inteligente por MAC Address:
