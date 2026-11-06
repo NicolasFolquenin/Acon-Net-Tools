@@ -83,8 +83,17 @@ func (a *App) startup(ctx context.Context) {
 			a.currentPC = a.lastMetric.SystemInfo
 		}
 	}
-	// Restaura o switch válido mais recente do histórico local para exibição instantânea
-	if validSw := a.storage.GetLastValidSwitchInfo(); validSw != nil {
+	// 4. Coleta dados de hardware e rede do PC imediatamente na inicialização
+	pc := CollectSystemInfo()
+	a.currentPC = &pc
+	a.lastGateway = pc.Gateway
+	a.lastAdapter = pc.NetworkAdapter
+
+	// Se a sonda estiver conectada em Wi-Fi, NÃO restaura switch físico cabeado do cache
+	if pc.IsOnWiFi() {
+		a.currentSwitch = nil
+		log.Println("[APP] Conexão ativa identificada como Wi-Fi. Cache de switch físico cabeado suprimido.")
+	} else if validSw := a.storage.GetLastValidSwitchInfo(); validSw != nil {
 		a.currentSwitch = validSw
 		log.Printf("[APP] Switch restaurado do cache local: %s (Porta %s)", validSw.SwitchName, validSw.SwitchPort)
 	} else if len(history) > 0 && a.lastMetric.SwitchInfo != nil && a.lastMetric.SwitchInfo.IsRealSwitch() {
@@ -97,13 +106,11 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}
 
-	// 4. Coleta dados de hardware do PC imediatamente na inicialização
 	go func() {
-		pc := CollectSystemInfo()
-		a.mu.Lock()
-		a.currentPC = &pc
-		a.mu.Unlock()
-		a.emitStatus()
+		if pc.IsOnWiFi() {
+			log.Println("[APP] Sonda em Wi-Fi. Escuta LLDP cabeada desnecessária.")
+			return
+		}
 
 		// Busca inicial de LLDP em background (captura resiliente)
 		// Faz até 3 tentativas (45s cada) até capturar o anúncio do switch corporativo (que emite a cada 30-60s)
