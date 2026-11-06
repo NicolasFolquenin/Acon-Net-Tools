@@ -4614,6 +4614,9 @@ function applyTelemetryFilters() {
     const id = item.node_id || item.NodeID;
     const isOld = (Date.now() - d.getTime() > 3 * 3600 * 1000);
 
+    const userVal = item.logged_user || (item.system_info && (item.system_info.logged_user || item.system_info.active_user)) || '';
+    const userBadge = userVal ? `<div class="node-sub-user" style="margin-top: 3px;" title="Usuário logado nesta leitura: ${escapeHtml(userVal)}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px; margin-right:3px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>${escapeHtml(cleanUserShort(userVal))}</div>` : '';
+
     const badgeHtml = isOld
       ? '<span class="dc-health-badge stale" style="display:inline-flex;">● Histórico</span>'
       : '<span class="dc-health-badge online" style="display:inline-flex;">● Sincronizado</span>';
@@ -4621,7 +4624,10 @@ function applyTelemetryFilters() {
     return `
       <tr>
         <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">${dateFormatted}</td>
-        <td><span class="telemetry-node-tag">${escapeHtml(id)}</span></td>
+        <td>
+          <span class="telemetry-node-tag">${escapeHtml(id)}</span>
+          ${userBadge}
+        </td>
         <td>${escapeHtml(item.location || 'Desconhecido')}</td>
         <td class="text-right">${item.download_mbps > 0 ? `<strong style="color: var(--accent-cyan);">${item.download_mbps.toFixed(1)}</strong> <small>Mbps</small>` : `<span class="text-subtle font-mono">--</span>`}</td>
         <td class="text-right">${item.upload_mbps > 0 ? `<strong style="color: #c084fc;">${item.upload_mbps.toFixed(1)}</strong> <small>Mbps</small>` : `<span class="text-subtle font-mono">--</span>`}</td>

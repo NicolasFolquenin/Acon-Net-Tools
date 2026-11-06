@@ -193,6 +193,7 @@ type MetricPayloadInput struct {
 	PingGateway    float64                `json:"ping_gateway"`
 	ProfileVersion string                 `json:"profile_version,omitempty"`
 	ClientVersion  string                 `json:"client_version,omitempty"`
+	LoggedUser     string                 `json:"logged_user,omitempty"`
 	Metrics        map[string]interface{} `json:"metrics,omitempty"`
 	SystemInfo     *SystemInfo            `json:"system_info,omitempty"`
 	SwitchInfo     *SwitchInfo            `json:"switch_info,omitempty"`
@@ -216,6 +217,7 @@ type TimeSeriesMetricDocument struct {
 	PingGateway    float64                `bson:"ping_gateway" json:"ping_gateway"`
 	ProfileVersion string                 `bson:"profile_version,omitempty" json:"profile_version,omitempty"`
 	ClientVersion  string                 `bson:"client_version,omitempty" json:"client_version,omitempty"`
+	LoggedUser     string                 `bson:"logged_user,omitempty" json:"logged_user,omitempty"`
 	Metrics        map[string]interface{} `bson:"metrics,omitempty" json:"metrics,omitempty"`
 	SystemInfo     *SystemInfo            `bson:"system_info,omitempty" json:"system_info,omitempty"`
 	SwitchInfo     *SwitchInfo            `bson:"switch_info,omitempty" json:"switch_info,omitempty"`
@@ -234,6 +236,7 @@ type FlattenedMetricItem struct {
 	PingGateway    float64                `json:"ping_gateway"`
 	ProfileVersion string                 `json:"profile_version,omitempty"`
 	ClientVersion  string                 `json:"client_version,omitempty"`
+	LoggedUser     string                 `json:"logged_user,omitempty"`
 	Metrics        map[string]interface{} `json:"metrics,omitempty"`
 	SystemInfo     *SystemInfo            `json:"system_info,omitempty"`
 	SwitchInfo     *SwitchInfo            `json:"switch_info,omitempty"`
