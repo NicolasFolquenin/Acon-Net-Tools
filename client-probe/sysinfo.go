@@ -349,7 +349,7 @@ func collectUserAccounts(info *SystemInfo) {
 func collectWindowsUsers(info *SystemInfo) {
 	// 1. Usuário ativo do console
 	cmdUser := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
-		`(Get-CimInstance Win32_ComputerSystem).UserName`)
+		`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; (Get-CimInstance Win32_ComputerSystem).UserName`)
 	hideWindow(cmdUser)
 	if out, err := cmdUser.Output(); err == nil {
 		active := strings.TrimSpace(string(out))
@@ -372,7 +372,7 @@ func collectWindowsUsers(info *SystemInfo) {
 	userCacheMu.Unlock()
 
 	cmdList := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
-		`Get-LocalUser | Select-Object Name, FullName, Enabled, Description | ConvertTo-Json -Compress`)
+		`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-LocalUser | Select-Object Name, FullName, Enabled, Description | ConvertTo-Json -Compress`)
 	hideWindow(cmdList)
 	outList, errList := cmdList.Output()
 
@@ -403,7 +403,7 @@ func collectWindowsUsers(info *SystemInfo) {
 	// Administradores locais
 	adminSet := make(map[string]bool)
 	cmdAdmins := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
-		`$m = Get-LocalGroupMember -Group 'Administradores' -ErrorAction SilentlyContinue; if (!$m) { $m = Get-LocalGroupMember -Group 'Administrators' -ErrorAction SilentlyContinue }; if ($m) { $m | ForEach-Object { $_.Name } }`)
+		`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $m = Get-LocalGroupMember -Group 'Administradores' -ErrorAction SilentlyContinue; if (!$m) { $m = Get-LocalGroupMember -Group 'Administrators' -ErrorAction SilentlyContinue }; if ($m) { $m | ForEach-Object { $_.Name } }`)
 	hideWindow(cmdAdmins)
 	if outAdmins, err := cmdAdmins.Output(); err == nil {
 		lines := strings.Split(strings.ReplaceAll(string(outAdmins), "\r\n", "\n"), "\n")
