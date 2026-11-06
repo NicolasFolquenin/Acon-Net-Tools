@@ -6224,28 +6224,37 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
   // 3. Switch LLDP & Conexão de Rede
   const switchContentEl = document.getElementById('sm-panel-switch-content');
   const switchVlanBadge = document.getElementById('sm-panel-switch-vlan');
-  const swName = swInfo.switch_name || '--';
-  const swPort = swInfo.switch_port || '--';
-  const vlanNum = swInfo.vlan || (summary && summary.vlan) || (diagnostic && diagnostic.vlan) || 0;
+  const isOnWiFi = !!(wf && wf.connected);
+  let swName = swInfo.switch_name || '--';
+  let swPort = swInfo.switch_port || '--';
+  let swProto = swInfo.protocol || 'LLDP / 802.1AB';
+  let vlanNum = swInfo.vlan || (summary && summary.vlan) || (diagnostic && diagnostic.vlan) || 0;
+
+  if (isOnWiFi) {
+    swName = 'Conexão Sem Fio (Wi-Fi)';
+    swPort = 'WLAN';
+    swProto = 'Wi-Fi 802.11';
+    vlanNum = 0;
+  }
 
   if (switchVlanBadge) {
-    switchVlanBadge.textContent = vlanNum > 0 ? ('VLAN ' + vlanNum) : 'Sem VLAN';
+    switchVlanBadge.textContent = isOnWiFi ? 'Wi-Fi' : (vlanNum > 0 ? ('VLAN ' + vlanNum) : 'Sem VLAN');
   }
 
   if (switchContentEl) {
-    const hasSwitch = (swName !== '--' && swName !== '' && swName !== '{}');
+    const hasSwitch = !isOnWiFi && (swName !== '--' && swName !== '' && swName !== '{}' && !swName.toLowerCase().includes('wi-fi'));
     switchContentEl.innerHTML = 
       '<div class="sm-switch-detail-row">' +
-        '<span class="text-muted">Nome do Switch:</span>' +
+        '<span class="text-muted">' + (isOnWiFi ? 'Modo de Conexão:' : 'Nome do Switch:') + '</span>' +
         '<strong class="font-mono text-cyan">' + escapeHtml(swName) + '</strong>' +
       '</div>' +
       '<div class="sm-switch-detail-row">' +
-        '<span class="text-muted">Porta de Enlace:</span>' +
+        '<span class="text-muted">' + (isOnWiFi ? 'Tipo de Enlace:' : 'Porta de Enlace:') + '</span>' +
         '<strong class="font-mono">' + escapeHtml(swPort) + '</strong>' +
       '</div>' +
       '<div class="sm-switch-detail-row">' +
         '<span class="text-muted">Protocolo de Descoberta:</span>' +
-        '<span>' + escapeHtml(swInfo.protocol || 'LLDP / 802.1AB') + '</span>' +
+        '<span>' + escapeHtml(swProto) + '</span>' +
       '</div>' +
       (hasSwitch ? (
         '<div class="sm-switch-action-btn-wrap">' +
@@ -6256,7 +6265,7 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
             'Ver Vizinhos Conectados neste Switch' +
           '</button>' +
         '</div>'
-      ) : '<div class="text-xs text-muted mt-2">Nenhum pacote LLDP recente detectado nesta porta.</div>');
+      ) : '<div class="text-xs text-muted mt-2">' + (isOnWiFi ? 'Conexão sem fio ativa. Enlace cabeado desconectado.' : 'Nenhum pacote LLDP recente detectado nesta porta.') + '</div>');
   }
 
   // 4. Inventário Completo de Placas de Rede & MACs
@@ -6347,7 +6356,10 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
   const probeUser = (diagnostic && (diagnostic.logged_user || (diagnostic.system_info && (diagnostic.system_info.logged_user || diagnostic.system_info.active_user))))
     || (summary && (summary.logged_user || (summary.system_info && (summary.system_info.logged_user || summary.system_info.active_user))))
     || '';
-  const usersList = (sys && (sys.users || sys.Users)) || [];
+  const usersList = (sys && (sys.users || sys.Users))
+    || (summary && (summary.users || summary.Users || (summary.system_info && (summary.system_info.users || summary.system_info.Users))))
+    || (diagnostic && (diagnostic.users || diagnostic.Users || (diagnostic.system_info && (diagnostic.system_info.users || diagnostic.system_info.Users))))
+    || [];
 
   if (loggedBadge) {
     if (probeUser) {
