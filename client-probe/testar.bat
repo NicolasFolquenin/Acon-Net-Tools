@@ -9,6 +9,7 @@ echo.
 cd /d "%~dp0"
 
 taskkill /F /IM test-runner.exe >nul 2>&1
+taskkill /F /IM uepg-net-tools.exe >nul 2>&1
 
 echo [1/3] Sincronizando arquivos da interface (frontend)...
 if not exist "frontend\dist" mkdir "frontend\dist"
