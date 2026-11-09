@@ -11,6 +11,9 @@ cd /d "%~dp0"
 taskkill /F /IM test-runner.exe >nul 2>&1
 taskkill /F /IM uepg-net-tools.exe >nul 2>&1
 
+rem Garante permissao de ping ICMP no Windows Defender Firewall para diagnostico remoto do Central Server
+powershell -NoProfile -Command "Enable-NetFirewallRule -Name 'FPS-ICMP4-ERQ-In' -ErrorAction SilentlyContinue" >nul 2>&1
+
 echo [1/3] Sincronizando arquivos da interface (frontend)...
 if not exist "frontend\dist" mkdir "frontend\dist"
 copy /y "frontend\index.html" "frontend\dist\" >nul
