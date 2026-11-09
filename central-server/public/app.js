@@ -5907,21 +5907,53 @@ function navigateToMachineDashboard(hostname) {
 }
 window.navigateToMachineDashboard = navigateToMachineDashboard;
 
+function resolveBestMachineIPFromClient(hostname, preferredIp) {
+  const summary = currentSummaries.find(s => s.node_id === hostname);
+  if (summary && summary.system_info) {
+    const sys = summary.system_info;
+    if (Array.isArray(sys.interfaces)) {
+      // Prioridade 1: interface operacional UP e Primária ou Wi-Fi
+      const activeIface = sys.interfaces.find(i => i.is_up && (i.is_primary || i.type === 'wifi' || (i.name && i.name.toLowerCase().includes('wi-fi'))));
+      if (activeIface && Array.isArray(activeIface.ip_addresses) && activeIface.ip_addresses.length > 0) {
+        const validIp = activeIface.ip_addresses.find(ip => ip && !ip.startsWith('127.') && !ip.startsWith('169.254.'));
+        if (validIp) return validIp;
+      }
+      // Prioridade 2: qualquer interface operacional UP
+      for (const iface of sys.interfaces) {
+        if (iface.is_up && Array.isArray(iface.ip_addresses)) {
+          const validIp = iface.ip_addresses.find(ip => ip && !ip.startsWith('127.') && !ip.startsWith('169.254.'));
+          if (validIp) return validIp;
+        }
+      }
+    }
+    if (sys.ip_address && !sys.ip_address.startsWith('127.') && !sys.ip_address.startsWith('169.254.')) {
+      return sys.ip_address;
+    }
+  }
+
+  const m = allAdminMachines.find(item => item.hostname === hostname);
+  if (m) {
+    if (m.system_info && Array.isArray(m.system_info.interfaces)) {
+      const activeIface = m.system_info.interfaces.find(i => i.is_up && (i.is_primary || i.type === 'wifi'));
+      if (activeIface && Array.isArray(activeIface.ip_addresses) && activeIface.ip_addresses.length > 0) {
+        const validIp = activeIface.ip_addresses.find(ip => ip && !ip.startsWith('127.') && !ip.startsWith('169.254.'));
+        if (validIp) return validIp;
+      }
+    }
+    if (m.ip_address && !m.ip_address.startsWith('127.') && !m.ip_address.startsWith('169.254.')) {
+      return m.ip_address;
+    }
+  }
+
+  return (preferredIp || '').trim();
+}
+
 function openPingModal(hostname, ipAddress) {
   const modal = document.getElementById('modal-ping-diagnostic');
   if (!modal) return;
 
-  // Se não foi passado IP, tenta buscar nos resumos ou lista de máquinas
-  let targetIp = (ipAddress || '').trim();
-  if (!targetIp && hostname) {
-    const summary = currentSummaries.find(s => s.node_id === hostname);
-    if (summary && summary.system_info && summary.system_info.ip_address) {
-      targetIp = summary.system_info.ip_address;
-    } else {
-      const m = allAdminMachines.find(item => item.hostname === hostname);
-      if (m && m.ip_address) targetIp = m.ip_address;
-    }
-  }
+  // Resolve melhor IP ativo da máquina (dando prioridade à interface operacional / Wi-Fi)
+  let targetIp = resolveBestMachineIPFromClient(hostname, ipAddress);
 
   currentPingTarget = {
     hostname: hostname || '',
@@ -6016,8 +6048,18 @@ async function executeAdminPing(hostname, target) {
       terminalOutput.textContent = data.raw_output || 'Sem saída de comando retornada.';
     }
 
+    if (data.target) {
+      const ipEl = document.getElementById('ping-modal-ip');
+      if (ipEl) ipEl.textContent = data.target;
+    }
+
     if (loadingEl) loadingEl.style.display = 'none';
     if (resultEl) resultEl.style.display = 'block';
+
+    // Atualiza imediatamente o dashboard para refletir a nova medição nos gráficos e tabelas
+    if (typeof loadDashboardData === 'function') {
+      loadDashboardData().catch(e => console.warn('[PING] Falha ao atualizar dashboard após teste:', e));
+    }
   } catch (err) {
     if (loadingEl) loadingEl.style.display = 'none';
     if (resultEl) resultEl.style.display = 'block';

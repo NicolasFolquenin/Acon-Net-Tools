@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os/exec"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"central-server/db"
+	"central-server/models"
 )
 
 // PingHandler gerencia requisições administrativas para teste de conectividade ICMP
@@ -71,20 +74,12 @@ func (h *PingHandler) AdminPing(w http.ResponseWriter, r *http.Request) {
 	hostname := strings.TrimSpace(req.Hostname)
 	target := strings.TrimSpace(req.Target)
 
-	ctx, cancel := context.WithTimeout(r.Context(), 14*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 18*time.Second)
 	defer cancel()
 
-	// Se o alvo não foi explicitado, localiza IP da máquina no banco
+	// Se o alvo não foi explicitado, localiza IP ativo e válido da máquina no banco
 	if target == "" && hostname != "" {
-		mach, err := h.db.GetMachine(ctx, hostname)
-		if err == nil && mach != nil && mach.IPAddress != "" {
-			target = mach.IPAddress
-		} else {
-			latest, errLatest := h.db.GetLatestMetricForNode(ctx, hostname)
-			if errLatest == nil && latest != nil && latest.SystemInfo != nil && latest.SystemInfo.IPAddress != "" {
-				target = latest.SystemInfo.IPAddress
-			}
-		}
+		target = h.resolveBestMachineIP(ctx, hostname)
 		if target == "" {
 			target = hostname
 		}
@@ -102,7 +97,238 @@ func (h *PingHandler) AdminPing(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := executePing(ctx, target, hostname)
+
+	// Se a máquina não respondeu (100% de perda) e possui outros IPs ativos (ex: Wi-Fi), testa o IP alternativo
+	if !res.Success && hostname != "" {
+		altIPs := h.findAlternativeIPs(ctx, hostname, target)
+		for _, alt := range altIPs {
+			resAlt := executePing(ctx, alt, hostname)
+			if resAlt.Success {
+				resAlt.RawOutput = fmt.Sprintf("[IP Principal %s sem resposta; alternado automaticamente para interface ativa %s]\n\n", target, alt) + resAlt.RawOutput
+				res = resAlt
+				target = alt
+				break
+			}
+		}
+	}
+
+	// Se ainda assim deu 100% de perda, anexa instrução de diagnóstico de firewall do Windows
+	if !res.Success {
+		res.RawOutput += "\n----------------------------------------------------------------------\n" +
+			"[Diagnóstico de Conectividade ICMP]\n" +
+			"• Host não respondeu aos pacotes de ping.\n" +
+			"• No Windows 10/11, o Windows Defender Firewall bloqueia ping (ICMP) por padrão.\n" +
+			"• Para liberar respostas de ping nesta máquina, execute no PowerShell (Admin):\n" +
+			"  Enable-NetFirewallRule -Name 'FPS-ICMP4-ERQ-In'\n" +
+			"• Se a máquina mudou para o Wi-Fi, confirme se a sonda executou um teste para atualizar o IP.\n"
+	}
+
+	// Registra a medição no banco de dados MongoDB para alimentar gráficos e tabela de telemetria
+	if hostname != "" {
+		h.recordPingMetric(ctx, hostname, target, res)
+	}
+
 	_ = json.NewEncoder(w).Encode(res)
+}
+
+func (h *PingHandler) resolveBestMachineIP(ctx context.Context, hostname string) string {
+	if h.db == nil || hostname == "" {
+		return ""
+	}
+
+	// 1. Tenta última medição (tem a foto mais recente das placas e do Wi-Fi)
+	if latest, errLatest := h.db.GetLatestMetricForNode(ctx, hostname); errLatest == nil && latest != nil && latest.SystemInfo != nil {
+		sys := latest.SystemInfo
+		// Se estiver no Wi-Fi ou possuir placas ativas, busca interface operacional com IP
+		for _, iface := range sys.Interfaces {
+			if iface.IsUp && (iface.IsPrimary || iface.Type == "wifi" || strings.Contains(strings.ToLower(iface.Name), "wi-fi")) {
+				for _, ip := range iface.IPAddresses {
+					if isValidPingTarget(ip) {
+						return ip
+					}
+				}
+			}
+		}
+		if sys.IPAddress != "" && isValidPingTarget(sys.IPAddress) {
+			return sys.IPAddress
+		}
+	}
+
+	// 2. Tenta cadastro da máquina
+	if mach, err := h.db.GetMachine(ctx, hostname); err == nil && mach != nil {
+		if mach.SystemInfo != nil {
+			for _, iface := range mach.SystemInfo.Interfaces {
+				if iface.IsUp && iface.IsPrimary {
+					for _, ip := range iface.IPAddresses {
+						if isValidPingTarget(ip) {
+							return ip
+						}
+					}
+				}
+			}
+		}
+		if mach.IPAddress != "" && isValidPingTarget(mach.IPAddress) {
+			return mach.IPAddress
+		}
+	}
+
+	return ""
+}
+
+func (h *PingHandler) findAlternativeIPs(ctx context.Context, hostname, currentTarget string) []string {
+	if h.db == nil || hostname == "" {
+		return nil
+	}
+
+	var ips []string
+	seen := make(map[string]bool)
+	seen[currentTarget] = true
+
+	collectFromSys := func(sys *models.SystemInfo) {
+		if sys == nil {
+			return
+		}
+		if sys.IPAddress != "" && !seen[sys.IPAddress] && isValidPingTarget(sys.IPAddress) {
+			ips = append(ips, sys.IPAddress)
+			seen[sys.IPAddress] = true
+		}
+		for _, iface := range sys.Interfaces {
+			if iface.IsUp {
+				for _, ip := range iface.IPAddresses {
+					if !seen[ip] && isValidPingTarget(ip) {
+						ips = append(ips, ip)
+						seen[ip] = true
+					}
+				}
+			}
+		}
+	}
+
+	if latest, errLatest := h.db.GetLatestMetricForNode(ctx, hostname); errLatest == nil && latest != nil {
+		collectFromSys(latest.SystemInfo)
+	}
+	if mach, err := h.db.GetMachine(ctx, hostname); err == nil && mach != nil {
+		if mach.IPAddress != "" && !seen[mach.IPAddress] && isValidPingTarget(mach.IPAddress) {
+			ips = append(ips, mach.IPAddress)
+			seen[mach.IPAddress] = true
+		}
+		collectFromSys(mach.SystemInfo)
+	}
+
+	return ips
+}
+
+func (h *PingHandler) recordPingMetric(ctx context.Context, hostname, target string, res PingResponse) {
+	if h.db == nil || hostname == "" {
+		return
+	}
+
+	location := "Geral"
+	groupName := "default"
+	vlan := 0
+	clientVer := ""
+	loggedUser := ""
+	var sysInfo *models.SystemInfo
+	var swInfo *models.SwitchInfo
+
+	if mach, err := h.db.GetMachine(ctx, hostname); err == nil && mach != nil {
+		if mach.GroupID != "" {
+			groupName = mach.GroupID
+		}
+		if mach.VLAN > 0 {
+			vlan = mach.VLAN
+		}
+		if mach.SystemInfo != nil {
+			sysInfo = mach.SystemInfo
+		}
+		if mach.LoggedUser != "" {
+			loggedUser = mach.LoggedUser
+		}
+	}
+
+	if latest, errLatest := h.db.GetLatestMetricForNode(ctx, hostname); errLatest == nil && latest != nil {
+		if location == "Geral" && latest.Location != "" {
+			location = latest.Location
+		}
+		if groupName == "default" && latest.GroupName != "" {
+			groupName = latest.GroupName
+		}
+		if vlan == 0 && latest.VLAN > 0 {
+			vlan = latest.VLAN
+		}
+		if clientVer == "" && latest.ClientVersion != "" {
+			clientVer = latest.ClientVersion
+		}
+		if loggedUser == "" && latest.LoggedUser != "" {
+			loggedUser = latest.LoggedUser
+		}
+		if sysInfo == nil && latest.SystemInfo != nil {
+			sysInfo = latest.SystemInfo
+		}
+		if swInfo == nil && latest.SwitchInfo != nil {
+			swInfo = latest.SwitchInfo
+		}
+	}
+
+	statusStr := "ok"
+	if !res.Success || res.PacketLossPercent >= 100 {
+		statusStr = "error"
+	} else if res.PacketLossPercent > 0 {
+		statusStr = "warning"
+	}
+
+	pingVal := res.AvgLatencyMs
+	if !res.Success {
+		pingVal = 0
+	}
+
+	metricsMap := map[string]interface{}{
+		"ping_gateway": map[string]interface{}{
+			"value":   pingVal,
+			"unit":    "ms",
+			"status":  statusStr,
+			"details": fmt.Sprintf("Ping ICMP administrativo: %.1fms (%s)", pingVal, target),
+		},
+		"packet_loss_gateway": map[string]interface{}{
+			"value":   res.PacketLossPercent,
+			"unit":    "%",
+			"status":  statusStr,
+			"details": fmt.Sprintf("Perda ICMP administrativo: %.0f%% (%d/%d)", res.PacketLossPercent, res.PacketsReceived, res.PacketsSent),
+		},
+	}
+
+	modResults := &models.ModularResults{
+		PacketLoss: &models.PacketLossResult{
+			Target:       target,
+			Sent:         res.PacketsSent,
+			Received:     res.PacketsReceived,
+			LossPercent:  res.PacketLossPercent,
+			MinLatencyMs: res.MinLatencyMs,
+			AvgLatencyMs: res.AvgLatencyMs,
+			MaxLatencyMs: res.MaxLatencyMs,
+		},
+	}
+
+	metricInput := &models.MetricPayloadInput{
+		NodeID:         hostname,
+		Location:       location,
+		GroupName:      groupName,
+		VLAN:           vlan,
+		Timestamp:      res.Timestamp.UTC(),
+		PingGateway:    pingVal,
+		ClientVersion:  clientVer,
+		LoggedUser:     loggedUser,
+		Metrics:        metricsMap,
+		SystemInfo:     sysInfo,
+		SwitchInfo:     swInfo,
+		ModularResults: modResults,
+	}
+
+	if err := h.db.InsertMetric(ctx, metricInput); err != nil {
+		log.Printf("[PING][ERRO] Falha ao persistir metrica de ping administrativo para %s: %v", hostname, err)
+	} else {
+		log.Printf("[PING][SUCESSO] Metrica de ping registrada no banco para %s: Latencia=%.1fms, Perda=%.0f%%", hostname, pingVal, res.PacketLossPercent)
+	}
 }
 
 // isValidPingTarget valida se o alvo é um IPv4, IPv6 ou hostname RFC válido
