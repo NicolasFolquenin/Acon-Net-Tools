@@ -4,17 +4,15 @@ Sistema corporativo completo de monitoramento distribuído e telemetria de rede 
 
 ---
 
-## 📚 Documentação Técnica Modular
+## 📚 Documentação Principal do Sistema
 
-A documentação detalhada do sistema foi particionada em pastas temáticas dentro do diretório [`docs/`](docs/README.md):
+A documentação do **UEPG Net Tools** está organizada em 3 guias principais detalhados:
 
-- 🏛️ **[Arquitetura do Sistema](docs/arquitetura/visao_geral.md):** [Visão Geral](docs/arquitetura/visao_geral.md) | [Fluxo de Telemetria](docs/arquitetura/fluxo_telemetria.md) | [Segurança & Permissões](docs/arquitetura/seguranca_e_rede.md)
-- 🐧 **[Servidor Central](docs/central-server/api_referencia.md):** [Referência da REST API](docs/central-server/api_referencia.md) | [Modelagem MongoDB](docs/central-server/banco_de_dados.md) | [Dashboard NOC Web](docs/central-server/dashboard_web.md)
-- 🖥️ **[Sonda Cliente (Probe)](docs/client-probe/ciclo_de_execucao.md):** [Ciclo de Execução](docs/client-probe/ciclo_de_execucao.md) | [Módulos de Teste](docs/client-probe/modulos_de_teste.md) | [Auto-Update (v2.4.1)](docs/client-probe/auto_update.md) | [Modo Desktop Wails](docs/client-probe/modo_desktop_wails.md)
-- 🚀 **[Deploy e Instalação](docs/deploy/servidor_docker.md):** [Servidor Docker na VM](docs/deploy/servidor_docker.md) | [Sonda Linux (systemd)](docs/deploy/sonda_linux.md) | [Sonda Windows (.exe)](docs/deploy/sonda_windows.md)
-- 🎨 **[UX/UI & Design System](docs/ux-ui/diretrizes_visuais.md):** [Diretrizes Visuais](docs/ux-ui/diretrizes_visuais.md) | [Dashboard & Gráficos Chart.js](docs/ux-ui/dashboard_e_graficos.md)
+1. 📘 **[O Que É o Net-Tools e O Que Ele Faz](docs/01_o_que_e_e_o_que_faz.md)**: Visão geral, objetivos no ACON/UEPG, métricas de rede (latência, perda, vazão, Wi-Fi, DNS), topologia física L2 (Switch LLDP/CDP), inventário de placas, endereços MAC e usuários locais.
+2. 🚀 **[Como Utilizar o Net-Tools](docs/02_como_utilizar.md)**: Manual de uso do Dashboard Web NOC, filtros por grupo/VLAN, disparo de pings forçados, mapa de vizinhos de switch, instalação e operação de sondas Windows (`testar.bat`, firewall) e Linux (`install-probe.sh`, monitor CLI), e gestão da VM com `./deploy.sh`.
+3. 🛠️ **[Documentação de Como Funciona o Código](docs/03_como_funciona_o_codigo.md)**: Arquitetura interna e engenharia de software: fluxo ponta a ponta, loop de polling, executores modulares Go, captura raw de quadros LLDP, buffer local SQLite, TimeSeries no MongoDB e frontend reativo em JavaScript puro.
 
-Para o índice completo e navegação, consulte **[`docs/README.md`](docs/README.md)**.
+> Para módulos técnicos complementares (referência da REST API, schemas de banco de dados e design system), consulte o **[Índice Geral da Documentação](docs/README.md)**.
 
 ---
 
