@@ -936,30 +936,41 @@ function renderTechnicalSpecs(status, latestRecord) {
   // 1. Status Wi-Fi & Potência
   const wifiBadge = document.getElementById('wifi-status-badge');
   const wifiBody = document.getElementById('wifi-content-body');
-  if (wifiBody) {
-    let wifiData = null;
-    if (sysInfo && sysInfo.wifi_info && sysInfo.wifi_info.connected) {
-      wifiData = sysInfo.wifi_info;
-    } else if (latestRecord && latestRecord.modular_results && latestRecord.modular_results.wifi && latestRecord.modular_results.wifi.connected) {
-      wifiData = latestRecord.modular_results.wifi;
-    } else if (sysInfo && Array.isArray(sysInfo.interfaces)) {
-      const wIface = sysInfo.interfaces.find(i => i.is_wireless || (i.type && i.type.toLowerCase().includes('wifi')) || (i.name && i.name.toLowerCase().includes('wi-fi')) || (i.name && i.name.toLowerCase().includes('wlan')));
-      if (wIface && wIface.wifi_info && wIface.wifi_info.connected) {
-        wifiData = wIface.wifi_info;
-      }
-    } else if (latestRecord && latestRecord.metrics && latestRecord.metrics.wifi_status && (latestRecord.metrics.wifi_status.status === 'ok' || latestRecord.metrics.wifi_status.value > 0)) {
-      const ms = latestRecord.metrics.wifi_status;
-      const ssidMatch = ms.details ? ms.details.match(/SSID:\s*([^,]+)/) : null;
-      const chMatch = ms.details ? ms.details.match(/Canal:\s*(\d+)/) : null;
+  let wifiData = null;
+  if (sysInfo && sysInfo.wifi_info && sysInfo.wifi_info.connected && sysInfo.wifi_info.ssid) {
+    wifiData = sysInfo.wifi_info;
+  } else if (latestRecord && latestRecord.modular_results && latestRecord.modular_results.wifi && latestRecord.modular_results.wifi.connected && latestRecord.modular_results.wifi.ssid) {
+    wifiData = latestRecord.modular_results.wifi;
+  } else if (sysInfo && Array.isArray(sysInfo.interfaces)) {
+    const wIface = sysInfo.interfaces.find(i => (i.is_wireless || (i.type && i.type.toLowerCase().includes('wifi'))) && i.wifi_info && i.wifi_info.connected && i.wifi_info.ssid);
+    if (wIface) {
+      wifiData = wIface.wifi_info;
+    }
+  } else if (latestRecord && latestRecord.metrics && latestRecord.metrics.wifi_status && (latestRecord.metrics.wifi_status.status === 'ok' || latestRecord.metrics.wifi_status.value > 0)) {
+    const ms = latestRecord.metrics.wifi_status;
+    const ssidMatch = ms.details ? ms.details.match(/SSID:\s*([^,]+)/) : null;
+    const chMatch = ms.details ? ms.details.match(/Canal:\s*(\d+)/) : null;
+    if (ssidMatch && ssidMatch[1].trim()) {
       wifiData = {
         connected: true,
         signal_percent: Math.round(ms.value || 0),
         signal_dbm: Math.round((ms.value || 0) / 2) - 100,
-        ssid: (ssidMatch ? ssidMatch[1].trim() : 'Wi-Fi Conectado'),
+        ssid: ssidMatch[1].trim(),
         channel: (chMatch ? parseInt(chMatch[1]) : 36),
       };
     }
+  }
 
+  // Placa primária é Ethernet?
+  const ifacesList = (sysInfo && Array.isArray(sysInfo.interfaces)) ? sysInfo.interfaces : [];
+  const primaryIface = ifacesList.find(i => i.is_primary && i.is_up);
+  const isPrimaryEthernet = !!(primaryIface && (primaryIface.type === 'ethernet' || (!primaryIface.is_wireless && !primaryIface.type?.includes('wifi'))));
+  const hasRealSwitch = !!(swInfo && swInfo.switch_name && !swInfo.switch_name.toLowerCase().includes('wi-fi') && !swInfo.switch_name.toLowerCase().includes('aguardando') && swInfo.switch_name !== '--');
+
+  // Só opera em Wi-Fi se não estiver no cabo Ethernet e houver Wi-Fi com SSID
+  const isOnWiFi = !!(wifiData && wifiData.connected && !isPrimaryEthernet && !hasRealSwitch);
+
+  if (wifiBody) {
     if (wifiData) {
       if (wifiBadge) {
         wifiBadge.textContent = 'Conectado';
@@ -999,7 +1010,7 @@ function renderTechnicalSpecs(status, latestRecord) {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-cyan"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
           <div>
             <div>Conexão Cabeada Exclusiva (Ethernet)</div>
-            <div class="text-xs text-muted" style="margin-top: 2px;">Esta sonda opera em enlace de par trançado. Adaptador Wi-Fi ausente ou desativado.</div>
+            <div class="text-xs text-muted" style="margin-top: 2px;">Esta sonda opera em enlace de par trançado. Adaptador Wi-Fi ausente ou desconectado.</div>
           </div>
         </div>
       `;
@@ -1034,8 +1045,6 @@ function renderTechnicalSpecs(status, latestRecord) {
   const swVlan = document.getElementById('switch-vlan');
   const swProto = document.getElementById('switch-protocol');
   const pcAdapter = document.getElementById('pc-adapter');
-
-  const isOnWiFi = !!(wifiData && wifiData.connected);
   if (isOnWiFi) {
     if (swName) swName.textContent = 'Conexão Sem Fio (Wi-Fi)';
     if (swPort) swPort.textContent = 'WLAN';

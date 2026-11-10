@@ -577,10 +577,14 @@ func collectWiFiInfo(info *SystemInfo) {
 					res.HasWiFiAdapter = true
 				} else if strings.Contains(key, "estado") || strings.Contains(key, "state") {
 					lowerVal := strings.ToLower(val)
-					if strings.Contains(lowerVal, "conectado") || strings.Contains(lowerVal, "connected") {
+					if strings.Contains(lowerVal, "desconectado") || strings.Contains(lowerVal, "disconnected") || strings.Contains(lowerVal, "desassociado") || strings.Contains(lowerVal, "disassociated") {
+						res.Connected = false
+						res.Status = "disconnected"
+					} else if strings.Contains(lowerVal, "conectado") || strings.Contains(lowerVal, "connected") {
 						res.Connected = true
 						res.Status = "ok"
 					} else {
+						res.Connected = false
 						res.Status = "disconnected"
 					}
 				} else if key == "ssid" {
@@ -623,7 +627,16 @@ func collectWiFiInfo(info *SystemInfo) {
 			}
 		}
 
-		if res.Connected {
+		if strings.TrimSpace(res.SSID) == "" {
+			res.Connected = false
+			if res.HasWiFiAdapter {
+				res.Status = "disconnected"
+			} else {
+				res.Status = "no_adapter"
+			}
+		}
+
+		if res.HasWiFiAdapter {
 			info.WiFiInfo = &res
 			for i := range info.Interfaces {
 				if info.Interfaces[i].Type == "wifi" || strings.Contains(strings.ToLower(info.Interfaces[i].Name), "wi-fi") || strings.Contains(strings.ToLower(info.Interfaces[i].Name), "wlan") {

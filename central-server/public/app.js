@@ -2973,11 +2973,12 @@ function renderSingleMachineHeaderAndAlert(diagnostic, summaries) {
     if (modResults && modResults.wifi && modResults.wifi.status && modResults.wifi.status !== 'skipped') {
       const wf = modResults.wifi || (sys && sys.wifi_info) || null;
       smWifiMeta.style.display = 'inline-flex';
-      if (wf.status === 'disconnected') {
+      const isTrulyConnected = !!(wf && (wf.connected || wf.status === 'ok' || wf.status === 'connected') && wf.status !== 'disconnected' && wf.ssid && wf.ssid.trim() !== '');
+      if (!isTrulyConnected) {
         smWifiVal.textContent = 'Desconectado';
         smWifiVal.className = 'sm-meta-val text-subtle';
       } else {
-        const pct = wf.signal_quality_percent || 0;
+        const pct = wf.signal_quality_percent || wf.signal_percent || 0;
         const ssid = wf.ssid || 'Wi-Fi';
         smWifiVal.textContent = `${ssid} (${pct}%)`;
         smWifiVal.className = 'sm-meta-val text-emerald font-bold';
@@ -6113,10 +6114,11 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
   const wifiBadge = document.getElementById('sm-panel-wifi-status-badge');
   const wifiContent = document.getElementById('sm-panel-wifi-content');
   const wf = modResults.wifi || (sys && sys.wifi_info) || null;
+  const isWifiTrulyConnected = !!(wf && (wf.connected || wf.status === 'ok' || wf.status === 'connected') && wf.status !== 'disconnected' && wf.ssid && wf.ssid.trim() !== '');
 
   if (wifiContent) {
     if (wf && (wf.status && wf.status !== 'skipped' || wf.has_wifi_adapter)) {
-      if (wf.connected) {
+      if (isWifiTrulyConnected) {
         const pct = Math.max(0, Math.min(100, wf.signal_percent || wf.signal_quality_percent || 0));
         const dbmStr = wf.signal_dbm ? (wf.signal_dbm + " dBm") : (wf.signal_strength_dbm ? (wf.signal_strength_dbm + " dBm") : '');
         let barClass = 'wifi-signal-bar-fill';
@@ -6170,7 +6172,7 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
             '</svg>' +
             '<div>' +
               '<strong>Adaptador Wi-Fi detectado (desconectado)</strong>' +
-              '<div class="text-xs text-muted">A placa wireless do computador está inativa ou fora do alcance de redes conhecidas.</div>' +
+              '<div class="text-xs text-muted">A placa wireless do computador está inativa/desconectada. Esta máquina está utilizando conexão cabeada Ethernet.</div>' +
             '</div>' +
           '</div>';
       }
@@ -6266,7 +6268,14 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
   // 3. Switch LLDP & Conexão de Rede
   const switchContentEl = document.getElementById('sm-panel-switch-content');
   const switchVlanBadge = document.getElementById('sm-panel-switch-vlan');
-  const isOnWiFi = !!(wf && wf.connected);
+
+  const ifacesList = sys.interfaces || sys.Interfaces || [];
+  const primaryIface = ifacesList.find(i => i.is_primary && i.is_up);
+  const isPrimaryEthernet = !!(primaryIface && (primaryIface.type === 'ethernet' || (!primaryIface.is_wireless && !primaryIface.type?.includes('wifi'))));
+  const hasValidSwitch = !!(swInfo && swInfo.switch_name && swInfo.switch_name !== '--' && swInfo.switch_name !== '{}' && !swInfo.switch_name.toLowerCase().includes('wi-fi') && !swInfo.switch_name.toLowerCase().includes('aguardando'));
+
+  // A máquina só está operando em Wi-Fi se não tiver switch físico cabeado, não for Ethernet primária e o Wi-Fi estiver de fato conectado
+  const isOnWiFi = isWifiTrulyConnected && !isPrimaryEthernet && !hasValidSwitch;
   let swName = swInfo.switch_name || '--';
   let swPort = swInfo.switch_port || '--';
   let swProto = swInfo.protocol || 'LLDP / 802.1AB';
