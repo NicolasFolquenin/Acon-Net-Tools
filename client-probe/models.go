@@ -53,16 +53,41 @@ func (s *SystemInfo) IsOnWiFi() bool {
 	if s == nil {
 		return false
 	}
-	if s.WiFiInfo != nil && s.WiFiInfo.Connected {
-		return true
-	}
+
+	// 1. Se a interface primária (rota padrão) for explicitamente cabeada (Ethernet) e estiver UP,
+	// a máquina está no cabo e NÃO está usando Wi-Fi para tráfego/internet.
 	for _, iface := range s.Interfaces {
-		if iface.IsPrimary && (iface.Type == "wifi" || iface.IsWireless || strings.Contains(strings.ToLower(iface.Name), "wi-fi") || strings.Contains(strings.ToLower(iface.Name), "wlan")) {
+		if iface.IsPrimary && iface.IsUp {
+			if iface.Type == "ethernet" || (!iface.IsWireless && !strings.Contains(strings.ToLower(iface.Name), "wi-fi") && !strings.Contains(strings.ToLower(iface.Name), "wlan")) {
+				return false
+			}
+		}
+	}
+
+	// 2. Se a interface primária ativa for explicitamente Wi-Fi
+	for _, iface := range s.Interfaces {
+		if iface.IsPrimary && iface.IsUp && (iface.Type == "wifi" || iface.IsWireless || strings.Contains(strings.ToLower(iface.Name), "wi-fi") || strings.Contains(strings.ToLower(iface.Name), "wlan")) {
 			return true
 		}
 	}
+
+	// 3. Se a placa Wi-Fi estiver conectada com SSID válido e NÃO houver placa Ethernet ativa com IP
+	if s.WiFiInfo != nil && s.WiFiInfo.Connected && strings.TrimSpace(s.WiFiInfo.SSID) != "" {
+		hasActiveEthernet := false
+		for _, iface := range s.Interfaces {
+			if iface.IsUp && (iface.Type == "ethernet" || !iface.IsWireless) && len(iface.IPAddresses) > 0 {
+				hasActiveEthernet = true
+				break
+			}
+		}
+		if !hasActiveEthernet {
+			return true
+		}
+	}
+
 	lower := strings.ToLower(s.NetworkAdapter)
 	if strings.Contains(lower, "wi-fi") || strings.Contains(lower, "wireless") || strings.Contains(lower, "wlan") {
+		// Só confirma se o adaptador principal não for Ethernet
 		return true
 	}
 	return false
