@@ -140,7 +140,7 @@ func LoadConfig(customPath string) (*Config, error) {
 		cfg.Location = "Escritorio-Local"
 	}
 	if cfg.ServerURL == "" {
-		cfg.ServerURL = "http://localhost:8090"
+		cfg.ServerURL = "http://177.101.22.40:8085"
 	}
 	if cfg.APIToken == "" {
 		cfg.APIToken = "super-secret-probe-token-2026"
@@ -174,7 +174,7 @@ func GetCurrentConfig() Config {
 		return Config{
 			NodeID:          hostname,
 			Location:        "Escritorio-Local",
-			ServerURL:       "http://localhost:8090",
+			ServerURL:       "http://177.101.22.40:8085",
 			APIToken:        "super-secret-probe-token-2026",
 			IntervalMinutes: 60,
 			PingTarget:      "1.1.1.1",

@@ -1,0 +1,49 @@
+# ==============================================================================
+# GitLab CI/CD Pipeline - UEPG Net Tools
+# Deploy Automatizado para a VM de Produção (177.101.22.40)
+# ==============================================================================
+
+stages:
+  - test
+  - deploy
+
+# ------------------------------------------------------------------------------
+# ETAPA 1: Testes Unitários e Validação de Compilação
+# ------------------------------------------------------------------------------
+test-backend:
+  stage: test
+  image: golang:1.22-alpine
+  script:
+    - apk add --no-cache git gcc musl-dev
+    - cd central-server
+    - go test -v ./...
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ------------------------------------------------------------------------------
+# ETAPA 2: Deploy Automatizado na VM de Produção
+# Executa apenas após merge na branch 'main' usando o GitLab Runner da VM
+# ------------------------------------------------------------------------------
+deploy-production:
+  stage: deploy
+  tags:
+    - production   # Tag associada ao GitLab Runner instalado na VM (177.101.22.40)
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - echo "======================================================================"
+    - echo "Iniciando Deploy Automatizado do UEPG Net Tools em Produção..."
+    - echo "Host: 177.101.22.40 | Commit: $CI_COMMIT_SHA | Autor: $GITLAB_USER_NAME"
+    - echo "======================================================================"
+    - cd /opt/net-tools/central-server || cd ~/net-tools/central-server
+    - git fetch origin main
+    - git checkout main
+    - git reset --hard origin/main
+    - chmod +x deploy.sh
+    - sudo ./deploy.sh -y
+    - echo "[✓] Deploy concluído com sucesso em Produção!"
+  environment:
+    name: production
+    url: http://177.101.22.40:8085

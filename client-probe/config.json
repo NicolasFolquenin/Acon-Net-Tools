@@ -1,7 +1,7 @@
 {
   "node_id": "DESKTOP-H7U5DKH",
   "location": "NTI",
-  "server_url": "https://akvorado.acon.dev.uepg.br/",
+  "server_url": "http://177.101.22.40:8085",
   "api_token": "super-secret-probe-token-2026",
   "interval_minutes": 10,
   "ping_target": "177.101.22.40",

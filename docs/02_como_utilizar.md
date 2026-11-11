@@ -196,3 +196,4 @@ CORE_GATEWAY_DEFAULT=10.0.101.1
 SESSION_SECRET=uepg-acon-secure-jwt-token-2026
 ```
 Ao editar o arquivo `.env`, execute `./deploy.sh` para recarregar as novas variáveis imediatamente.
+
