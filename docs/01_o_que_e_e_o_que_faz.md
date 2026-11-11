@@ -113,3 +113,4 @@ O sistema é dividido em dois componentes principais independentes:
    - Disponível como **aplicativo Desktop Windows com GUI (Wails v2)** e como **daemon de segundo plano Linux (systemd)**.
    - Possui **Buffer Local em SQLite**: se o link de rede cair, a sonda guarda as medições no disco local e as envia automaticamente quando o link retornar, sem perda de dados históricos.
    - Suporte a **Auto-Update**: a sonda verifica periodicamente novas versões no Central Server, baixa o binário compilado, valida o checksum SHA256 e se auto-atualiza sem intervenção do usuário.
+

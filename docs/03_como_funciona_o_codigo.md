@@ -218,3 +218,4 @@ Desenvolvido em **JavaScript Moderno Vanilla (SPA)** para máxima velocidade, le
   - Renderiza o medidor de sinal Wi-Fi somente se a rede sem fio estiver genuinamente associada com SSID válido.
   - Monta a tabela de adaptadores de rede físicos destacando a placa com rota de Gateway.
 - **Ciclo de Atualização:** Executa `loadDashboardData()` a cada 10 segundos, atualizando os componentes de tela de forma silenciosa e reativa.
+
