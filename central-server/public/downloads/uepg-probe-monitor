@@ -20,7 +20,7 @@ if [ -f "$CONFIG_FILE" ]; then
   SERVER_URL=$(grep -o '"server_url":[[:space:]]*"[^"]*"' "$CONFIG_FILE" 2>/dev/null | cut -d'"' -f4 || true)
 fi
 if [ -z "$SERVER_URL" ]; then
-  SERVER_URL="https://akvorado.acon.dev.uepg.br"
+  SERVER_URL="https://nettools.acon.uepg.br"
 fi
 
 HOSTNAME=$(cat /etc/hostname 2>/dev/null || uname -n)

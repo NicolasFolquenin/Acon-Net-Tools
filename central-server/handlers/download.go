@@ -175,6 +175,7 @@ func (h *DownloadHandler) HandleInstallScript(w http.ResponseWriter, r *http.Req
 
 	serverURL := h.getServerURL(r)
 	content := string(data)
+	content = strings.Replace(content, `SUGGESTED_URL="https://nettools.acon.uepg.br"`, fmt.Sprintf(`SUGGESTED_URL="%s"`, serverURL), 1)
 	content = strings.Replace(content, `SUGGESTED_URL="https://akvorado.acon.dev.uepg.br"`, fmt.Sprintf(`SUGGESTED_URL="%s"`, serverURL), 1)
 
 	w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")

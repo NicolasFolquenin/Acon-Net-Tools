@@ -32,7 +32,7 @@ if [ -z "$SUGGESTED_URL" ] && [ -f "/etc/uepg-probe/config.json" ]; then
   SUGGESTED_URL=$(grep -o '"server_url":[[:space:]]*"[^"]*"' /etc/uepg-probe/config.json 2>/dev/null | cut -d'"' -f4 || true)
 fi
 if [ -z "$SUGGESTED_URL" ]; then
-  SUGGESTED_URL="https://akvorado.acon.dev.uepg.br"
+  SUGGESTED_URL="https://nettools.acon.uepg.br"
 fi
 
 echo -e "\n${BLUE}------------------------------------------------------------------${NC}"
