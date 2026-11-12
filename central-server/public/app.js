@@ -557,16 +557,17 @@ function showLoginModal(mode = 'gateway') {
   const adminSection = document.getElementById('sidebar-admin-section');
   if (adminSection) adminSection.style.display = 'none';
   if (btnOpenUsers) btnOpenUsers.style.display = 'none';
-  if (usersModal) usersModal.style.display = 'none';
+  if (typeof viewUsers !== 'undefined' && viewUsers) viewUsers.style.display = 'none';
   if (tabMachines) tabMachines.style.display = 'none';
   if (btnOpenGroups) btnOpenGroups.style.display = 'none';
   if (tabGroups) tabGroups.style.display = 'none';
   if (tabModules) tabModules.style.display = 'none';
-  if (groupsModal) groupsModal.style.display = 'none';
+  if (typeof viewGroups !== 'undefined' && viewGroups) viewGroups.style.display = 'none';
   switchView('dashboard');
   if (refreshInterval) clearInterval(refreshInterval);
 }
 window.showLoginModal = showLoginModal;
+window.__showLoginModalFull = showLoginModal;
 
 let configuredServerURL = '';
 
@@ -649,7 +650,7 @@ function getEffectiveServerOrigin() {
 
 function updateLinuxInstallCommand() {
   const origin = getEffectiveServerOrigin();
-  const cmd = `curl -fsSL ${origin}/downloads/install-probe.sh | bash -s -- ${origin}`;
+  const cmd = `curl -fsSL ${origin}/api/v1/download/install-probe.sh | bash -s -- ${origin}`;
   const cmdSpan = document.getElementById('linux-install-cmd');
   if (cmdSpan) cmdSpan.textContent = cmd;
   const modalCmdSpan = document.getElementById('modal-linux-cmd');
@@ -663,7 +664,7 @@ window.addEventListener('load', () => {
 
 function copyLinuxInstallCommand() {
   const origin = getEffectiveServerOrigin();
-  const cmd = `curl -fsSL ${origin}/downloads/install-probe.sh | bash -s -- ${origin}`;
+  const cmd = `curl -fsSL ${origin}/api/v1/download/install-probe.sh | bash -s -- ${origin}`;
   const label = document.getElementById('copy-btn-label');
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1533,9 +1534,9 @@ function setupEventListeners() {
     if (e.key === 'Escape') {
       if (deleteConfirmModal && deleteConfirmModal.style.display !== 'none') {
         closeDeleteModal();
-      } else if (usersModal && usersModal.style.display !== 'none') {
+      } else if (typeof usersModal !== 'undefined' && usersModal && usersModal.style.display !== 'none') {
         closeUsersModal();
-      } else if (groupsModal && groupsModal.style.display !== 'none') {
+      } else if (typeof groupsModal !== 'undefined' && groupsModal && groupsModal.style.display !== 'none') {
         closeGroupsModal();
       } else if (pcModal && pcModal.style.display !== 'none') {
         closePCModal();
@@ -6322,7 +6323,7 @@ function renderSingleMachineDetailsPanel(summary, diagnostic) {
   // 4. Inventário Completo de Placas de Rede & MACs
   const ifacesTbody = document.getElementById('sm-panel-ifaces-body');
   const ifacesCount = document.getElementById('sm-panel-ifaces-count');
-  const ifacesList = sys.interfaces || sys.Interfaces || [];
+  // ifacesList já declarado acima na mesma função (linha 6272)
 
   if (ifacesTbody) {
     if (ifacesList.length > 0) {
