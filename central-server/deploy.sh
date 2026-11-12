@@ -186,34 +186,37 @@ if [ ! -f ".env" ]; then
   IS_FIRST_INSTALL=true
   if [ -f ".env.example" ]; then
     echo -e "${YELLOW}[!] .env não encontrado. Criando a partir de .env.example...${NC}"
-    cp .env.example .env
+    tr -d '\r' < .env.example > .env
   else
     echo -e "${RED}[ERRO] Arquivo .env.example não encontrado.${NC}"
     exit 1
   fi
+else
+  # Garante sanitização de quebras de linha Windows no .env existente
+  tr -d '\r' < .env > .env.tmp 2>/dev/null && mv .env.tmp .env
 fi
 
 # Detecção do IP local da VM
-LOCAL_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' | tr -d '\n')
+LOCAL_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' | tr -d '\n\r')
 if [ -z "$LOCAL_IP" ]; then
-  LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' | tr -d '\n\r')
 fi
 [ -z "$LOCAL_IP" ] && LOCAL_IP="127.0.0.1"
 
 # Lê configurações atuais do .env
-CURRENT_PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "8085")
+CURRENT_PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "\r' || echo "8085")
 [ -z "$CURRENT_PORT" ] && CURRENT_PORT="8085"
 
-CURRENT_DNS_SERVER=$(grep -E '^DNS_SERVER_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "1.1.1.1")
+CURRENT_DNS_SERVER=$(grep -E '^DNS_SERVER_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "\r' || echo "1.1.1.1")
 [ -z "$CURRENT_DNS_SERVER" ] && CURRENT_DNS_SERVER="1.1.1.1"
 
-CURRENT_DNS_DOMAIN=$(grep -E '^DNS_DOMAIN_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "google.com")
+CURRENT_DNS_DOMAIN=$(grep -E '^DNS_DOMAIN_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "\r' || echo "google.com")
 [ -z "$CURRENT_DNS_DOMAIN" ] && CURRENT_DNS_DOMAIN="google.com"
 
-CURRENT_PING_CORE=$(grep -E '^PING_CORE_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "' || echo "1.1.1.1")
+CURRENT_PING_CORE=$(grep -E '^PING_CORE_TARGET=' .env 2>/dev/null | cut -d'=' -f2 | tr -d ' "\r' || echo "1.1.1.1")
 [ -z "$CURRENT_PING_CORE" ] && CURRENT_PING_CORE="1.1.1.1"
 
-CURRENT_PUBLIC_URL=$(grep -E '^PUBLIC_SERVER_URL=' .env 2>/dev/null | cut -d'=' -f2- | tr -d ' "' || true)
+CURRENT_PUBLIC_URL=$(grep -E '^PUBLIC_SERVER_URL=' .env 2>/dev/null | cut -d'=' -f2- | tr -d ' "\r' || true)
 SUGGESTED_PUBLIC_URL="$CURRENT_PUBLIC_URL"
 if [ -z "$SUGGESTED_PUBLIC_URL" ] || [ "$SUGGESTED_PUBLIC_URL" = "http://localhost:8080" ] || [ "$SUGGESTED_PUBLIC_URL" = "http://localhost:8085" ]; then
   SUGGESTED_PUBLIC_URL="http://${LOCAL_IP}:${CURRENT_PORT}"
@@ -326,7 +329,12 @@ echo -e "${GREEN}[✓] Diretórios e permissões organizados com sucesso.${NC}\n
 if [ "$MODE" = "docker" ]; then
   echo -e "${GREEN}[4/5] Construindo imagens e iniciando containers Docker...${NC}"
   
-  # Exporta variáveis para o compose ler imediatamente
+  # Garante sanitização de quebras de linha Windows antes de chamar o docker compose
+  tr -d '\r' < .env > .env.tmp 2>/dev/null && mv .env.tmp .env
+
+  # Exporta variáveis para o compose ler imediatamente sem caracteres de controle
+  TARGET_PORT=$(echo "$TARGET_PORT" | tr -d ' \r\n')
+  TARGET_URL=$(echo "$TARGET_URL" | tr -d ' \r\n')
   export PORT="${TARGET_PORT}"
   export PUBLIC_SERVER_URL="${TARGET_URL}"
 
