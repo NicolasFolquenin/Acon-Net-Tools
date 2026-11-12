@@ -95,11 +95,14 @@ func main() {
 
 	// Download público do Instalador / Executável da Sonda Client
 	mux.HandleFunc("/api/v1/download/client", downloadHandler.HandleDownloadClient)
+	mux.HandleFunc("/api/v1/download/installer.exe", downloadHandler.HandleDownloadClient)
 	mux.HandleFunc("/api/v1/download/client/info", downloadHandler.HandleClientInfo)
 	mux.HandleFunc("/api/v1/download/version", downloadHandler.HandleVersionInfo)
 	mux.HandleFunc("/api/v1/download/binary/", downloadHandler.HandleDownloadBinary)
+	mux.HandleFunc("/api/v1/download/install-probe.sh", downloadHandler.HandleInstallScript)
 	mux.HandleFunc("/download/client", downloadHandler.HandleDownloadClient)
 	mux.HandleFunc("/downloads/install-probe.sh", downloadHandler.HandleInstallScript)
+	mux.HandleFunc("/downloads/UEPG-Net-Tools-Instalador.exe", downloadHandler.HandleDownloadClient)
 
 	// Endpoints de Gerenciamento de Usuários (Apenas Administrador)
 	mux.HandleFunc("/api/v1/users", authHandler.RequireAdmin(authHandler.HandleUsers))

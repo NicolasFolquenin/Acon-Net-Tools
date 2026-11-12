@@ -1291,6 +1291,29 @@
   <!-- =========================================================================
        MODAL 1: Portal de Entrada (Opções: Fazer Login ou Baixar Client)
        ========================================================================= -->
+  <script>
+    // Fallback global de inicialização imediata para garantir abertura instantânea
+    function showLoginModal(mode) {
+      if (window.__showLoginModalFull) {
+        return window.__showLoginModalFull(mode);
+      }
+      var wc = document.getElementById('welcome-gateway-card');
+      var lc = document.getElementById('login-card');
+      var ov = document.getElementById('login-modal-overlay');
+      if (ov) ov.style.display = 'flex';
+      document.body.classList.add('auth-mode');
+      if (mode === 'login') {
+        if (wc) wc.style.display = 'none';
+        if (lc) lc.style.display = 'flex';
+        var u = document.getElementById('login-username');
+        if (u) setTimeout(function() { u.focus(); }, 50);
+      } else {
+        if (wc) wc.style.display = 'flex';
+        if (lc) lc.style.display = 'none';
+      }
+    }
+  </script>
+
   <div id="login-modal-overlay" class="modal-overlay auth-overlay">
     
     <!-- 1A: Portal de Boas-Vindas e Escolha de Fluxo -->
@@ -1308,7 +1331,7 @@
 
       <div class="gateway-options-grid">
         <!-- Card Opção 1: Fazer Login no Painel -->
-        <div class="gateway-option-card card-login" id="card-choice-login">
+        <div class="gateway-option-card card-login" id="card-choice-login" onclick="showLoginModal('login')" style="cursor: pointer;">
           <div class="option-header-badge badge-cyan">
             <span>NOC & Gestão</span>
           </div>
@@ -1325,7 +1348,7 @@
             <p class="option-desc">Monitore computadores em tempo real, equipamentos descobertos via switch LLDP, gráficos de tráfego e métricas.</p>
           </div>
           <div class="option-footer">
-            <button type="button" id="btn-gateway-go-login" class="btn btn-primary-submit gateway-action-btn">
+            <button type="button" id="btn-gateway-go-login" class="btn btn-primary-submit gateway-action-btn" onclick="showLoginModal('login')">
               <span>Fazer Login</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -1368,7 +1391,7 @@
               <p class="option-desc">Aplicativo desktop com interface visual gráfica, bandeja de sistema, suporte a LLDP corporativo e auto-registro no servidor.</p>
             </div>
             <div class="option-footer">
-              <a href="/downloads/UEPG-Net-Tools-Instalador.exe" id="btn-gateway-download-client" class="btn btn-emerald-submit gateway-action-btn" download="UEPG-Net-Tools-Instalador.exe">
+              <a href="/api/v1/download/client" id="btn-gateway-download-client" class="btn btn-emerald-submit gateway-action-btn" download="UEPG-Net-Tools-Instalador.exe">
                 <span>Baixar Instalador (.exe)</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -1408,7 +1431,7 @@
                 </div>
                 <div class="cli-terminal-code">
                   <span class="cli-terminal-prompt">$</span>
-                  <code id="linux-install-cmd">curl -fsSL http://localhost:8080/downloads/install-probe.sh | bash -s -- http://localhost:8080</code>
+                  <code id="linux-install-cmd">curl -fsSL https://nettools.acon.uepg.br/api/v1/download/install-probe.sh | bash -s -- https://nettools.acon.uepg.br</code>
                 </div>
               </div>
 
@@ -1416,7 +1439,7 @@
               <div class="linux-bin-section">
                 <span class="linux-bin-label">Downloads manuais avulsos:</span>
                 <div class="linux-bin-grid">
-                  <a href="/downloads/uepg-probe-linux-amd64" class="linux-bin-btn" download="uepg-probe-linux-amd64" title="Binário x86_64">
+                  <a href="/api/v1/download/binary/linux-amd64" class="linux-bin-btn" download="uepg-probe-linux-amd64" title="Binário x86_64">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                       <polyline points="7 10 12 15 17 10"></polyline>
@@ -1424,7 +1447,7 @@
                     </svg>
                     <span>Linux x86_64 (amd64)</span>
                   </a>
-                  <a href="/downloads/uepg-probe-linux-arm64" class="linux-bin-btn" download="uepg-probe-linux-arm64" title="Binário ARM64 / Raspberry Pi">
+                  <a href="/api/v1/download/binary/linux-arm64" class="linux-bin-btn" download="uepg-probe-linux-arm64" title="Binário ARM64 / Raspberry Pi">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                       <polyline points="7 10 12 15 17 10"></polyline>
@@ -1515,7 +1538,7 @@
     <!-- 1B: Card do Formulário de Login (Oculto inicialmente, acessado via "Fazer Login") -->
     <div id="login-card" class="login-card" style="display: none;">
       <div class="login-top-bar">
-        <button type="button" id="btn-back-to-gateway" class="btn-back-gateway" title="Voltar para a seleção inicial">
+        <button type="button" id="btn-back-to-gateway" class="btn-back-gateway" onclick="showLoginModal('gateway')" title="Voltar para a seleção inicial">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
