@@ -12,7 +12,7 @@
 O Dashboard Central é a interface gráfica onde administradores de rede, analistas de suporte e gestores acompanham o status de toda a rede universitária.
 
 ### 1.1. Acesso ao Painel
-- **URL Padrão (Produção ACON):** `https://akvorado.acon.dev.uepg.br` *(ou o IP da sua VM na porta configurada, ex: `http://10.0.x.x:8080`)*.
+- **URL Padrão (Produção ACON):** `https://nettools.acon.uepg.br` *(ou diretamente via IP da VM: `http://177.101.22.40:8085`)*.
 - **Autenticação:** O sistema possui suporte a autenticação de administrador com chave de sessão JWT/Cookie para operações sensíveis (como personalização de módulos de teste, reconfiguração de grupos e disparo de comandos).
 
 ---
@@ -116,7 +116,7 @@ netsh advfirewall firewall add rule name="Permitir Ping ICMPv4" protocol=icmpv4:
 #### A. Instalação em 1 Comando via Terminal
 Execute na máquina cliente com privilégios de `root`:
 ```bash
-curl -fsSL https://akvorado.acon.dev.uepg.br/downloads/install-probe.sh | sudo bash
+curl -fsSL https://nettools.acon.uepg.br/downloads/install-probe.sh | sudo bash
 ```
 *(Caso use IP direto na sua rede local, substitua pelo IP da sua VM: `http://10.0.x.x:8080/downloads/install-probe.sh`)*
 
@@ -184,7 +184,8 @@ PORT=8080
 MONGO_URI=mongodb://localhost:27017
 
 # Domínio ou IP do Host Central para downloads e Webhooks
-APP_DOMAIN=akvorado.acon.dev.uepg.br
+APP_DOMAIN=nettools.acon.uepg.br
+PUBLIC_SERVER_URL=https://nettools.acon.uepg.br
 
 # IP do Servidor DNS Institucional padrão a ser auditado
 DNS_TARGET_DEFAULT=177.101.22.40

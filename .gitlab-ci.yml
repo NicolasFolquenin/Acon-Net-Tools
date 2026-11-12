@@ -46,5 +46,5 @@ deploy-production:
     - echo "[✓] Deploy concluído com sucesso em Produção!"
   environment:
     name: production
-    url: http://177.101.22.40:8085
+    url: https://nettools.acon.uepg.br
 
