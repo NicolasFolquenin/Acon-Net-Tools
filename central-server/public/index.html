@@ -22,9 +22,15 @@
       <aside class="app-sidebar" id="app-sidebar">
         <div class="sidebar-top">
           <div class="sidebar-brand" id="brand-logo-btn" style="cursor: pointer;" title="Voltar ao Dashboard Inicial" onclick="navigateToHomeDashboard()">
-            <img src="uepg-logo.png" alt="Logo UEPG" class="brand-logo" />
+            <div class="brand-logo" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3);">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                <path d="M2 17l10 5 10-5"></path>
+                <path d="M2 12l10 5 10-5"></path>
+              </svg>
+            </div>
             <div class="brand-text">
-              <h2>UEPG Net Tools</h2>
+              <h2>Net Tools</h2>
               <p>Coletor Distribuído Go</p>
             </div>
           </div>
@@ -1319,11 +1325,15 @@
     <!-- 1A: Portal de Boas-Vindas e Escolha de Fluxo -->
     <div id="welcome-gateway-card" class="gateway-card">
       <div class="gateway-header">
-        <div class="gateway-brand-badge">
-          <img src="uepg-logo.png" alt="Logo UEPG" class="gateway-logo" />
+        <div class="gateway-brand-badge" style="background: rgba(15, 23, 42, 0.85) !important; border-color: rgba(59, 130, 246, 0.3); display: flex; align-items: center; justify-content: center;">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+            <path d="M2 12h20"></path>
+          </svg>
         </div>
         <div class="gateway-title-group">
-          <h2>UEPG Net Tools</h2>
+          <h2>Net Tools</h2>
           <p class="gateway-tagline">Sistema Integrado de Telemetria e Monitoramento de Redes</p>
         </div>
         <p class="gateway-instruction">Bem-vindo! Selecione como deseja acessar a plataforma:</p>
