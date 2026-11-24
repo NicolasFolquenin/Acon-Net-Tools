@@ -12,7 +12,7 @@
 O Dashboard Central é a interface gráfica onde administradores de rede, analistas de suporte e gestores acompanham o status de toda a rede universitária.
 
 ### 1.1. Acesso ao Painel
-- **URL Padrão (Produção ACON):** `https://nettools.acon.uepg.br` *(ou diretamente via IP da VM: `http://1.1.1.1:8085`)*.
+- **URL Padrão (Produção ACON):** `https://nettools.acon.uepg.br` *(ou diretamente pelo IP da VM, na porta `8085`)*.
 - **Autenticação:** O sistema possui suporte a autenticação de administrador com chave de sessão JWT/Cookie para operações sensíveis (como personalização de módulos de teste, reconfiguração de grupos e disparo de comandos).
 
 ---

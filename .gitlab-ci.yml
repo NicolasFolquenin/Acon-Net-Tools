@@ -1,6 +1,6 @@
 # ==============================================================================
 # GitLab CI/CD Pipeline - UEPG Net Tools
-# Deploy Automatizado para a VM de Produção (1.1.1.1)
+# Deploy Automatizado para a VM de Produção
 # ==============================================================================
 
 stages:
@@ -29,13 +29,13 @@ test-backend:
 deploy-production:
   stage: deploy
   tags:
-    - production   # Tag associada ao GitLab Runner instalado na VM (1.1.1.1)
+    - production   # Tag associada ao GitLab Runner instalado na VM de produção
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
   script:
     - echo "======================================================================"
     - echo "Iniciando Deploy Automatizado do UEPG Net Tools em Produção..."
-    - echo "Host: 1.1.1.1 | Commit: $CI_COMMIT_SHA | Autor: $GITLAB_USER_NAME"
+    - echo "Commit: $CI_COMMIT_SHA | Autor: $GITLAB_USER_NAME"
     - echo "======================================================================"
     - cd /opt/net-tools/central-server || cd ~/net-tools/central-server
     - git fetch origin main

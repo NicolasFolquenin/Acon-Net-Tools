@@ -81,7 +81,7 @@ O sistema opera de forma modular e automatizada, cobrindo seis grandes pilares d
 - **Inventário de Contas Locais Persistente:** Registra todas as contas de usuário do computador (ativas, inativas, privilégio de Administrador ou Padrão), permitindo que a equipe de suporte consulte a lista de usuários mesmo que a máquina esteja desligada ou offline.
 
 ### 2.6. Auditoria de Resolução DNS Institucional
-- Testa a resolução de nomes contra o servidor DNS institucional da UEPG (`1.1.1.1`) e provedores públicos globais (Cloudflare `1.1.1.1`, Google `8.8.8.8`).
+- Testa a resolução de nomes contra o servidor DNS institucional da UEPG (definido em `DNS_SERVER_TARGET`) e provedores públicos globais (Cloudflare `1.1.1.1`, Google `8.8.8.8`).
 - Mede o tempo de resposta do DNS em milissegundos e alerta em caso de falha de resolução ou inconsistência de zonas internas.
 
 ---

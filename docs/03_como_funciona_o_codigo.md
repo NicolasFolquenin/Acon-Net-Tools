@@ -94,7 +94,7 @@ Todas as tarefas de teste implementam a interface `TaskExecutor`:
 - **`ExecuteThroughputTask`:**  
   Realiza download e upload de streams de bytes contra os endpoints `/api/v1/throughput/download` e `/api/v1/throughput/upload` do Central Server. Mede tempo decorrido em microssegundos e calcula Mbps reais.
 - **`ExecuteMultiDNSTask`:**  
-  Gera consultas `A` concorrentes contra o DNS interno da UEPG (`1.1.1.1`) e provedores públicos (`1.1.1.1`, `8.8.8.8`) medindo tempo de resolução em microssegundos.
+  Gera consultas `A` concorrentes contra o DNS interno da UEPG (`DNS_SERVER_TARGET`) e provedores públicos (`1.1.1.1`, `8.8.8.8`) medindo tempo de resolução em microssegundos.
 - **`ExecuteWiFiStatusTask`:**  
   Mede status, potência (dBm e %), SSID, canal, frequência e taxa Tx/Rx:
   - **No Windows:** Faz o parsing de `netsh wlan show interfaces`.

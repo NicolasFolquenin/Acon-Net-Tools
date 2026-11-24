@@ -74,7 +74,7 @@ O módulo coleta informações detalhadas do enlace de rádio sem fio:
 Avaliar o tempo de resolução de nomes das sondas comparando o servidor DNS Institucional da UEPG contra grandes provedores públicos da internet.
 
 ### 3.2. Servidores Avaliados por Padrão
-1. `1.1.1.1`: DNS Institucional UEPG (Campus Uvaranas / NTI).
+1. IP definido em `DNS_SERVER_TARGET`: DNS Institucional UEPG (Campus Uvaranas / NTI).
 2. `1.1.1.1`: Cloudflare Public DNS.
 3. `8.8.8.8`: Google Public DNS.
 
